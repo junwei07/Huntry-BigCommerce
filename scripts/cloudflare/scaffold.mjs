@@ -36,14 +36,15 @@ const DEV_DEPENDENCIES_TO_ADD = {
   wrangler: "^4.128.0",
 };
 
-// The migrate scripts name the credentials database, which the developer
-// creates and names themselves — so they carry the same
-// {{CREDENTIALS_DB_NAME}} placeholder as wrangler.jsonc.example and have to be
-// edited to match it. Left unreplaced, the migrate step fails rather than
-// migrating the wrong database, though wrangler's message ("No migrations
-// present at ./migrations") doesn't point at the placeholder, so the
-// next-steps output below calls this out explicitly.
+// The migrate scripts name each D1 database, which the developer creates and
+// names themselves — so they carry the same {{...DB_NAME}} placeholders as
+// wrangler.jsonc.example and have to be edited to match. Left unreplaced,
+// the migrate step fails rather than migrating the wrong database, though
+// wrangler's message ("No migrations present at ./migrations") doesn't
+// point at the placeholder, so the next-steps output below calls this out
+// explicitly.
 const CREDENTIALS_DB_PLACEHOLDER = "{{CREDENTIALS_DB_NAME}}";
+const HUNTRY_DB_PLACEHOLDER = "{{HUNTRY_DB_NAME}}";
 
 function scriptsToAdd() {
   return {
@@ -53,8 +54,15 @@ function scriptsToAdd() {
       "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
     upload: "opennextjs-cloudflare build && opennextjs-cloudflare upload",
     "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
-    "d1:migrate": `wrangler d1 migrations apply ${CREDENTIALS_DB_PLACEHOLDER} --local`,
-    "d1:migrate:remote": `wrangler d1 migrations apply ${CREDENTIALS_DB_PLACEHOLDER} --remote`,
+    // Two independent D1 databases, each with its own migrations_dir in
+    // wrangler.jsonc — chained rather than combined into one wrangler
+    // invocation, since each is a separate --local/--remote database.
+    "d1:migrate":
+      `wrangler d1 migrations apply ${CREDENTIALS_DB_PLACEHOLDER} --local && ` +
+      `wrangler d1 migrations apply ${HUNTRY_DB_PLACEHOLDER} --local`,
+    "d1:migrate:remote":
+      `wrangler d1 migrations apply ${CREDENTIALS_DB_PLACEHOLDER} --remote && ` +
+      `wrangler d1 migrations apply ${HUNTRY_DB_PLACEHOLDER} --remote`,
   };
 }
 
@@ -260,14 +268,15 @@ export async function scaffold() {
       "       pnpm install\n" +
       "  2. Create your Cloudflare resources, and record the names you give them\n" +
       "     plus the ids Cloudflare prints: an R2 bucket for the incremental cache,\n" +
-      "     a D1 database for the cache tags, and a separate D1 database for the\n" +
-      "     credentials store. See docs/CLOUDFLARE-DEPLOYMENT.md for the commands.\n" +
+      "     a D1 database for the cache tags, a D1 database for the credentials\n" +
+      "     store, and a separate D1 database for Huntry's own data. See\n" +
+      "     docs/CLOUDFLARE-DEPLOYMENT.md for the commands.\n" +
       "  3. Copy wrangler.jsonc.example to wrangler.jsonc and replace every\n" +
       "     {{PLACEHOLDER}} with those names and ids.\n" +
       "\n" +
-      "     Then replace {{CREDENTIALS_DB_NAME}} in the d1:migrate and\n" +
-      "     d1:migrate:remote scripts in package.json with the same credentials\n" +
-      "     database name you used in wrangler.jsonc.\n" +
+      "     Then replace {{CREDENTIALS_DB_NAME}} and {{HUNTRY_DB_NAME}} in the\n" +
+      "     d1:migrate and d1:migrate:remote scripts in package.json with the\n" +
+      "     same database names you used in wrangler.jsonc.\n" +
       "  4. Copy the var templates and fill in your values:\n" +
       "       cp .secrets.production.example .secrets.production\n" +
       "       cp .env.production.local.example .env.production.local\n" +

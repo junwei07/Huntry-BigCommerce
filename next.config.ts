@@ -31,6 +31,10 @@ function buildCredentialsDriverAliases(): Record<string, string> {
   if (configuredDriver !== "POSTGRES") {
     aliases["@/lib/credentials-store/postgres-driver-loader"] =
       "@/lib/credentials-store/postgres-driver-loader.unavailable";
+    // Huntry's own database access reuses the same pool, behind its own
+    // stable specifier (see huntry/db/postgres-pool-loader.ts) so it can be
+    // aliased away independently of the credentials-store driver above.
+    aliases["@/lib/huntry/db/postgres-pool-loader"] = "@/lib/huntry/db/postgres-pool-loader.unavailable";
   }
 
   return aliases;

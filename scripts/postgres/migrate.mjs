@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Runs node-pg-migrate against the POSTGRES credentials-store driver's
-// migrations (see src/lib/credentials-store/postgres-driver/migrations/).
+// Runs node-pg-migrate against every migration set below, each its own
+// independent history against the same database (see MIGRATION_SETS).
 // Deliberately keyed only on DATABASE_URL_UNPOOLED/DATABASE_URL being set —
 // not on DATA_MODE/CREDENTIALS_STORE_DRIVER — so this script has no
 // knowledge of (or dependency on) this app's own mode concept. That keeps
@@ -40,18 +40,34 @@ if (!connectionString) {
 // with `node` works identically on every platform, no shim involved.
 const nodePgMigrateBin = fileURLToPath(import.meta.resolve("node-pg-migrate/bin/node-pg-migrate"));
 
-execFileSync(
-  process.execPath,
-  [
-    nodePgMigrateBin,
-    "up",
-    "--migrations-dir",
-    "src/lib/credentials-store/postgres-driver/migrations",
-    "--migration-file-language",
-    "sql",
-  ],
-  {
-    stdio: "inherit",
-    env: { ...process.env, DATABASE_URL: connectionString },
-  },
-);
+// Each entry is an independent, unrelated migration history run against the
+// same database — every entry needs its own --migrations-table (passed
+// explicitly, even for credentials-store's, rather than relying on
+// node-pg-migrate's own default staying "pgmigrations" forever) so two
+// histories can never be silently merged into one shared tracking table.
+const MIGRATION_SETS = [
+  { migrationsDir: "src/lib/credentials-store/postgres-driver/migrations", migrationsTable: "pgmigrations" },
+  { migrationsDir: "src/lib/huntry/db/migrations", migrationsTable: "huntry_pgmigrations" },
+];
+
+for (const { migrationsDir, migrationsTable } of MIGRATION_SETS) {
+  console.log(`[migrate] Running migrations in ${migrationsDir} (table: ${migrationsTable})...`);
+
+  execFileSync(
+    process.execPath,
+    [
+      nodePgMigrateBin,
+      "up",
+      "--migrations-dir",
+      migrationsDir,
+      "--migration-file-language",
+      "sql",
+      "--migrations-table",
+      migrationsTable,
+    ],
+    {
+      stdio: "inherit",
+      env: { ...process.env, DATABASE_URL: connectionString },
+    },
+  );
+}

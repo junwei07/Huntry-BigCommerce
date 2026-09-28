@@ -54,3 +54,8 @@ next-env.d.ts
 !.secrets.*.example
 
 ARTIFACTS/*
+
+tickets.md
+migration.md
+HBC-CHANGELOG.md
+huntry/

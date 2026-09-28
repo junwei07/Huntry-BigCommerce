@@ -93,6 +93,19 @@
       // Keeps schema next to the driver it belongs to, rather than in the
       // default top-level ./migrations.
       "migrations_dir": "src/lib/credentials-store/d1-driver/migrations"
+    },
+    {
+      // Backs Huntry's own data (events/sponsors/rewards/eggs/claims) — a
+      // separate database from CREDENTIALS_D1 so the two migration
+      // histories can never collide, since D1's migration tracking lives
+      // inside the database being migrated with no table-name override the
+      // way node-pg-migrate has. Not yet read/written at runtime (Huntry's
+      // D1 driver is a later phase) — this only makes its schema migratable
+      // ahead of time.
+      "binding": "HUNTRY_D1",
+      "database_name": "{{HUNTRY_DB_NAME}}",
+      "database_id": "{{HUNTRY_DB_UUID}}",
+      "migrations_dir": "src/lib/huntry/db/migrations"
     }
   ],
   // NEXT_CACHE_DO_QUEUE collapses a burst of revalidations for one stale route

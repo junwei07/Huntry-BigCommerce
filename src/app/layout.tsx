@@ -9,8 +9,8 @@ const sourceSans3 = Source_Sans_3({
 });
 
 export const metadata: Metadata = {
-  title: "Gift Certificates Manager",
-  description: "A BigCommerce single-click app for managing gift certificates.",
+  title: "Huntry",
+  description: "A BigCommerce single-click app for running map-based treasure-hunt rewards.",
 };
 
 export default function RootLayout({
