@@ -31,6 +31,25 @@ export interface StoreExtensionRecord {
   extensionId: string;
 }
 
+// Links a store to the Huntry storefront script registered for it at
+// install time. scriptId is BigCommerce's own opaque id (Scripts API), not
+// something this app generates. One row per store (only one script is ever
+// registered per install) — same 1:1 shape as StoreExtensionRecord.
+export interface StoreStorefrontScriptRecord {
+  storeHash: string;
+  scriptId: string;
+}
+
+// Links a store to one registered webhook (Webhooks API). hookId is
+// BigCommerce's own opaque id. Keyed by (storeHash, scope) rather than
+// storeHash alone, since more than one webhook scope may be registered over
+// time (e.g. a future store/cart/updated alongside store/order/created).
+export interface StoreWebhookRecord {
+  storeHash: string;
+  scope: string;
+  hookId: string;
+}
+
 // Generic persistence for per-store API credentials, implemented by one
 // driver per backing DB (see sqlite-driver/ and postgres-driver/) — see
 // docs/ARCHITECTURE.md for the full design (upsert semantics, the
@@ -43,6 +62,10 @@ export interface CredentialsStore {
   getStoreToken(storeHash: string): Promise<string | undefined>;
   setStoreExtension(storeExtension: StoreExtensionRecord): Promise<void>;
   getStoreExtension(storeHash: string): Promise<string | undefined>;
+  setStoreStorefrontScript(storeStorefrontScript: StoreStorefrontScriptRecord): Promise<void>;
+  getStoreStorefrontScript(storeHash: string): Promise<string | undefined>;
+  setStoreWebhook(storeWebhook: StoreWebhookRecord): Promise<void>;
+  getStoreWebhook(storeHash: string, scope: string): Promise<string | undefined>;
   isStoreUserLinked(storeHash: string, userId: number): Promise<boolean>;
   deleteStore(storeHash: string): Promise<void>;
   deleteUser(storeHash: string, userId: number): Promise<void>;

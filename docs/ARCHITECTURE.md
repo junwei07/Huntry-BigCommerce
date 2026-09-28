@@ -249,6 +249,14 @@ layout's own check is skippable by Next's client Router Cache on a
 same-layout client-side navigation, and neither a layout's nor a page's
 check extends to Server Actions (they're directly POST-able).
 
+This applies to Huntry's routes with no changes needed: `src/proxy.ts`'s
+matcher already covers `app/store/[storeHash]/huntry/...` (it matches on
+the literal `/store` prefix plus any wildcard tail, not on specific known
+routes). Every new Server Action under
+`src/app/store/[storeHash]/huntry/**` must still call
+`isAuthorizedForStore(storeHash)` itself at the top of the action, the same
+way `src/app/store/[storeHash]/gift-certs/[id]/actions.ts`'s actions do.
+
 A failed check redirects to `/unauthorized`, a plain top-level route with no
 shell chrome — `AuthorizedPage` redirects rather than rendering inline
 because `[storeHash]/layout.tsx` has already committed to rendering

@@ -1,6 +1,14 @@
 import { D1DatabaseLike, D1StatementLike } from "@/lib/credentials-store/d1-driver/types";
 import { decrypt, encrypt } from "@/lib/credentials-store/encryption";
-import { CredentialsStore, StoreExtensionRecord, StoreRecord, StoreUserRecord, UserRecord } from "@/lib/credentials-store/types";
+import {
+  CredentialsStore,
+  StoreExtensionRecord,
+  StoreRecord,
+  StoreStorefrontScriptRecord,
+  StoreUserRecord,
+  StoreWebhookRecord,
+  UserRecord,
+} from "@/lib/credentials-store/types";
 import { AppError } from "@/lib/errors/app-error";
 import { logError } from "@/lib/errors/logger";
 
@@ -22,6 +30,14 @@ interface StoreTokenRow {
 
 interface ExtensionIdRow {
   extension_id: string;
+}
+
+interface ScriptIdRow {
+  script_id: string;
+}
+
+interface HookIdRow {
+  hook_id: string;
 }
 
 // Cloudflare D1 driver — the MULTITENANT-capable store for Workers, where
@@ -123,6 +139,62 @@ export class D1CredentialsStore implements CredentialsStore {
     });
   }
 
+  // Only called after a successful Scripts API create (see
+  // register-storefront-script.ts) — same non-conflict semantics as
+  // setStoreExtension.
+  async setStoreStorefrontScript(storeStorefrontScript: StoreStorefrontScriptRecord): Promise<void> {
+    await withDatabaseErrorHandling("setStoreStorefrontScript", async () => {
+      await this.db
+        .prepare(
+          `INSERT INTO store_storefront_scripts (store_hash, script_id)
+           VALUES (?, ?)
+           ON CONFLICT(store_hash) DO UPDATE SET
+             script_id = excluded.script_id`,
+        )
+        .bind(storeStorefrontScript.storeHash, storeStorefrontScript.scriptId)
+        .run();
+    });
+  }
+
+  async getStoreStorefrontScript(storeHash: string): Promise<string | undefined> {
+    return withDatabaseErrorHandling("getStoreStorefrontScript", async () => {
+      const row = await this.db
+        .prepare("SELECT script_id FROM store_storefront_scripts WHERE store_hash = ?")
+        .bind(storeHash)
+        .first<ScriptIdRow>();
+
+      return row?.script_id ?? undefined;
+    });
+  }
+
+  // Only called after a successful Webhooks API create (see
+  // register-webhooks.ts) — same non-conflict semantics as
+  // setStoreExtension.
+  async setStoreWebhook(storeWebhook: StoreWebhookRecord): Promise<void> {
+    await withDatabaseErrorHandling("setStoreWebhook", async () => {
+      await this.db
+        .prepare(
+          `INSERT INTO store_webhooks (store_hash, scope, hook_id)
+           VALUES (?, ?, ?)
+           ON CONFLICT(store_hash, scope) DO UPDATE SET
+             hook_id = excluded.hook_id`,
+        )
+        .bind(storeWebhook.storeHash, storeWebhook.scope, storeWebhook.hookId)
+        .run();
+    });
+  }
+
+  async getStoreWebhook(storeHash: string, scope: string): Promise<string | undefined> {
+    return withDatabaseErrorHandling("getStoreWebhook", async () => {
+      const row = await this.db
+        .prepare("SELECT hook_id FROM store_webhooks WHERE store_hash = ? AND scope = ?")
+        .bind(storeHash, scope)
+        .first<HookIdRow>();
+
+      return row?.hook_id ?? undefined;
+    });
+  }
+
   async isStoreUserLinked(storeHash: string, userId: number): Promise<boolean> {
     return withDatabaseErrorHandling("isStoreUserLinked", async () => {
       const row = await this.db
@@ -149,6 +221,8 @@ export class D1CredentialsStore implements CredentialsStore {
       await this.db.batch([
         this.db.prepare("DELETE FROM store_users WHERE store_hash = ?").bind(storeHash),
         this.db.prepare("DELETE FROM store_extensions WHERE store_hash = ?").bind(storeHash),
+        this.db.prepare("DELETE FROM store_storefront_scripts WHERE store_hash = ?").bind(storeHash),
+        this.db.prepare("DELETE FROM store_webhooks WHERE store_hash = ?").bind(storeHash),
         this.db.prepare("DELETE FROM stores WHERE store_hash = ?").bind(storeHash),
         deleteUsersWithNoRemainingStores(this.db),
       ]);

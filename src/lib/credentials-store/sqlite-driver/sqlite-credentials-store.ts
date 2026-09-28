@@ -3,7 +3,15 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { CREATE_CREDENTIALS_STORE_SCHEMA } from "@/lib/credentials-store/sqlite-driver/schema";
 import { decrypt, encrypt } from "@/lib/credentials-store/encryption";
-import { CredentialsStore, StoreExtensionRecord, StoreRecord, StoreUserRecord, UserRecord } from "@/lib/credentials-store/types";
+import {
+  CredentialsStore,
+  StoreExtensionRecord,
+  StoreRecord,
+  StoreStorefrontScriptRecord,
+  StoreUserRecord,
+  StoreWebhookRecord,
+  UserRecord,
+} from "@/lib/credentials-store/types";
 import { AppError } from "@/lib/errors/app-error";
 import { logError } from "@/lib/errors/logger";
 
@@ -44,6 +52,14 @@ interface StoreTokenRow {
 
 interface ExtensionIdRow {
   extension_id: string;
+}
+
+interface ScriptIdRow {
+  script_id: string;
+}
+
+interface HookIdRow {
+  hook_id: string;
 }
 
 interface UserIdRow {
@@ -147,6 +163,58 @@ export class SqliteCredentialsStore implements CredentialsStore {
     });
   }
 
+  // Only called after a successful Scripts API create (see
+  // register-storefront-script.ts) — same non-conflict semantics as
+  // setStoreExtension.
+  async setStoreStorefrontScript(storeStorefrontScript: StoreStorefrontScriptRecord): Promise<void> {
+    withDatabaseErrorHandling("setStoreStorefrontScript", () => {
+      this.db
+        .prepare(
+          `INSERT INTO store_storefront_scripts (store_hash, script_id)
+           VALUES (?, ?)
+           ON CONFLICT(store_hash) DO UPDATE SET
+             script_id = excluded.script_id`,
+        )
+        .run(storeStorefrontScript.storeHash, storeStorefrontScript.scriptId);
+    });
+  }
+
+  async getStoreStorefrontScript(storeHash: string): Promise<string | undefined> {
+    return withDatabaseErrorHandling("getStoreStorefrontScript", () => {
+      const row = this.db.prepare("SELECT script_id FROM store_storefront_scripts WHERE store_hash = ?").get(storeHash) as unknown as
+        | ScriptIdRow
+        | undefined;
+
+      return row?.script_id;
+    });
+  }
+
+  // Only called after a successful Webhooks API create (see
+  // register-webhooks.ts) — same non-conflict semantics as
+  // setStoreExtension.
+  async setStoreWebhook(storeWebhook: StoreWebhookRecord): Promise<void> {
+    withDatabaseErrorHandling("setStoreWebhook", () => {
+      this.db
+        .prepare(
+          `INSERT INTO store_webhooks (store_hash, scope, hook_id)
+           VALUES (?, ?, ?)
+           ON CONFLICT(store_hash, scope) DO UPDATE SET
+             hook_id = excluded.hook_id`,
+        )
+        .run(storeWebhook.storeHash, storeWebhook.scope, storeWebhook.hookId);
+    });
+  }
+
+  async getStoreWebhook(storeHash: string, scope: string): Promise<string | undefined> {
+    return withDatabaseErrorHandling("getStoreWebhook", () => {
+      const row = this.db
+        .prepare("SELECT hook_id FROM store_webhooks WHERE store_hash = ? AND scope = ?")
+        .get(storeHash, scope) as unknown as HookIdRow | undefined;
+
+      return row?.hook_id;
+    });
+  }
+
   async isStoreUserLinked(storeHash: string, userId: number): Promise<boolean> {
     return withDatabaseErrorHandling("isStoreUserLinked", () => {
       const row = this.db
@@ -172,6 +240,8 @@ export class SqliteCredentialsStore implements CredentialsStore {
 
         this.db.prepare("DELETE FROM store_users WHERE store_hash = ?").run(storeHash);
         this.db.prepare("DELETE FROM store_extensions WHERE store_hash = ?").run(storeHash);
+        this.db.prepare("DELETE FROM store_storefront_scripts WHERE store_hash = ?").run(storeHash);
+        this.db.prepare("DELETE FROM store_webhooks WHERE store_hash = ?").run(storeHash);
         this.db.prepare("DELETE FROM stores WHERE store_hash = ?").run(storeHash);
 
         const countRemainingStoreUsersStmt = this.db.prepare("SELECT COUNT(*) as c FROM store_users WHERE user_id = ?");

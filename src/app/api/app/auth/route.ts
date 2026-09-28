@@ -3,6 +3,8 @@ import { installStore } from "@/lib/bc-auth/install-store";
 import { InstallSaveFailedError, TokenExchangeFailedError } from "@/lib/bc-auth/errors";
 import { getAppErrorUrl } from "@/lib/bc-auth/app-error-reason";
 import { registerAppExtension } from "@/lib/gift-certs-manager/register-app-extension";
+import { registerStorefrontScript } from "@/lib/huntry/register-storefront-script";
+import { registerWebhooks } from "@/lib/huntry/register-webhooks";
 import { getAbsoluteAppUrl } from "@/lib/routing/app-url";
 import { logError } from "@/lib/errors/logger";
 
@@ -53,9 +55,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     return NextResponse.redirect(getAbsoluteAppUrl(undefined, getAppErrorUrl("INSTALL_FAILED")));
   }
 
-  // Deliberately outside the try/catch above: registerAppExtension already
-  // swallows and logs its own failures.
+  // Deliberately outside the try/catch above: registerAppExtension,
+  // registerStorefrontScript, and registerWebhooks all swallow and log
+  // their own failures. This is also the insertion point for BC-HUN-012's
+  // generalized/renamed register-app-extension.ts, once the Huntry route
+  // tree it links to exists.
   await registerAppExtension(storeHash, accessToken);
+  await registerStorefrontScript(storeHash, accessToken);
+  await registerWebhooks(storeHash, accessToken);
 
   return NextResponse.redirect(getAbsoluteAppUrl(storeHash, "/"));
 }

@@ -2,7 +2,9 @@ import {
   CredentialsStore,
   StoreExtensionRecord,
   StoreRecord,
+  StoreStorefrontScriptRecord,
   StoreUserRecord,
+  StoreWebhookRecord,
   UserRecord,
 } from "@/lib/credentials-store/types";
 
@@ -34,6 +36,22 @@ export class PostgresCredentialsStore implements CredentialsStore {
   }
 
   async getStoreExtension(_storeHash: string): Promise<string | undefined> {
+    throw unavailableError();
+  }
+
+  async setStoreStorefrontScript(_storeStorefrontScript: StoreStorefrontScriptRecord): Promise<void> {
+    throw unavailableError();
+  }
+
+  async getStoreStorefrontScript(_storeHash: string): Promise<string | undefined> {
+    throw unavailableError();
+  }
+
+  async setStoreWebhook(_storeWebhook: StoreWebhookRecord): Promise<void> {
+    throw unavailableError();
+  }
+
+  async getStoreWebhook(_storeHash: string, _scope: string): Promise<string | undefined> {
     throw unavailableError();
   }
 
