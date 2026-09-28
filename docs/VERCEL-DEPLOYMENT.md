@@ -160,11 +160,15 @@ its callbacks at the Vercel production URL.
 
 3. On the **Scopes** tab, enable at minimum:
 
+   * **Marketing**: modify (gates the Promotions v3 + coupon-code APIs —
+     there is no separate "Promotions" scope)
    * **Customers**: modify
-   * **Marketing**: modify
-   * **Channel Settings**: read-only
-   * **Channel Listings**: read-only
-   * **Information & Settings**: read-only 
+   * **Content**: modify
+   * **Storefront API Customer Impersonation Tokens**: required for
+     `customer/current.jwt`
+   * **Orders**: read-only (gates webhook registration for
+     `store/order/created` and the order re-fetch it triggers — there is no
+     separate "Webhooks" scope)
    * **App Extensions**: manage
 
 4. Copy the **Client ID** and **Client Secret** for the next step.
