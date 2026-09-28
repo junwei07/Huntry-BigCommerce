@@ -16,7 +16,17 @@ const getCachedRestApiClient = cache(async (resolvedStoreHash: string | undefine
 // dev route) and resolves internally which store to actually target, since
 // that isn't always the same thing (e.g. STATIC mode always targets its one
 // env-configured store).
-export async function getRestApiClient(storeHash: string | undefined): Promise<BcRestApiClient> {
+//
+// apiToken is an explicit override, mirroring getGraphqlApiClient's own —
+// needed by callers like register-storefront-script.ts/register-webhooks.ts
+// that run right after the OAuth handshake, where the token may not be
+// written to the credentials store yet. Passing it skips resolveApiToken
+// and the shared cache, since this client is a one-off for a single call.
+export async function getRestApiClient(storeHash: string | undefined, apiToken?: string): Promise<BcRestApiClient> {
+  if (apiToken !== undefined) {
+    return new RestApiClient({ storeHash, apiToken });
+  }
+
   if (getDataMode() === "MOCK") {
     return new MockRestApiClient();
   }
