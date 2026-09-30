@@ -6,7 +6,7 @@ import {
   AppExtensionsResult,
   CREATE_APP_EXTENSION_MUTATION,
   CreateAppExtensionResult,
-} from "@/lib/gift-certs-manager/app-extension-gql";
+} from "@/lib/huntry/app-extension-gql";
 import { getCredentialsStore } from "@/lib/credentials-store/get-credentials-store";
 import { logError } from "@/lib/errors/logger";
 
@@ -45,13 +45,13 @@ export async function findOrCreateAppExtension(graphqlApiClient: BcGraphqlApiCli
 // than looking it up, since the credentials store may not have it written
 // yet. Called from the /auth route, not from within installStore itself —
 // installStore is agnostic single-click-app plumbing; registering this
-// extension is a Gift Certificates Manager concern.
+// extension is a Huntry concern.
 //
 // Deliberately never throws: a failed registration shouldn't block install
-// (the app is still usable without the menu shortcut). Logged rather than
+// (the app is still usable without the menu link). Logged rather than
 // silently swallowed, since that's the only way to notice a store missing
-// its shortcut. A user-triggered retry lives separately in
-// components/gift-certs-manager/app-extension-status-banner/.
+// its link. A user-triggered retry lives separately in
+// components/huntry/app-extension-status-banner/.
 export async function registerAppExtension(storeHash: string, apiToken: string): Promise<void> {
   try {
     const graphqlApiClient = await getGraphqlApiClient(storeHash, apiToken);

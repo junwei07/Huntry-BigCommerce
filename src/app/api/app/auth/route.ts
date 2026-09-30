@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { installStore } from "@/lib/bc-auth/install-store";
 import { InstallSaveFailedError, TokenExchangeFailedError } from "@/lib/bc-auth/errors";
 import { getAppErrorUrl } from "@/lib/bc-auth/app-error-reason";
-import { registerAppExtension } from "@/lib/gift-certs-manager/register-app-extension";
+import { registerAppExtension } from "@/lib/huntry/register-app-extension";
 import { registerStorefrontScript } from "@/lib/huntry/register-storefront-script";
 import { registerWebhooks } from "@/lib/huntry/register-webhooks";
 import { getAbsoluteAppUrl } from "@/lib/routing/app-url";
@@ -10,10 +10,10 @@ import { logError } from "@/lib/errors/logger";
 
 // BigCommerce's install callback. Agnostic install logic lives in
 // lib/bc-auth/install-store.ts — this route calls that, then separately
-// registers this app's Gift Certificates Manager-specific App Extension
-// using the token installStore just obtained. BigCommerce navigates the
-// merchant's iframe directly to this route, so an install failure redirects
-// to /app-error rather than returning JSON.
+// registers this app's Huntry-specific App Extension using the token
+// installStore just obtained. BigCommerce navigates the merchant's iframe
+// directly to this route, so an install failure redirects to /app-error
+// rather than returning JSON.
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const code = request.nextUrl.searchParams.get("code");
   const context = request.nextUrl.searchParams.get("context");
@@ -57,9 +57,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   // Deliberately outside the try/catch above: registerAppExtension,
   // registerStorefrontScript, and registerWebhooks all swallow and log
-  // their own failures. This is also the insertion point for BC-HUN-012's
-  // generalized/renamed register-app-extension.ts, once the Huntry route
-  // tree it links to exists.
+  // their own failures.
   await registerAppExtension(storeHash, accessToken);
   await registerStorefrontScript(storeHash, accessToken);
   await registerWebhooks(storeHash, accessToken);

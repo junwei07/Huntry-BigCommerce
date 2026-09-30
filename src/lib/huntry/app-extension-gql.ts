@@ -54,16 +54,17 @@ export interface AppExtensionsResult {
   };
 }
 
-// This app's one App Extension: a LINK-context menu item on the customer
-// detail page that opens this app's gift-certificates-for-customer view.
-// label.locales is required by the schema despite being documented as
-// optional — an empty array satisfies it since there's no localized text.
+// This app's one App Extension: a top-level LINK-context menu item that
+// opens the Huntry admin experience. Unlike a record-scoped extension
+// (e.g. one on a customer detail page), a top-level link isn't attached to
+// a resource type, so there's no `model` field here. label.locales is
+// required by the schema despite being documented as optional — an empty
+// array satisfies it since there's no localized text.
 export const APP_EXTENSION_INPUT = {
   context: "LINK",
-  model: "CUSTOMERS",
-  url: "/customers/${id}",
+  url: "/huntry",
   label: {
-    defaultValue: "Manage Gift Certificates",
+    defaultValue: "Huntry",
     locales: [],
   },
 };

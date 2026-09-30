@@ -1,8 +1,8 @@
 import { Box, Flex, FlexItem } from "@bigcommerce/big-design";
-import { AppExtensionStatusBanner } from "@/components/gift-certs-manager/app-extension-status-banner";
+import { AppExtensionStatusBanner } from "@/components/huntry/app-extension-status-banner";
 import { DataModeBanner } from "@/components/layout/data-mode-banner";
 import { DeveloperInfoPanel } from "@/components/layout/developer-info-panel";
-import { MainNav } from "@/components/gift-certs-manager/main-nav";
+import { MainNav } from "@/components/layout/main-nav";
 import { Suspense } from "react";
 
 const SIDEBAR_WIDTH = "280px";

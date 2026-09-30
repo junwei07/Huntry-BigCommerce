@@ -4,7 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useParams } from "next/navigation";
 import { Box, InlineMessage } from "@bigcommerce/big-design";
 import { showErrorAlert, showSuccessAlert } from "@/components/ui/action-alerts";
-import { retryAppExtensionRegistration } from "@/components/gift-certs-manager/app-extension-status-banner/actions/retry-app-extension-registration";
+import { retryAppExtensionRegistration } from "@/components/huntry/app-extension-status-banner/actions/retry-app-extension-registration";
 
 // null = still checking (render nothing rather than flash the banner then
 // hide it), true = registered (render nothing), false = confirmed missing
@@ -81,7 +81,7 @@ export function AppExtensionStatusBanner() {
         header="App extension registration failed"
         messages={[
           {
-            text: "The \"Manage Gift Certificates\" menu shortcut could not be added to the customer detail page.",
+            text: "The \"Huntry\" menu link could not be added to the app navigation.",
           },
         ]}
         type="warning"

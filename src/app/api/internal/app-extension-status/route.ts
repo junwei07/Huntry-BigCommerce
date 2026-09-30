@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchAppExtensionStatus } from "@/lib/gift-certs-manager/app-extension-status";
+import { fetchAppExtensionStatus } from "@/lib/huntry/app-extension-status";
 import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
 import { logError } from "@/lib/errors/logger";
 import { jsonError } from "@/lib/errors/json-error";

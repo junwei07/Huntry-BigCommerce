@@ -6,34 +6,40 @@ import { Box, Flex, Text } from "@bigcommerce/big-design";
 import { AppLink } from "@/components/ui/app-link";
 import { getAppUrl } from "@/lib/routing/app-url";
 
-// isIndex marks the item whose page is also served at the app's root path.
-// The root route is a pass-through re-export of the gift certificates page
-// (see app/store/[storeHash]/page.tsx), so "/" renders that section without
-// "gift-certs" ever appearing in the URL — this flag is what lets the item
-// claim the index route without anything outside this directory needing to
-// know which section the root happens to point at. Move it if the root
-// pass-through is ever re-pointed at another section.
+// Unlike the old gift-certs-manager nav (two independent top-level sibling
+// features, "/gift-certs" and "/customers"), Huntry is one feature mounted
+// at "/huntry" with these as nested sub-routes underneath it (see
+// app/store/[storeHash]/huntry/{page.tsx, map/, events/, rewards/,
+// sponsors/} and the matching app/(root)/huntry/... pass-throughs). isIndex
+// marks the item served at "/huntry" itself (also the app's root path, via
+// app/store/[storeHash]/page.tsx's pass-through) rather than a sub-route.
 const NAV_ITEMS = [
-  { id: "gift-certs", title: "Gift Certificates", isIndex: true },
-  { id: "customers", title: "Customers", isIndex: false },
+  { id: "huntry", title: "Overview", isIndex: true },
+  { id: "map", title: "Map", isIndex: false },
+  { id: "events", title: "Events", isIndex: false },
+  { id: "rewards", title: "Rewards", isIndex: false },
+  { id: "sponsors", title: "Sponsors", isIndex: false },
 ];
 
-// A store-scoped path is "/store/<storeHash>/<section>" (see app-url.ts's
-// getAppUrl) — segments[2] is the section. A root-level dev route (no
-// storeHash, no "/store" prefix) has its section at segments[0] instead.
+// A store-scoped path is "/store/<storeHash>/huntry/<subSection>" (see
+// app-url.ts's getAppUrl) — segments[2] is always the fixed "huntry"
+// feature prefix, so segments[3] is the actual sub-section. A root-level
+// dev route (no storeHash, no "/store" prefix) has its sub-section at
+// segments[1] instead, one past its own fixed "huntry" prefix.
 //
-// An absent section segment means the index route ("/" or
-// "/store/<storeHash>"), which resolves to whichever item is flagged
-// isIndex rather than leaving no item highlighted.
+// An absent sub-section segment means the index route ("/huntry" or
+// "/store/<storeHash>/huntry", including via the "/"/"/store/<storeHash>"
+// pass-throughs), which resolves to whichever item is flagged isIndex
+// rather than leaving no item highlighted.
 function getActiveSection(pathname: string, storeHash: string | undefined): string | undefined {
   const segments = pathname.split("/").filter(Boolean);
-  const sectionSegment = storeHash ? segments[2] : segments[0];
+  const subSection = storeHash ? segments[3] : segments[1];
 
-  if (!sectionSegment) {
+  if (!subSection) {
     return NAV_ITEMS.find((item) => item.isIndex)?.id;
   }
 
-  return NAV_ITEMS.some((item) => item.id === sectionSegment) ? sectionSegment : undefined;
+  return NAV_ITEMS.some((item) => item.id === subSection) ? subSection : undefined;
 }
 
 // Built from plain links rather than BigDesign's Tabs component, since this
@@ -90,7 +96,7 @@ export function MainNav() {
           >
             <AppLink
               aria-current={isActive ? "page" : undefined}
-              href={getAppUrl(storeHash, `/${item.id}`)}
+              href={getAppUrl(storeHash, item.isIndex ? "/huntry" : `/huntry/${item.id}`)}
               style={{ textDecoration: "none" }}
             >
               <Text bold color={isActive ? "primary" : "secondary70"} margin="none">
