@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button, Dropdown, DropdownItem, DropdownLinkItem, Modal, Text } from "@bigcommerce/big-design";
+import { useRouter } from "next/navigation";
+import { Button, Dropdown, DropdownItem, Modal, Text } from "@bigcommerce/big-design";
 import { MoreHorizIcon } from "@bigcommerce/big-design-icons";
 import { deleteHuntrySponsor } from "@/app/store/[storeHash]/huntry/sponsors/[id]/actions";
 import { runServerAction } from "@/components/ui/action-alerts";
+import { useGlobalTransition } from "@/components/ui/global-loading";
 import { useStoreHash } from "@/components/ui/store-hash-context";
 import { HuntrySponsor } from "@/lib/huntry/sponsors/types";
 import { getAppUrl } from "@/lib/routing/app-url";
@@ -12,9 +14,17 @@ import { getAppUrl } from "@/lib/routing/app-url";
 // Mirrors EventActionsMenu's exact Dropdown/kebab-Button/confirm-Modal
 // shape (itself ported from GiftCertificateActionsMenu).
 export function SponsorActionsMenu({ sponsor }: { sponsor: HuntrySponsor }) {
+  const router = useRouter();
   const storeHash = useStoreHash();
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isPending, startTransition] = useTransition();
+  // Edit navigates to a route with its own not-yet-revealed Suspense
+  // boundary, so it gets the same useGlobalTransition({ autoResolve: false
+  // }) + EditSponsorForm's useClearGlobalLoading() pairing every "+ New X"
+  // button already uses — see global-loading.tsx. Kept separate from the
+  // plain isPending/startTransition above, which is Delete's own modal
+  // spinner and shouldn't trigger the full-page overlay.
+  const [, startEditTransition] = useGlobalTransition({ autoResolve: false });
   // Bumped on every selection to force Dropdown (downshift's useSelect
   // underneath) to remount with a fresh internal reducer — see
   // EventActionsMenu for why.
@@ -32,11 +42,14 @@ export function SponsorActionsMenu({ sponsor }: { sponsor: HuntrySponsor }) {
     });
   };
 
-  const items: Array<DropdownItem | DropdownLinkItem> = [
+  const items: DropdownItem[] = [
     {
-      type: "link",
       content: "Edit",
-      url: getAppUrl(storeHash, `/huntry/sponsors/${sponsor.id}`),
+      onItemClick: () => {
+        startEditTransition(() => {
+          router.push(getAppUrl(storeHash, `/huntry/sponsors/${sponsor.id}`));
+        });
+      },
     },
     {
       content: "Delete",

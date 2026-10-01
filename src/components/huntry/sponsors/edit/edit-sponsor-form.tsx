@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Button, Flex, Panel } from "@bigcommerce/big-design";
 import { updateHuntrySponsor } from "@/app/store/[storeHash]/huntry/sponsors/[id]/actions";
 import { runServerAction } from "@/components/ui/action-alerts";
+import { useClearGlobalLoading } from "@/components/ui/global-loading";
 import { useStoreHash } from "@/components/ui/store-hash-context";
 import { SponsorFormFields } from "@/components/huntry/sponsors/sponsor-form-fields";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
@@ -23,7 +23,12 @@ function toFormState(sponsor: HuntrySponsor): SponsorFormInput {
 }
 
 export function EditSponsorForm({ sponsor }: { sponsor: HuntrySponsor }) {
-  const router = useRouter();
+  // This is SponsorActionsMenu's destination for a useGlobalTransition({
+  // autoResolve: false }) navigation — see its comment. Marks the full-page
+  // overlay done once this real form is actually showing, mirroring
+  // NewSponsorForm's precedent.
+  useClearGlobalLoading();
+
   const storeHash = useStoreHash();
   const [isPending, startTransition] = useTransition();
   const [state, setState] = useState<SponsorFormInput>(() => toFormState(sponsor));
@@ -37,7 +42,15 @@ export function EditSponsorForm({ sponsor }: { sponsor: HuntrySponsor }) {
       const result = await runServerAction(() => updateHuntrySponsor(sponsor.id, state, storeHash));
 
       if (result.success) {
-        router.push(getAppUrl(storeHash, "/huntry/sponsors"));
+        // A hard, iframe-scoped navigation rather than router.push —
+        // leaving this dynamic [id] route via a client-side transition can
+        // get permanently stuck re-rendering this same edit form (no
+        // error, only a hard refresh recovers; router.push + router.refresh
+        // was tried first and didn't fix it either). window.location (not
+        // window.top.location — see control-panel-link.tsx) only reloads
+        // this app's own iframe content, never BigCommerce's own admin
+        // frame around it.
+        window.location.href = getAppUrl(storeHash, "/huntry/sponsors");
       }
     });
   };
@@ -51,7 +64,14 @@ export function EditSponsorForm({ sponsor }: { sponsor: HuntrySponsor }) {
       />
 
       <Flex flexGap="0.5rem" justifyContent="flex-end">
-        <Button onClick={() => router.push(getAppUrl(storeHash, "/huntry/sponsors"))} variant="subtle">
+        <Button
+          onClick={() => {
+            // See handleSubmit's identical comment on why this is a hard
+            // navigation rather than router.push.
+            window.location.href = getAppUrl(storeHash, "/huntry/sponsors");
+          }}
+          variant="subtle"
+        >
           Cancel
         </Button>
         <Button

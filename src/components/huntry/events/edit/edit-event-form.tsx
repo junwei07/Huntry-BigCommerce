@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { Button, Flex, Panel } from "@bigcommerce/big-design";
 import { updateHuntryEvent } from "@/app/store/[storeHash]/huntry/events/[id]/actions";
 import { runServerAction } from "@/components/ui/action-alerts";
+import { useClearGlobalLoading } from "@/components/ui/global-loading";
 import { useStoreHash } from "@/components/ui/store-hash-context";
 import { EventFormFields } from "@/components/huntry/events/event-form-fields";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
@@ -33,7 +33,12 @@ function toFormState(event: HuntryEvent): EventFormInput {
 // preserve them rather than trusting anything from this form for those
 // three. slug never changes here either — see docs/HUNTRY-UI-REFERENCE.md.
 export function EditEventForm({ event }: { event: HuntryEvent }) {
-  const router = useRouter();
+  // This is EventActionsMenu's destination for a useGlobalTransition({
+  // autoResolve: false }) navigation — see its comment. Marks the full-page
+  // overlay done once this real form is actually showing, mirroring
+  // NewEventForm's precedent.
+  useClearGlobalLoading();
+
   const storeHash = useStoreHash();
   const [isPending, startTransition] = useTransition();
   const [state, setState] = useState<EventFormInput>(() => toFormState(event));
@@ -47,7 +52,15 @@ export function EditEventForm({ event }: { event: HuntryEvent }) {
       const result = await runServerAction(() => updateHuntryEvent(event.id, state, storeHash));
 
       if (result.success) {
-        router.push(getAppUrl(storeHash, "/huntry/events"));
+        // A hard, iframe-scoped navigation rather than router.push —
+        // leaving this dynamic [id] route via a client-side transition can
+        // get permanently stuck re-rendering this same edit form (no
+        // error, only a hard refresh recovers; router.push + router.refresh
+        // was tried first and didn't fix it either). window.location (not
+        // window.top.location — see control-panel-link.tsx) only reloads
+        // this app's own iframe content, never BigCommerce's own admin
+        // frame around it.
+        window.location.href = getAppUrl(storeHash, "/huntry/events");
       }
     });
   };
@@ -57,7 +70,14 @@ export function EditEventForm({ event }: { event: HuntryEvent }) {
       <EventFormFields onChange={handleChange} state={state} />
 
       <Flex flexGap="0.5rem" justifyContent="flex-end">
-        <Button onClick={() => router.push(getAppUrl(storeHash, "/huntry/events"))} variant="subtle">
+        <Button
+          onClick={() => {
+            // See handleSubmit's identical comment on why this is a hard
+            // navigation rather than router.push.
+            window.location.href = getAppUrl(storeHash, "/huntry/events");
+          }}
+          variant="subtle"
+        >
           Cancel
         </Button>
         <Button

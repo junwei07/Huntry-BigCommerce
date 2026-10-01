@@ -290,6 +290,54 @@ action. Reuse this exact shape for rewards/sponsors kebab menus later.
   shifts the displayed time when the store's timezone isn't UTC.
   `src/lib/huntry/events/datetime-local.ts`'s `toDatetimeLocalValue`.
 
+## Rewards (BC-HUN-019)
+
+**No EVMS reference for the core fields.** `huntry/EVMS`'s `RewardDetail`
+model has no discount type, discount value, discount scope, or product
+picker at all — those are purely `huntry/includes/rewards/meta-box.php`
+(`huntry_render_reward_details_meta_box()`) concepts, so unlike events,
+there was no EVMS-vs-WP reconciliation to do here; the WP plugin is the only
+field/requiredness source. EVMS's `CapacityCounter`/date-pair widgets and
+its searchable sponsor dropdown were considered but not ported — this app's
+plain `Input type="number"` and BigDesign `Select` already cover the same
+ground without a bespoke widget.
+
+**Gift Card Code is read-only, not a form field.** The WP form has a
+required "Gift Card Code" input, but in this app `couponCode`/
+`bcPromotionId`/`bcCouponCodeId`/`bcCustomerGroupId` are populated later by
+BC-HUN-020's Promotions/coupon sync — this ticket is local-DB-only. The edit
+form shows `couponCode` as a disabled `Input` ("Not yet generated" when
+null); the create form never renders it at all (a reward has no coupon code
+until coupon-sync exists). Don't add an editable coupon-code field here —
+that's BC-HUN-020's territory once it lands.
+
+**Hard delete only — no archive UI.** `docs/MIGRATION.md`'s original design
+had `huntry_rewards.status = 'archived'` disable a reward's Promotion while
+keeping its Customer Group as an audit trail. BC-HUN-018 shipped
+hard-delete-only instead, per earlier explicit user direction (see
+`rewards/types.ts`'s `RewardStatus` comment) — `RewardActionsMenu` offers
+**Edit / Delete** only, matching `EventActionsMenu`/`SponsorActionsMenu`'s
+shape exactly. Don't "fix" this toward an archive action without first
+checking whether BC-HUN-020/021 (coupon-sync) has actually landed and
+reintroduced a real use for `status`.
+
+**`ProductPicker` is this app's first multi-select pattern.** Every other
+Huntry picker (`theme-picker.tsx`, `item-marker-picker.tsx`,
+`location-marker-picker.tsx`) is single-select; no BigDesign multi-select
+component is used anywhere else in `src/`. `src/components/huntry/rewards/
+product-picker.tsx` is a debounced search box over `fetchBcProductsForPicker`
+(BC-HUN-018) plus a BigDesign `Checkbox` list, with already-selected
+products pinned in their own "Selected" section so changing the search term
+never silently drops a prior selection. Reuse this component (or its
+pattern) for any future Huntry concept that needs to pick several
+BigCommerce resources at once, rather than inventing a second multi-select
+shape.
+
+**List row has no thumbnail column.** Unlike `EventCard`/`SponsorCard`,
+`RewardCard` has no logo/banner image to show (rewards have no such field),
+so `REWARD_ROW_GRID_TEMPLATE` (`"1fr 140px 130px 48px"`) starts directly at
+Name instead of a leading thumbnail cell — Name / Discount / Scope / kebab.
+
 ## Known EVMS issues — don't replicate
 
 - **Map style picker is disconnected from what's saved.** EVMS's 4-tile

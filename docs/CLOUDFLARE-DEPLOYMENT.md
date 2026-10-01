@@ -287,8 +287,13 @@ callbacks at the Worker's URL.
 
    * **Marketing**: modify (gates the Promotions v3 + coupon-code APIs —
      there is no separate "Promotions" scope)
-   * **Customers**: modify
+   * **Customers**: modify (the Customer Group eligibility mechanism — see
+     `docs/MIGRATION.md` §2)
    * **Content**: modify
+   * **Products**: read-only (gates `GET /v3/catalog/products`, used by the
+     reward product picker — a distinct scope from Customers; conflating the
+     two caused a live 403 the first time the picker was exercised, see
+     `HBC-CHANGELOG.md`'s BC-HUN-019 entry)
    * **Storefront API Customer Impersonation Tokens**: required for
      `customer/current.jwt`
    * **Orders**: read-only (gates webhook registration for
