@@ -30,10 +30,16 @@ export function showErrorAlert(message: string): void {
 // and an error alert (falling back to a generic message) if it either
 // returns success: false or throws. Centralizes the try/catch every action
 // call site would otherwise repeat.
+//
+// Returns the resolved ActionResult (synthesizing one from a caught throw)
+// so a caller that needs to act on success — e.g. navigating away after a
+// creation flow — can do so without duplicating this try/catch itself.
+// Every existing caller ignores the return value, so this is a
+// backward-compatible extension, not a behavior change.
 export async function runServerAction(
   action: () => Promise<ActionResult>,
   fallbackErrorMessage = "Something went wrong. Please try again.",
-): Promise<void> {
+): Promise<ActionResult> {
   try {
     const result = await action();
 
@@ -42,8 +48,14 @@ export async function runServerAction(
     } else {
       showErrorAlert(result.message || fallbackErrorMessage);
     }
+
+    return result;
   } catch (error) {
-    showErrorAlert(error instanceof Error ? error.message : fallbackErrorMessage);
+    const message = error instanceof Error ? error.message : fallbackErrorMessage;
+
+    showErrorAlert(message);
+
+    return { success: false, message };
   }
 }
 

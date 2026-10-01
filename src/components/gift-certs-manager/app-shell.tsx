@@ -3,6 +3,7 @@ import { AppExtensionStatusBanner } from "@/components/huntry/app-extension-stat
 import { DataModeBanner } from "@/components/layout/data-mode-banner";
 import { DeveloperInfoPanel } from "@/components/layout/developer-info-panel";
 import { MainNav } from "@/components/layout/main-nav";
+import { StoreHashProvider } from "@/components/ui/store-hash-context";
 import { Suspense } from "react";
 
 const SIDEBAR_WIDTH = "280px";
@@ -11,46 +12,50 @@ const SIDEBAR_WIDTH = "280px";
 // sync Server Component that renders immediately regardless of how long
 // `children` takes to resolve.
 //
-// MainNav and AppExtensionStatusBanner both read useParams() client-side —
-// under cacheComponents, route params are "blocks navigation" data even from
-// a Client Component, so each needs its own Suspense boundary or Next throws.
+// StoreHashProvider is the only client component reading useParams() in this
+// tree now (MainNav/AppExtensionStatusBanner/children all read storeHash from
+// its context instead) — under cacheComponents, route params are "blocks
+// navigation" data even from a Client Component, so it needs a Suspense
+// boundary or Next throws. One boundary around the provider covers every
+// consumer below it, so MainNav/AppExtensionStatusBanner no longer need their
+// own.
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <Box>
-      <DataModeBanner />
-      <Suspense>
-        <AppExtensionStatusBanner />
-      </Suspense>
-      {/*
-        Below the "wide" breakpoint, a table-heavy page is wider than a
-        narrowed control-panel iframe can show alongside a fixed-width
-        sidebar. flexDirection uses BigDesign's ResponsiveProp (real CSS
-        @media queries), which measures the iframe's own content window
-        rather than the parent control panel page.
+    <Suspense>
+      <StoreHashProvider>
+        <Box>
+          <DataModeBanner />
+          <AppExtensionStatusBanner />
+          {/*
+            Below the "wide" breakpoint, a table-heavy page is wider than a
+            narrowed control-panel iframe can show alongside a fixed-width
+            sidebar. flexDirection uses BigDesign's ResponsiveProp (real CSS
+            @media queries), which measures the iframe's own content window
+            rather than the parent control panel page.
 
-        DeveloperInfoPanel is a flex item in this same container (not a
-        separate row alongside just `children`) so it reflows relative to
-        the nav — coming after the nav+content item places it to the right
-        in row mode and below in column mode via DOM order alone.
-      */}
-      <Flex
-        flexDirection={{ mobile: "column", wide: "row" }}
-        padding="large"
-        flexGap="1rem"
-        alignItems={{ mobile: "stretch", wide: "flex-start" }}
-      >
-        <FlexItem flexGrow={1} flexShrink={1} flexBasis={{ mobile: "auto", wide: "0" }}>
-          <Box paddingBottom="large">
-            <Suspense>
-              <MainNav />
-            </Suspense>
-          </Box>
-          <Box>{children}</Box>
-        </FlexItem>
-        <FlexItem flexGrow={0} flexShrink={0} style={{ width: SIDEBAR_WIDTH }}>
-          <DeveloperInfoPanel />
-        </FlexItem>
-      </Flex>
-    </Box>
+            DeveloperInfoPanel is a flex item in this same container (not a
+            separate row alongside just `children`) so it reflows relative to
+            the nav — coming after the nav+content item places it to the right
+            in row mode and below in column mode via DOM order alone.
+          */}
+          <Flex
+            flexDirection={{ mobile: "column", wide: "row" }}
+            padding="large"
+            flexGap="1rem"
+            alignItems={{ mobile: "stretch", wide: "flex-start" }}
+          >
+            <FlexItem flexGrow={1} flexShrink={1} flexBasis={{ mobile: "auto", wide: "0" }}>
+              <Box paddingBottom="large">
+                <MainNav />
+              </Box>
+              <Box>{children}</Box>
+            </FlexItem>
+            <FlexItem flexGrow={0} flexShrink={0} style={{ width: SIDEBAR_WIDTH }}>
+              <DeveloperInfoPanel />
+            </FlexItem>
+          </Flex>
+        </Box>
+      </StoreHashProvider>
+    </Suspense>
   );
 }

@@ -1,9 +1,10 @@
 "use client";
 
-import { useParams, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useTheme } from "styled-components";
 import { Box, Flex, Text } from "@bigcommerce/big-design";
 import { AppLink } from "@/components/ui/app-link";
+import { useStoreHash } from "@/components/ui/store-hash-context";
 import { getAppUrl } from "@/lib/routing/app-url";
 
 // Unlike the old gift-certs-manager nav (two independent top-level sibling
@@ -48,11 +49,11 @@ function getActiveSection(pathname: string, storeHash: string | undefined): stri
 // pill-on-background look is deliberate, so it doesn't read as the same kind
 // of control as the underline-style Tabs used on the detail page.
 //
-// Reads storeHash via useParams() rather than a prop, so AppShell never
-// needs to await params just to compute a value only this component uses.
+// Reads storeHash from the global StoreHashProvider context rather than a
+// prop, so AppShell never needs to await params just to compute a value only
+// this component uses.
 export function MainNav() {
-  const params = useParams<{ storeHash?: string }>();
-  const storeHash = params.storeHash;
+  const storeHash = useStoreHash();
   const pathname = usePathname();
   const activeSection = getActiveSection(pathname, storeHash);
   const theme = useTheme();

@@ -14,6 +14,15 @@ if (process.env.APP_ORIGIN) {
   allowedOrigins.push(new URL(process.env.APP_ORIGIN).host);
 }
 
+// A separate, dev-only allowlist for cross-origin access to Next's own dev
+// resources (notably the /_next/webpack-hmr websocket) — distinct from
+// allowedOrigins above, which only guards Server Action requests. Without
+// this, developing through a tunnel (ngrok, devtunnels.ms) blocks the HMR
+// websocket, which can leave the dev client unable to confirm a
+// client-navigated-to route finished compiling and fall back to reverting
+// the navigation instead of completing it.
+const allowedDevOrigins = process.env.APP_ORIGIN ? [new URL(process.env.APP_ORIGIN).host] : [];
+
 // For credentials-store drivers that must have an indirection layer when they're
 // not actually in the configured stack, stub them by aliasing the driver-loader specifier.
 //
@@ -47,6 +56,7 @@ const nextConfig: NextConfig = {
   // here — cacheLife accepts an inline profile object, so keeping them in one
   // module avoids splitting the caching configuration across two places.
   cacheComponents: true,
+  allowedDevOrigins,
   turbopack: {
     resolveAlias: buildCredentialsDriverAliases(),
   },

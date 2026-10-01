@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useParams } from "next/navigation";
 import { Box, InlineMessage } from "@bigcommerce/big-design";
 import { showErrorAlert, showSuccessAlert } from "@/components/ui/action-alerts";
+import { useStoreHash } from "@/components/ui/store-hash-context";
 import { retryAppExtensionRegistration } from "@/components/huntry/app-extension-status-banner/actions/retry-app-extension-registration";
 
 // null = still checking (render nothing rather than flash the banner then
@@ -14,11 +14,11 @@ type RegistrationStatus = boolean | null;
 // Whether the App Extension is registered is a cosmetic diagnostic, not
 // something any page render should block on, so this fetches its own status
 // client-side via an internal API route rather than awaiting it server-side.
-// storeHash is read via useParams() rather than a prop, so AppShell never
-// needs to await route params just to pass a value only this component uses.
+// storeHash is read from the global StoreHashProvider context rather than a
+// prop, so AppShell never needs to await route params just to pass a value
+// only this component uses.
 export function AppExtensionStatusBanner() {
-  const params = useParams<{ storeHash?: string }>();
-  const storeHash = params.storeHash;
+  const storeHash = useStoreHash();
   const [status, setStatus] = useState<RegistrationStatus>(null);
   const [isRetrying, startRetry] = useTransition();
 
