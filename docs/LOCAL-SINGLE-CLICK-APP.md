@@ -130,43 +130,11 @@ Only a few fields matter for local development — nothing else in the app
 profile is mandatory unless you're preparing for marketplace approval.
 
 1. Create a new app in the developer portal.
-2. On the **Technical** tab, set the callback URLs, substituting your
-   tunnel URL for `<APP_ORIGIN>`:
-
-   | Callback | URL |
-   | --- | --- |
-   | Auth | `<APP_ORIGIN>/api/app/auth` |
-   | Load | `<APP_ORIGIN>/api/app/load` |
-   | Uninstall | `<APP_ORIGIN>/api/app/uninstall` |
-   | Remove User | `<APP_ORIGIN>/api/app/remove_user` |
-
-   These paths are the four route handlers under `src/app/api/app/`. The
-   Auth callback URL must match `APP_ORIGIN` exactly, since the app sends
-   it back to BigCommerce as the OAuth `redirect_uri` during the token
-   exchange and BigCommerce rejects a mismatch.
-
-3. On the **Scopes** tab, enable at minimum:
-
-   * **Marketing**: modify (gates the Promotions v3 + coupon-code APIs —
-     there is no separate "Promotions" scope)
-   * **Customers**: modify (the Customer Group eligibility mechanism — see
-     `docs/MIGRATION.md` §2)
-   * **Content**: modify
-   * **Products**: read-only (gates `GET /v3/catalog/products`, used by the
-     reward product picker — a distinct scope from Customers; conflating the
-     two caused a live 403 the first time the picker was exercised, see
-     `HBC-CHANGELOG.md`'s BC-HUN-019 entry)
-   * **Storefront API Customer Impersonation Tokens**: required for
-     `customer/current.jwt`
-   * **Orders**: read-only (gates webhook registration for
-     `store/order/created` and the order re-fetch it triggers — there is no
-     separate "Webhooks" scope)
-   * **App Extensions**: manage
-
-   Scope changes only take effect for a store on the next install, so if
-   you change them later, uninstall and reinstall the app.
-
-4. Copy the **Client ID** and **Client Secret** into `.env.local` as
+2. On the **Technical** tab and **Scopes** tab, set the callback URLs and
+   scopes as described in
+   [APP-SETUP-COMMON.md](./APP-SETUP-COMMON.md#callback-urls), substituting
+   your tunnel URL for `<APP_ORIGIN>`.
+3. Copy the **Client ID** and **Client Secret** into `.env.local` as
    `BIGCOMMERCE_CLIENT_ID` and `BIGCOMMERCE_CLIENT_SECRET`.
 
 Keep the app in draft status. A draft app is installable from the control panel of
@@ -207,17 +175,8 @@ the full commentary on each one.
 | `SESSION_SECRET` | Generated locally (see below) |
 | `CREDENTIALS_ENCRYPTION_KEY` | Generated locally (see below) |
 
-Generate the two secrets with:
-
-```shell
-node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
-```
-
-Run it once per variable so they get different values. `SESSION_SECRET`
-signs this app's own session cookie; `CREDENTIALS_ENCRYPTION_KEY` encrypts
-stored store access tokens at rest. Neither is interchangeable with
-`BIGCOMMERCE_CLIENT_SECRET`, which is only used to verify BigCommerce's
-inbound signed payloads.
+Generate `SESSION_SECRET` and `CREDENTIALS_ENCRYPTION_KEY` as described in
+[APP-SETUP-COMMON.md](./APP-SETUP-COMMON.md#generating-secrets).
 
 `APP_ORIGIN` is deliberately never derived from the incoming request — it's
 the single source of truth for the OAuth `redirect_uri` and for the app's

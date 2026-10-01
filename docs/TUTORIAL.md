@@ -181,22 +181,8 @@ request is only logged on a miss. Set it to `FALSE` to turn caching off; that
 keeps all of this step's code in place but serves nothing stale. Note the
 app's own fallback for an undefined var is *off*, so caching is never on
 unless something opted in. See the caching section of
-[ARCHITECTURE.md](./ARCHITECTURE.md#caching) for how the switch works.
-
-> [!WARNING]
-> Caching is an core architectural pattern to understand.
-> However, it might
-> not be a desirable trade-off in an admin-targeted app
-> where data should always be up-to-date. Evaluate your
-> own app's use case.
->
-> In the Gift Certificates Manager example, cached data
-> will be appropriately invalidated based on the app's own actions
-> (such as refilling a gift certificate), but stale data will persist
-> for the cache lifetime when external updates occur (such as 
-> new gift certificates being purchased).)
->
-> When your own apps utilize caching, use [webhooks](https://docs.bigcommerce.com/developer/docs/integrations/webhooks/overview) to invalidate cached data wherever possible.
+[ARCHITECTURE.md](./ARCHITECTURE.md#caching) for how the switch works
+(including the trade-off warning).
 
 [Completed state](https://github.com/bigcommerce-edu/starter-sc-app-next/tree/caching-post)
 

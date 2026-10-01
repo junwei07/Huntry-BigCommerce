@@ -30,6 +30,24 @@ framework install command, see
 [`docs/PROGRESSIVE-HISTORY.md`](docs/PROGRESSIVE-HISTORY.md) — only needed
 when rebuilding or extending the progressive history.
 
+## Doc Style: Pointer-First
+
+This repo is read almost entirely by coding agents, so new or edited docs
+should default to an exact file/function/line pointer over restated prose —
+the pattern already used throughout `huntry/docs/` (its gotchas table and
+ADRs cite the exact legacy file/function behind every claim) and in
+`CLAUDE.md`'s doc map (a pointer + one-line description, read on demand, not
+auto-loaded).
+
+When two docs would otherwise explain the same decision, pick one as
+authoritative and have the other link to it rather than re-deriving the
+rationale — e.g. `docs/ARCHITECTURE.md` explains *why* a pattern exists and
+`docs/USING-AS-A-STARTER.md` says *what to do* with it for a new app, rather
+than each explaining the pattern itself. Prefer "see `path/to/file.ts`" over
+restating what's already readable in the code, and prefer a short index
+(name + one line) over a long narrative when a reader just needs to decide
+whether to open something.
+
 ## File Removal - Protected Paths
 
 When creating a clean orphan branch, protect these additional paths from

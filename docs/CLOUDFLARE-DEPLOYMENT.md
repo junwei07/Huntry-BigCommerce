@@ -273,38 +273,11 @@ callbacks at the Worker's URL.
    that its callback URLs point at your tunnel, so either update them or keep
    a separate app record per environment; a separate record is cleaner, since
    it lets local and deployed installs coexist).
-2. On the **Technical** tab, set the callback URLs, substituting your Worker
-   origin for `<APP_ORIGIN>`:
-
-   | Callback | URL |
-   | --- | --- |
-   | Auth | `<APP_ORIGIN>/api/app/auth` |
-   | Load | `<APP_ORIGIN>/api/app/load` |
-   | Uninstall | `<APP_ORIGIN>/api/app/uninstall` |
-   | Remove User | `<APP_ORIGIN>/api/app/remove_user` |
-
-3. On the **Scopes** tab, enable at minimum:
-
-   * **Marketing**: modify (gates the Promotions v3 + coupon-code APIs —
-     there is no separate "Promotions" scope)
-   * **Customers**: modify (the Customer Group eligibility mechanism — see
-     `docs/MIGRATION.md` §2)
-   * **Content**: modify
-   * **Products**: read-only (gates `GET /v3/catalog/products`, used by the
-     reward product picker — a distinct scope from Customers; conflating the
-     two caused a live 403 the first time the picker was exercised, see
-     `HBC-CHANGELOG.md`'s BC-HUN-019 entry)
-   * **Storefront API Customer Impersonation Tokens**: required for
-     `customer/current.jwt`
-   * **Orders**: read-only (gates webhook registration for
-     `store/order/created` and the order re-fetch it triggers — there is no
-     separate "Webhooks" scope)
-   * **App Extensions**: manage
-
-4. Copy the **Client ID** and **Client Secret** for the next step.
-
-See the [local guide](./LOCAL-SINGLE-CLICK-APP.md#registering-the-app-in-the-developer-portal)
-for more detail on the app profile and what each scope is for.
+2. On the **Technical** tab and **Scopes** tab, set the callback URLs and
+   scopes as described in
+   [APP-SETUP-COMMON.md](./APP-SETUP-COMMON.md#callback-urls), substituting
+   your Worker origin for `<APP_ORIGIN>`.
+3. Copy the **Client ID** and **Client Secret** for the next step.
 
 ## 6. Set the Remaining Configuration
 
@@ -356,16 +329,9 @@ In `.secrets.production`, set:
 | `CREDENTIALS_ENCRYPTION_KEY` | Generated (see below) |
 | `STATIC_STORE_HASH`, `STATIC_STORE_TOKEN` | Leave empty outside `STATIC` mode |
 
-Generate each secret separately:
-
-```shell
-node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
-```
-
-Use fresh values rather than reusing your local ones, and treat them as
-production secrets. Note that `CREDENTIALS_ENCRYPTION_KEY` encrypts stored
-access tokens at rest — changing it later makes every already-stored token
-undecryptable, forcing every store to reinstall.
+Generate `SESSION_SECRET` and `CREDENTIALS_ENCRYPTION_KEY` as described in
+[APP-SETUP-COMMON.md](./APP-SETUP-COMMON.md#generating-secrets), using fresh
+values rather than reusing your local ones.
 
 `APP_ORIGIN` must exactly match the origin in the developer portal's Auth
 callback URL. It's the source of truth for the OAuth `redirect_uri` and is

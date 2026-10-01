@@ -31,8 +31,18 @@ to decide whether to open the file.
   [`docs/VERCEL-DEPLOYMENT.md`](docs/VERCEL-DEPLOYMENT.md),
   [`docs/CLOUDFLARE-DEPLOYMENT.md`](docs/CLOUDFLARE-DEPLOYMENT.md) — the
   deployment guide chain, in order.
+- [`docs/APP-SETUP-COMMON.md`](docs/APP-SETUP-COMMON.md) — callback
+  URLs/scopes/secret-gen shared by all three guides above.
 - [`docs/CACHE-IMPLEMENTATION-SWAP.md`](docs/CACHE-IMPLEMENTATION-SWAP.md)
   — companion to ARCHITECTURE.md's caching section.
+- [`docs/PROGRESSIVE-HISTORY.md`](docs/PROGRESSIVE-HISTORY.md) — tag
+  conventions, commit structure, and the lab/enhancement step table for
+  rebuilding the progressive history (see `AGENTS.md`).
+- [`docs/big-design-modal-removechild-patch.md`](docs/big-design-modal-removechild-patch.md)
+  — root cause + patch for a BigDesign `Modal` crash; re-check when bumping
+  BigDesign.
+- [`CHANGELOG.md`](CHANGELOG.md) — progressive-history/tutorial version log
+  (distinct from `HBC-CHANGELOG.md` below).
 
 **Huntry migration docs:**
 
