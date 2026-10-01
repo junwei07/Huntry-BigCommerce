@@ -189,6 +189,25 @@ export async function fetchSponsor(id: number, storeHash: string | undefined): P
   return fetchSponsorFromDb(id, resolvedStoreHash);
 }
 
+// Uncached counterpart to fetchSponsor — used by updateHuntrySponsor to
+// read the current logoUrl (not an edit-form field — see
+// LogoUploadField/sponsor-form-schema.ts) right before writing, the same
+// reasoning fetchEventUncached documents: a Server Action about to mutate a
+// record should never trust a cached read.
+export async function fetchSponsorUncached(id: number, storeHash: string | undefined): Promise<HuntrySponsor | undefined> {
+  if (getDataMode() === "MOCK") {
+    return MOCK_SPONSORS.find((sponsor) => sponsor.id === id);
+  }
+
+  const resolvedStoreHash = resolveStoreHash(storeHash);
+
+  if (!resolvedStoreHash) {
+    return undefined;
+  }
+
+  return selectSponsorRow(id, resolvedStoreHash);
+}
+
 async function insertSponsorRow(input: CreateSponsorInput, storeHash: string): Promise<HuntrySponsor> {
   const db = getHuntryDb();
 

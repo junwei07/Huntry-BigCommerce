@@ -1,5 +1,6 @@
-import { Box, Flex, FlexItem, Text } from "@bigcommerce/big-design";
+import { Box, Text } from "@bigcommerce/big-design";
 import { EventActionsMenu } from "@/components/huntry/events/list/event-actions-menu";
+import { EVENT_ROW_GRID_TEMPLATE } from "@/components/huntry/events/list/event-row-grid";
 import { EVENT_STATUS_COLOR, EVENT_STATUS_LABEL } from "@/lib/huntry/events/status";
 import { HuntryEvent } from "@/lib/huntry/events/types";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
@@ -25,15 +26,23 @@ function formatDateRange(startsAt: Date | null, endsAt: Date | null): string {
 // itself is deliberately not a link — only the kebab menu's Edit item
 // navigates to events/[id] (EVMS points its card's name at a different
 // destination, a per-event dashboard this app doesn't have).
+//
+// CSS Grid, not Flex — EVENT_ROW_GRID_TEMPLATE is shared with
+// EventListHeader so column widths come from the template alone, not from
+// what's rendered in a cell (the status pill's intrinsic width varies a
+// lot between "Live" and "Not Scheduled", which drifted a Flex-based
+// header out of alignment with the cards — see HBC-CHANGELOG.md).
 export function EventCard({ event }: { event: HuntryEvent }) {
   return (
-    <Flex
-      alignItems="center"
-      flexGap="1rem"
+    <Box
       style={{
+        alignItems: "center",
         backgroundColor: "#FFFFFF",
         border: "1px solid rgba(0,0,0,0.1)",
         borderRadius: "12px",
+        display: "grid",
+        gap: "1rem",
+        gridTemplateColumns: EVENT_ROW_GRID_TEMPLATE,
         padding: "12px",
       }}
     >
@@ -44,20 +53,19 @@ export function EventCard({ event }: { event: HuntryEvent }) {
           backgroundPosition: "center",
           backgroundSize: "cover",
           borderRadius: "8px",
-          flexShrink: 0,
           height: "60px",
           width: "80px",
         }}
       />
 
-      <FlexItem flexGrow={1}>
+      <Box>
         <Text bold margin="none" style={{ color: HUNTRY_COLORS.text }}>
           {event.name}
         </Text>
         <Text margin="none" style={{ color: HUNTRY_COLORS.textMuted }}>
           {formatDateRange(event.startsAt, event.endsAt)}
         </Text>
-      </FlexItem>
+      </Box>
 
       <Box
         style={{
@@ -66,6 +74,7 @@ export function EventCard({ event }: { event: HuntryEvent }) {
           color: EVENT_STATUS_COLOR[event.status],
           fontSize: "12px",
           fontWeight: 700,
+          justifySelf: "start",
           padding: "4px 12px",
           textTransform: "uppercase",
         }}
@@ -73,7 +82,9 @@ export function EventCard({ event }: { event: HuntryEvent }) {
         {EVENT_STATUS_LABEL[event.status]}
       </Box>
 
-      <EventActionsMenu event={event} />
-    </Flex>
+      <Box style={{ justifySelf: "center" }}>
+        <EventActionsMenu event={event} />
+      </Box>
+    </Box>
   );
 }

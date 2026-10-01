@@ -1,5 +1,6 @@
 import { Box, Flex, Panel, Text } from "@bigcommerce/big-design";
 import { EventCard } from "@/components/huntry/events/list/event-card";
+import { EventListHeader } from "@/components/huntry/events/list/event-list-header";
 import { NewEventButton } from "@/components/huntry/events/list/new-event-button";
 import { SortToggle } from "@/components/huntry/events/list/sort-toggle";
 import { fetchEvents } from "@/lib/huntry/events/events-api";
@@ -42,10 +43,12 @@ export async function EventListView({
           <NewEventButton />
         </Flex>
 
+        <EventListHeader />
+
         {events.length === 0 ? (
           <Text style={{ color: HUNTRY_COLORS.textMuted }}>No events yet.</Text>
         ) : (
-          <Flex flexDirection="column" flexGap="0.75rem">
+          <Flex flexDirection="column" flexGap="0.75rem" marginTop="small">
             {events.map((event) => (
               <EventCard event={event} key={event.id} />
             ))}
