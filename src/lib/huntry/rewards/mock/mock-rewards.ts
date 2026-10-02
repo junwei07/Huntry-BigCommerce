@@ -127,11 +127,14 @@ export function updateMockReward(id: number, input: UpdateRewardInput): HuntryRe
 }
 
 // MOCK counterpart to updateRewardCouponFields (rewards-api.ts) — the sole
-// writer of bcPromotionId/bcCouponCodeId in MOCK mode, called only from
-// coupon-sync.ts's MOCK branch. Kept separate from updateMockReward rather
-// than overloading its UpdateRewardInput-shaped signature. A no-op if the
-// fixture no longer exists (shouldn't happen in practice — coupon-sync only
-// ever runs right after create/update on the same id).
+// writer of bcPromotionId/bcCouponCodeId/bcCustomerGroupId in MOCK mode,
+// called only from coupon-sync.ts's MOCK branch. Kept separate from
+// updateMockReward rather than overloading its UpdateRewardInput-shaped
+// signature. A no-op if the fixture no longer exists (shouldn't happen in
+// practice — coupon-sync only ever runs right after create/update on the
+// same id). The generic spread below already forwards whatever shape
+// RewardCouponFields has — BC-HUN-021 added bcCustomerGroupId to that type
+// without needing any edit here.
 export function updateMockRewardCouponFields(id: number, fields: RewardCouponFields): void {
   const existing = MOCK_REWARDS.find((reward) => reward.id === id);
 

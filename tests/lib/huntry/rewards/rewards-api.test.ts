@@ -13,6 +13,7 @@ import {
   fetchReward,
   fetchRewardUncached,
   updateReward,
+  updateRewardCouponFields,
 } from "@/lib/huntry/rewards/rewards-api";
 import { CreateRewardInput } from "@/lib/huntry/rewards/types";
 
@@ -172,6 +173,28 @@ describe("rewards-api (SQLite)", () => {
 
     expect(deleted).toBe(false);
   });
+
+  // BC-HUN-021: bc_customer_group_id joins bc_promotion_id/bc_coupon_code_id
+  // as a coupon-sync.ts-written column — confirms the real UPDATE statement
+  // writes all three, not just the pre-existing two.
+  it("updateRewardCouponFields writes bc_promotion_id/bc_coupon_code_id/bc_customer_group_id", async () => {
+    const reward = await createReward(
+      { ...baseInput, name: "Coupon Fields Reward", couponCode: "COUPONFIELDSREWARD" },
+      "store-a",
+    );
+
+    await updateRewardCouponFields(reward.id, "store-a", {
+      bcPromotionId: "promo-1",
+      bcCouponCodeId: "code-1",
+      bcCustomerGroupId: "group-1",
+    });
+
+    const fetched = await fetchRewardUncached(reward.id, "store-a");
+
+    expect(fetched?.bcPromotionId).toBe("promo-1");
+    expect(fetched?.bcCouponCodeId).toBe("code-1");
+    expect(fetched?.bcCustomerGroupId).toBe("group-1");
+  });
 });
 
 describe("rewards-api (MOCK mode)", () => {
@@ -206,6 +229,26 @@ describe("rewards-api (MOCK mode)", () => {
       const afterDelete = await fetchReward(created.id, undefined);
 
       expect(afterDelete).toBeUndefined();
+    } finally {
+      process.env.DATA_MODE = "MULTITENANT";
+    }
+  });
+
+  it("updateRewardCouponFields round-trips bc_customer_group_id in MOCK mode", async () => {
+    process.env.DATA_MODE = "MOCK";
+
+    try {
+      const created = await createReward({ ...baseInput, name: "Mock Coupon Fields Reward" }, undefined);
+
+      await updateRewardCouponFields(created.id, undefined, {
+        bcPromotionId: "mock-promo-1",
+        bcCouponCodeId: "mock-code-1",
+        bcCustomerGroupId: "mock-group-1",
+      });
+
+      const fetched = await fetchReward(created.id, undefined);
+
+      expect(fetched?.bcCustomerGroupId).toBe("mock-group-1");
     } finally {
       process.env.DATA_MODE = "MULTITENANT";
     }

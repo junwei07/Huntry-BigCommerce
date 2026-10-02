@@ -319,9 +319,11 @@ keeping its Customer Group as an audit trail. BC-HUN-018 shipped
 hard-delete-only instead, per earlier explicit user direction (see
 `rewards/types.ts`'s `RewardStatus` comment) — `RewardActionsMenu` offers
 **Edit / Delete** only, matching `EventActionsMenu`/`SponsorActionsMenu`'s
-shape exactly. Don't "fix" this toward an archive action without first
-checking whether BC-HUN-020/021 (coupon-sync) has actually landed and
-reintroduced a real use for `status`.
+shape exactly. BC-HUN-021 (which did land the Customer Group/coupon-sync
+work) deliberately did **not** reintroduce a use for `status` or add any
+disable-on-delete behavior — a deleted reward's Promotion/coupon/Customer
+Group are all left alone, same as before. `status` stays hard-delete-only
+for good; don't "fix" this toward an archive action.
 
 **`ProductPicker` is this app's first multi-select pattern.** Every other
 Huntry picker (`theme-picker.tsx`, `item-marker-picker.tsx`,

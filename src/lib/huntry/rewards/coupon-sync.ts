@@ -67,6 +67,14 @@ interface PromotionRule {
   action: PromotionRuleAction;
 }
 
+// Confirmed live (docs/MIGRATION.md §8) as a top-level field on the
+// Promotion resource, not nested under rules[].condition. group_ids taking
+// BigCommerce's v2 Customer Group id directly is also confirmed live — a
+// real promotion created this way echoes it straight back in the response.
+interface PromotionCustomerCondition {
+  group_ids: number[];
+}
+
 interface PromotionRequestBody {
   name: string;
   redemption_type: "COUPON";
@@ -75,6 +83,8 @@ interface PromotionRequestBody {
   // objects," not raw channel ids.
   channels: { id: number }[];
   rules: PromotionRule[];
+  // Present only once a reward has a synced Customer Group — BC-HUN-021.
+  customer?: PromotionCustomerCondition;
 }
 
 interface PromotionResource {
@@ -83,6 +93,22 @@ interface PromotionResource {
 
 interface V3SingleResponse<T> {
   data: T;
+}
+
+// BigCommerce's Customer Groups API is v2, not v3 (GET /v3/customer_groups
+// 404s "route not found"; GET /v2/customer_groups works — confirmed live,
+// docs/MIGRATION.md §8). v2 responses are bare resources, unlike v3's
+// { data: T } envelope.
+interface CustomerGroupResource {
+  id: number;
+}
+
+// v2 Customer Groups create/update body — confirmed live (docs/MIGRATION.md
+// §8): returns a bare resource, not a { data } envelope like v3.
+interface CustomerGroupRequestBody {
+  name: string;
+  is_default: boolean;
+  category_access: { type: "all" };
 }
 
 interface CouponCodeResource {
@@ -109,8 +135,8 @@ function buildDiscountAmount(reward: HuntryReward): DiscountAmount {
 // (product-restricted, every selected product in one items.products
 // array); otherwise -> cart_value (store-wide). Deliberately has no
 // awareness of bcCustomerGroupId — group-scoped eligibility lives on the
-// promotion's own top-level `customer` field (confirmed live), not here,
-// and is BC-HUN-021's addition, not this ticket's.
+// promotion's own top-level `customer` field (buildPromotionRequestBody),
+// a separate top-level field rather than another rule condition.
 function buildDiscountAction(reward: HuntryReward): PromotionRuleAction {
   const discount = buildDiscountAmount(reward);
 
@@ -121,14 +147,62 @@ function buildDiscountAction(reward: HuntryReward): PromotionRuleAction {
   return { cart_value: { discount } };
 }
 
-function buildPromotionRequestBody(reward: HuntryReward): PromotionRequestBody {
-  return {
+// Exported (like computeRewardUsageLimit) so the request shape is
+// unit-testable without a REST client. Only includes `customer` once a
+// Customer Group has actually been synced (bcCustomerGroupId set) —
+// syncRewardCoupon always calls this with that already threaded through.
+export function buildPromotionRequestBody(reward: HuntryReward): PromotionRequestBody {
+  const body: PromotionRequestBody = {
     name: reward.name,
     redemption_type: "COUPON",
     status: "ENABLED",
     channels: [{ id: 1 }],
     rules: [{ action: buildDiscountAction(reward) }],
   };
+
+  if (reward.bcCustomerGroupId) {
+    body.customer = { group_ids: [Number(reward.bcCustomerGroupId)] };
+  }
+
+  return body;
+}
+
+// BC-HUN-021: one Customer Group per reward, the primary preventive
+// mechanism replacing the legacy plugin's per-request
+// woocommerce_coupon_is_valid account-ownership check (docs/MIGRATION.md
+// §2) — BigCommerce refuses the coupon for anyone not a member, rather
+// than this app policing it after the fact. Lookup-or-create by
+// reward.bcCustomerGroupId, same shape as syncPromotion/syncCouponCode.
+// Request/response shape confirmed live (docs/MIGRATION.md §8). Exported
+// (like buildPromotionRequestBody) so it's unit-testable without a REST
+// client.
+export function buildCustomerGroupRequestBody(reward: HuntryReward): CustomerGroupRequestBody {
+  return {
+    name: `Huntry Reward #${reward.id}: ${reward.name}`,
+    is_default: false,
+    category_access: { type: "all" },
+  };
+}
+
+async function syncCustomerGroup(
+  reward: HuntryReward,
+  storeHash: string | undefined,
+): Promise<CustomerGroupResource> {
+  const apiClient = await getRestApiClient(storeHash);
+  const body = buildCustomerGroupRequestBody(reward);
+
+  if (reward.bcCustomerGroupId) {
+    const response = await apiClient.put<CustomerGroupResource>(
+      `/v2/customer_groups/${reward.bcCustomerGroupId}`,
+      { body },
+    );
+
+    return response.data;
+  }
+
+  const response = await apiClient.post<CustomerGroupResource>("/v2/customer_groups", { body });
+
+  return response.data;
 }
 
 async function syncPromotion(
@@ -221,14 +295,23 @@ export async function syncRewardCoupon(
     return {
       bcPromotionId: reward.bcPromotionId ?? `mock-promotion-${reward.id}`,
       bcCouponCodeId: reward.bcCouponCodeId ?? `mock-coupon-${reward.id}`,
+      bcCustomerGroupId: reward.bcCustomerGroupId ?? `mock-customer-group-${reward.id}`,
     };
   }
 
-  const promotion = await syncPromotion(reward, storeHash);
-  const couponCode = await syncCouponCode(reward, String(promotion.id), storeHash);
+  // Group first: the Promotion's customer.group_ids field needs the
+  // group's id at build time. Threaded through a shallow copy rather than
+  // mutating the caller's reward, since buildPromotionRequestBody only
+  // reads bcCustomerGroupId off it.
+  const customerGroup = await syncCustomerGroup(reward, storeHash);
+  const rewardWithGroup: HuntryReward = { ...reward, bcCustomerGroupId: String(customerGroup.id) };
+
+  const promotion = await syncPromotion(rewardWithGroup, storeHash);
+  const couponCode = await syncCouponCode(rewardWithGroup, String(promotion.id), storeHash);
 
   return {
     bcPromotionId: String(promotion.id),
     bcCouponCodeId: String(couponCode.id),
+    bcCustomerGroupId: String(customerGroup.id),
   };
 }

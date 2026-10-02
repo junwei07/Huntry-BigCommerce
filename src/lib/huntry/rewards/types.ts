@@ -85,12 +85,13 @@ export type CreateRewardInput = Omit<
 export type UpdateRewardInput = CreateRewardInput;
 
 // The narrow shape updateRewardCouponFields (rewards-api.ts) writes —
-// coupon-sync.ts's (BC-HUN-020) sole output. Deliberately excludes
+// coupon-sync.ts's (BC-HUN-020/021) sole output. Deliberately excludes
 // couponCode itself: that's an admin-typed, normal CreateRewardInput/
 // UpdateRewardInput field now, not something coupon-sync writes back.
 export interface RewardCouponFields {
   bcPromotionId: string;
   bcCouponCodeId: string;
+  bcCustomerGroupId: string;
 }
 
 // Mirrors channels/types.ts's CHANNELS_PATH precedent — co-located with the

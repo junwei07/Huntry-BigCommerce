@@ -653,14 +653,21 @@ export async function updateRewardCouponFields(
 
   if (db instanceof DatabaseSync) {
     db.prepare(
-      "UPDATE huntry_rewards SET bc_promotion_id = ?, bc_coupon_code_id = ?, updated_at = ? WHERE id = ? AND store_hash = ?",
-    ).run(fields.bcPromotionId, fields.bcCouponCodeId, new Date().toISOString(), id, resolvedStoreHash);
+      "UPDATE huntry_rewards SET bc_promotion_id = ?, bc_coupon_code_id = ?, bc_customer_group_id = ?, updated_at = ? WHERE id = ? AND store_hash = ?",
+    ).run(
+      fields.bcPromotionId,
+      fields.bcCouponCodeId,
+      fields.bcCustomerGroupId,
+      new Date().toISOString(),
+      id,
+      resolvedStoreHash,
+    );
     return;
   }
 
   await db.query(
-    "UPDATE huntry_rewards SET bc_promotion_id = $1, bc_coupon_code_id = $2, updated_at = now() WHERE id = $3 AND store_hash = $4",
-    [fields.bcPromotionId, fields.bcCouponCodeId, id, resolvedStoreHash],
+    "UPDATE huntry_rewards SET bc_promotion_id = $1, bc_coupon_code_id = $2, bc_customer_group_id = $3, updated_at = now() WHERE id = $4 AND store_hash = $5",
+    [fields.bcPromotionId, fields.bcCouponCodeId, fields.bcCustomerGroupId, id, resolvedStoreHash],
   );
 }
 
@@ -686,17 +693,14 @@ async function deleteRewardRow(id: number, storeHash: string): Promise<boolean> 
 // by schema design — a reward's past claims stay intact after the reward
 // row itself is gone).
 //
-// TODO(BC-HUN-021): now that coupon-sync.ts exists (BC-HUN-020) and a reward
-// can carry a live bcPromotionId, extend this to disable (never delete) that
-// Promotion before/after removing the row — mirroring the WP plugin's own
-// documented caution against a destructive symmetric delete cascade
-// (huntry/docs/decisions/0001-coupon-delete-asymmetry.md: even a permanent
-// Reward delete there only unlinks its coupon, never deletes it).
-// Deliberately left to BC-HUN-021 rather than done here: that ticket's own
-// text claims this semantic ("On archive: disable the Promotion but keep
-// the group... never delete it here"), and getting the unlink-vs-disable
-// distinction right needs its group-aware design to exist first — see
-// docs/MIGRATION.md's BC-HUN-020 plan notes.
+// BC-HUN-021 considered extending this to disable (never delete) a
+// reward's live Promotion before/after removing the row, mirroring
+// huntry/docs/decisions/0001-coupon-delete-asymmetry.md's unlink-not-
+// disable precedent — but after review, a deleted reward doesn't need to
+// stop its coupon from being redeemable by customers who already claimed
+// it. This stays a plain DB delete; the Promotion/coupon/Customer Group
+// are left alone in BigCommerce, same orphaned-coupon precedent the
+// legacy plugin used.
 export async function deleteReward(id: number, storeHash: string | undefined): Promise<boolean> {
   if (getDataMode() === "MOCK") {
     return deleteMockReward(id);
