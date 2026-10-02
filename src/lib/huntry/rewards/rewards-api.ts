@@ -5,7 +5,13 @@ import { getDataMode, resolveStoreHash } from "@/lib/bc-api-client/resolve-store
 import { getRestApiClient } from "@/lib/bc-api-client/get-rest-api-client";
 import { ApiRequestParams, V3ListResponse } from "@/lib/bc-api-client/rest-client/types";
 import { rewardTag, REWARDS_LIST_TAG } from "@/lib/huntry/rewards/cache-tags";
-import { addMockReward, deleteMockReward, MOCK_REWARDS, updateMockReward } from "@/lib/huntry/rewards/mock/mock-rewards";
+import {
+  addMockReward,
+  deleteMockReward,
+  MOCK_REWARDS,
+  updateMockReward,
+  updateMockRewardCouponFields,
+} from "@/lib/huntry/rewards/mock/mock-rewards";
 import {
   BcProductSummary,
   CreateRewardInput,
@@ -13,6 +19,7 @@ import {
   DiscountType,
   HuntryReward,
   PRODUCTS_PATH,
+  RewardCouponFields,
   RewardFields,
   RewardsQuery,
   RewardStatus,
@@ -267,12 +274,11 @@ export async function fetchReward(id: number, storeHash: string | undefined): Pr
   return fetchRewardFromDb(id, resolvedStoreHash);
 }
 
-// Uncached counterpart to fetchReward — not consumed by this ticket (no
-// Server Action exists yet), but BC-HUN-019's update action will need it to
-// preserve couponCode/bc*Id/status (none of which are edit-form fields)
-// right before writing, the same reasoning fetchEventUncached/
-// fetchSponsorUncached document: a Server Action about to mutate a record
-// should never trust a cached read.
+// Uncached counterpart to fetchReward — used by updateHuntryReward to
+// preserve bcPromotionId/bcCouponCodeId/bcCustomerGroupId/status (none of
+// which are edit-form fields) right before writing, the same reasoning
+// fetchEventUncached/fetchSponsorUncached document: a Server Action about to
+// mutate a record should never trust a cached read.
 export async function fetchRewardUncached(id: number, storeHash: string | undefined): Promise<HuntryReward | undefined> {
   if (getDataMode() === "MOCK") {
     return MOCK_REWARDS.find((reward) => reward.id === id);
@@ -285,6 +291,61 @@ export async function fetchRewardUncached(id: number, storeHash: string | undefi
   }
 
   return selectRewardRow(id, resolvedStoreHash);
+}
+
+// Primary uniqueness check (BC-HUN-020) — called by the Server Actions
+// before createReward/updateReward, so a duplicate coupon code surfaces as
+// a specific form error instead of a confusing write failure after the
+// reward row is already committed. excludeId lets an update check against
+// every *other* reward in the store without flagging its own current code.
+// MOCK mode checks MOCK_REWARDS directly rather than a DB round trip.
+export async function isRewardCouponCodeTaken(
+  storeHash: string | undefined,
+  couponCode: string,
+  excludeId?: number,
+): Promise<boolean> {
+  if (getDataMode() === "MOCK") {
+    return MOCK_REWARDS.some((reward) => reward.couponCode === couponCode && reward.id !== excludeId);
+  }
+
+  const resolvedStoreHash = resolveStoreHash(storeHash);
+
+  if (!resolvedStoreHash) {
+    return false;
+  }
+
+  const db = getHuntryDb();
+
+  if (db instanceof DatabaseSync) {
+    const row = db
+      .prepare("SELECT 1 FROM huntry_rewards WHERE store_hash = ? AND coupon_code = ? AND id != ? LIMIT 1")
+      .get(resolvedStoreHash, couponCode, excludeId ?? -1);
+
+    return row !== undefined;
+  }
+
+  const result = await db.query(
+    "SELECT 1 FROM huntry_rewards WHERE store_hash = $1 AND coupon_code = $2 AND id != $3 LIMIT 1",
+    [resolvedStoreHash, couponCode, excludeId ?? -1],
+  );
+
+  return (result.rowCount ?? 0) > 0;
+}
+
+// Race-condition backstop behind isRewardCouponCodeTaken's primary
+// pre-check — true when an error means the new
+// huntry_rewards_store_hash_coupon_code_key UNIQUE constraint
+// (db/migrations/0002_reward_coupon_code_unique.sql) was violated, as
+// opposed to any other write failure. Mirrors events-api.ts's
+// isUniqueSlugConstraintError exactly (Postgres SQLSTATE 23505, SQLite's
+// message-substring check — neither driver exposes a structured constraint
+// identifier any more precise than that).
+export function isUniqueCouponCodeConstraintError(error: unknown): boolean {
+  if (error && typeof error === "object" && "code" in error && (error as { code?: unknown }).code === "23505") {
+    return true;
+  }
+
+  return error instanceof Error && error.message.includes("UNIQUE constraint failed");
 }
 
 async function replaceRewardProductsPg(client: PoolClient, rewardId: number, productIds: number[]): Promise<void> {
@@ -324,8 +385,8 @@ async function insertRewardRowPg(pool: Pool, input: CreateRewardInput, storeHash
     const result = await client.query<PostgresRewardRow>(
       `INSERT INTO huntry_rewards
         (store_hash, name, description, sponsor_id, egg_capacity, reward_starts_at, reward_expires_at,
-         discount_type, discount_value, discount_scope)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         discount_type, discount_value, discount_scope, coupon_code)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
         storeHash,
@@ -338,6 +399,7 @@ async function insertRewardRowPg(pool: Pool, input: CreateRewardInput, storeHash
         input.discountType,
         input.discountValue,
         input.discountScope,
+        input.couponCode,
       ],
     );
 
@@ -364,8 +426,8 @@ function insertRewardRowSqlite(db: DatabaseSync, input: CreateRewardInput, store
       .prepare(
         `INSERT INTO huntry_rewards
           (store_hash, name, description, sponsor_id, egg_capacity, reward_starts_at, reward_expires_at,
-           discount_type, discount_value, discount_scope)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           discount_type, discount_value, discount_scope, coupon_code)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         storeHash,
@@ -378,6 +440,7 @@ function insertRewardRowSqlite(db: DatabaseSync, input: CreateRewardInput, store
         input.discountType,
         input.discountValue,
         input.discountScope,
+        input.couponCode,
       );
 
     const row = db
@@ -437,8 +500,8 @@ async function updateRewardRowPg(
       `UPDATE huntry_rewards SET
         name = $1, description = $2, sponsor_id = $3, egg_capacity = $4, reward_starts_at = $5,
         reward_expires_at = $6, discount_type = $7, discount_value = $8, discount_scope = $9,
-        updated_at = now()
-       WHERE id = $10 AND store_hash = $11
+        coupon_code = $10, updated_at = now()
+       WHERE id = $11 AND store_hash = $12
        RETURNING *`,
       [
         input.name,
@@ -450,6 +513,7 @@ async function updateRewardRowPg(
         input.discountType,
         input.discountValue,
         input.discountScope,
+        input.couponCode,
         id,
         storeHash,
       ],
@@ -490,7 +554,7 @@ function updateRewardRowSqlite(
         `UPDATE huntry_rewards SET
           name = ?, description = ?, sponsor_id = ?, egg_capacity = ?, reward_starts_at = ?,
           reward_expires_at = ?, discount_type = ?, discount_value = ?, discount_scope = ?,
-          updated_at = ?
+          coupon_code = ?, updated_at = ?
          WHERE id = ? AND store_hash = ?`,
       )
       .run(
@@ -503,6 +567,7 @@ function updateRewardRowSqlite(
         input.discountType,
         input.discountValue,
         input.discountScope,
+        input.couponCode,
         new Date().toISOString(),
         id,
         storeHash,
@@ -562,6 +627,43 @@ export async function updateReward(
   return updateRewardInDb(id, input, resolvedStoreHash);
 }
 
+// The sole writer of the two BigCommerce-id columns — called only from
+// coupon-sync.ts's Server Action call sites (BC-HUN-020), never from the
+// reward form's own create/update path above, which never touches these
+// columns at all (CreateRewardInput/UpdateRewardInput omit them). A single-
+// statement write, no transaction needed (no child-table replace, unlike
+// createReward/updateReward).
+export async function updateRewardCouponFields(
+  id: number,
+  storeHash: string | undefined,
+  fields: RewardCouponFields,
+): Promise<void> {
+  if (getDataMode() === "MOCK") {
+    updateMockRewardCouponFields(id, fields);
+    return;
+  }
+
+  const resolvedStoreHash = resolveStoreHash(storeHash);
+
+  if (!resolvedStoreHash) {
+    return;
+  }
+
+  const db = getHuntryDb();
+
+  if (db instanceof DatabaseSync) {
+    db.prepare(
+      "UPDATE huntry_rewards SET bc_promotion_id = ?, bc_coupon_code_id = ?, updated_at = ? WHERE id = ? AND store_hash = ?",
+    ).run(fields.bcPromotionId, fields.bcCouponCodeId, new Date().toISOString(), id, resolvedStoreHash);
+    return;
+  }
+
+  await db.query(
+    "UPDATE huntry_rewards SET bc_promotion_id = $1, bc_coupon_code_id = $2, updated_at = now() WHERE id = $3 AND store_hash = $4",
+    [fields.bcPromotionId, fields.bcCouponCodeId, id, resolvedStoreHash],
+  );
+}
+
 async function deleteRewardRow(id: number, storeHash: string): Promise<boolean> {
   const db = getHuntryDb();
 
@@ -584,13 +686,17 @@ async function deleteRewardRow(id: number, storeHash: string): Promise<boolean> 
 // by schema design — a reward's past claims stay intact after the reward
 // row itself is gone).
 //
-// TODO(BC-HUN-020/021): once coupon-sync.ts exists and a reward can carry a
-// live bcPromotionId, extend this to disable (never delete) that Promotion
-// before/after removing the row — mirroring the WP plugin's own documented
-// caution against a destructive symmetric delete cascade
+// TODO(BC-HUN-021): now that coupon-sync.ts exists (BC-HUN-020) and a reward
+// can carry a live bcPromotionId, extend this to disable (never delete) that
+// Promotion before/after removing the row — mirroring the WP plugin's own
+// documented caution against a destructive symmetric delete cascade
 // (huntry/docs/decisions/0001-coupon-delete-asymmetry.md: even a permanent
-// Reward delete there only unlinks its coupon, never deletes it). No
-// coupon-sync module exists yet for this ticket to call into.
+// Reward delete there only unlinks its coupon, never deletes it).
+// Deliberately left to BC-HUN-021 rather than done here: that ticket's own
+// text claims this semantic ("On archive: disable the Promotion but keep
+// the group... never delete it here"), and getting the unlink-vs-disable
+// distinction right needs its group-aware design to exist first — see
+// docs/MIGRATION.md's BC-HUN-020 plan notes.
 export async function deleteReward(id: number, storeHash: string | undefined): Promise<boolean> {
   if (getDataMode() === "MOCK") {
     return deleteMockReward(id);

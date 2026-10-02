@@ -101,8 +101,10 @@ export class RestApiClient implements BcRestApiClient {
     logApiRequest("GET", url, response.status, performance.now() - startedAt);
 
     if (!response.ok) {
+      const bodyText = await response.text();
+
       throw new AppError("UPSTREAM_API", `A BigCommerce API request failed.`, {
-        cause: `GET "${path}" failed with status ${response.status}.`,
+        cause: `GET "${path}" failed with status ${response.status}: ${bodyText.slice(0, 1000)}`,
         status: response.status,
       });
     }
@@ -150,8 +152,10 @@ export class RestApiClient implements BcRestApiClient {
     logApiRequest(method, url, response.status, performance.now() - startedAt);
 
     if (!response.ok) {
+      const bodyText = await response.text();
+
       throw new AppError("UPSTREAM_API", `A BigCommerce API request failed.`, {
-        cause: `${method} "${path}" failed with status ${response.status}.`,
+        cause: `${method} "${path}" failed with status ${response.status}: ${bodyText.slice(0, 1000)}`,
         status: response.status,
       });
     }

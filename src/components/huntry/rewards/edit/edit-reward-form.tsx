@@ -22,6 +22,7 @@ function toFormState(reward: HuntryReward): RewardFormInput {
     name: reward.name,
     description: reward.description,
     sponsorId: reward.sponsorId ? String(reward.sponsorId) : "",
+    couponCode: reward.couponCode ?? "",
     rewardStartsAt: reward.rewardStartsAt ? toDatetimeLocalValue(reward.rewardStartsAt) : "",
     rewardExpiresAt: reward.rewardExpiresAt ? toDatetimeLocalValue(reward.rewardExpiresAt) : "",
     eggCapacity: String(reward.eggCapacity),
@@ -48,6 +49,7 @@ export function EditRewardForm({ reward, sponsors }: { reward: HuntryReward; spo
   const canSubmit =
     state.name.trim() !== "" &&
     state.description.trim() !== "" &&
+    state.couponCode.trim() !== "" &&
     state.rewardStartsAt !== "" &&
     state.rewardExpiresAt !== "" &&
     state.eggCapacity !== "" &&
@@ -74,7 +76,7 @@ export function EditRewardForm({ reward, sponsors }: { reward: HuntryReward; spo
 
   return (
     <Panel header={`Edit Reward: ${reward.name}`} style={{ backgroundColor: "#FFFFFF", borderRadius: "16px" }}>
-      <RewardFormFields couponCode={reward.couponCode} onChange={handleChange} sponsors={sponsors} state={state} />
+      <RewardFormFields onChange={handleChange} sponsors={sponsors} state={state} />
 
       <Flex flexGap="0.5rem" justifyContent="flex-end">
         <Button

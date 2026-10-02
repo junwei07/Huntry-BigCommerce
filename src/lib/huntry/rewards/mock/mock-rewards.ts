@@ -1,4 +1,4 @@
-import { CreateRewardInput, HuntryReward, UpdateRewardInput } from "@/lib/huntry/rewards/types";
+import { CreateRewardInput, HuntryReward, RewardCouponFields, UpdateRewardInput } from "@/lib/huntry/rewards/types";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -84,6 +84,9 @@ export let MOCK_REWARDS: HuntryReward[] = [
 // concepts are "MOCK-mode testable: Yes" per docs/MIGRATION.md §6, matching
 // addMockEvent/addMockSponsor's precedent. status always starts "active" —
 // this DAL never writes "archived" (see types.ts's RewardStatus comment).
+// couponCode comes from input (BC-HUN-020: admin-typed, required) — not
+// overridden here, unlike bcPromotionId/bcCouponCodeId/bcCustomerGroupId,
+// which stay null until coupon-sync.ts (MOCK branch) populates them.
 export function addMockReward(input: CreateRewardInput): HuntryReward {
   const nextId = MOCK_REWARDS.reduce((maxId, reward) => Math.max(maxId, reward.id), 0) + 1;
   const now = new Date();
@@ -92,7 +95,6 @@ export function addMockReward(input: CreateRewardInput): HuntryReward {
     ...input,
     id: nextId,
     storeHash: "mock-store",
-    couponCode: null,
     bcPromotionId: null,
     bcCouponCodeId: null,
     bcCustomerGroupId: null,
@@ -106,10 +108,10 @@ export function addMockReward(input: CreateRewardInput): HuntryReward {
   return reward;
 }
 
-// id/storeHash/createdAt/couponCode/bc*Id/status are preserved; every
-// editable field is replaced. Returns undefined if no fixture with this id
-// exists, matching updateRewardRow's "no row matched" behavior for the DB
-// drivers.
+// id/storeHash/createdAt/bc*Id/status are preserved; every editable field,
+// including couponCode (BC-HUN-020: admin-typed, can change on edit), is
+// replaced. Returns undefined if no fixture with this id exists, matching
+// updateRewardRow's "no row matched" behavior for the DB drivers.
 export function updateMockReward(id: number, input: UpdateRewardInput): HuntryReward | undefined {
   const existing = MOCK_REWARDS.find((reward) => reward.id === id);
 
@@ -122,6 +124,24 @@ export function updateMockReward(id: number, input: UpdateRewardInput): HuntryRe
   MOCK_REWARDS = MOCK_REWARDS.map((reward) => (reward.id === id ? updated : reward));
 
   return updated;
+}
+
+// MOCK counterpart to updateRewardCouponFields (rewards-api.ts) — the sole
+// writer of bcPromotionId/bcCouponCodeId in MOCK mode, called only from
+// coupon-sync.ts's MOCK branch. Kept separate from updateMockReward rather
+// than overloading its UpdateRewardInput-shaped signature. A no-op if the
+// fixture no longer exists (shouldn't happen in practice — coupon-sync only
+// ever runs right after create/update on the same id).
+export function updateMockRewardCouponFields(id: number, fields: RewardCouponFields): void {
+  const existing = MOCK_REWARDS.find((reward) => reward.id === id);
+
+  if (!existing) {
+    return;
+  }
+
+  const updated: HuntryReward = { ...existing, ...fields, updatedAt: new Date() };
+
+  MOCK_REWARDS = MOCK_REWARDS.map((reward) => (reward.id === id ? updated : reward));
 }
 
 // A genuine hard delete, matching deleteRewardRow's DB behavior — returns

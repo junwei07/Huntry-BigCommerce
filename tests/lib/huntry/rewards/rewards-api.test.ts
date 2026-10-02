@@ -43,6 +43,7 @@ const baseInput: CreateRewardInput = {
   name: "Test Reward",
   description: "desc",
   sponsorId: null,
+  couponCode: "TESTREWARD",
   eggCapacity: 5,
   rewardStartsAt: null,
   rewardExpiresAt: null,
@@ -64,7 +65,7 @@ describe("rewards-api (SQLite)", () => {
 
   it("creates a 'specific'-scope reward with product associations and round-trips them", async () => {
     const reward = await createReward(
-      { ...baseInput, name: "Specific Reward", discountScope: "specific", productIds: [201, 202] },
+      { ...baseInput, name: "Specific Reward", couponCode: "SPECIFICREWARD", discountScope: "specific", productIds: [201, 202] },
       "store-a",
     );
 
@@ -81,9 +82,13 @@ describe("rewards-api (SQLite)", () => {
   });
 
   it("enforces store isolation on update/delete", async () => {
-    const reward = await createReward({ ...baseInput, name: "Isolated Reward" }, "store-a");
+    const reward = await createReward({ ...baseInput, name: "Isolated Reward", couponCode: "ISOLATEDREWARD" }, "store-a");
 
-    const updatedWrongStore = await updateReward(reward.id, { ...baseInput, name: "Hacked" }, "store-b");
+    const updatedWrongStore = await updateReward(
+      reward.id,
+      { ...baseInput, name: "Hacked", couponCode: "ISOLATEDREWARD" },
+      "store-b",
+    );
 
     expect(updatedWrongStore).toBeUndefined();
 
@@ -98,13 +103,13 @@ describe("rewards-api (SQLite)", () => {
 
   it("replaces product associations on update (specific -> all clears them)", async () => {
     const reward = await createReward(
-      { ...baseInput, name: "Flip Scope Reward", discountScope: "specific", productIds: [301] },
+      { ...baseInput, name: "Flip Scope Reward", couponCode: "FLIPSCOPEREWARD", discountScope: "specific", productIds: [301] },
       "store-a",
     );
 
     const updated = await updateReward(
       reward.id,
-      { ...baseInput, name: "Flip Scope Reward", discountScope: "all", productIds: [] },
+      { ...baseInput, name: "Flip Scope Reward", couponCode: "FLIPSCOPEREWARD", discountScope: "all", productIds: [] },
       "store-a",
     );
 
@@ -116,7 +121,7 @@ describe("rewards-api (SQLite)", () => {
   });
 
   it("deleteReward cascades a manually-inserted huntry_eggs row for that reward", async () => {
-    const reward = await createReward({ ...baseInput, name: "Egg Cascade Reward" }, "store-a");
+    const reward = await createReward({ ...baseInput, name: "Egg Cascade Reward", couponCode: "EGGCASCADEREWARD" }, "store-a");
 
     // huntry_eggs.event_id is a real, enforced FK under node:sqlite's
     // DatabaseSync (it enables foreign key enforcement by default — unlike

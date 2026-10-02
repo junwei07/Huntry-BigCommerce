@@ -3,7 +3,14 @@
 import { updateTag } from "next/cache";
 import { ActionResult } from "@/lib/actions/action-result";
 import { rewardTag, REWARDS_LIST_TAG } from "@/lib/huntry/rewards/cache-tags";
-import { deleteReward, fetchRewardUncached, updateReward } from "@/lib/huntry/rewards/rewards-api";
+import { syncRewardCoupon } from "@/lib/huntry/rewards/coupon-sync";
+import {
+  deleteReward,
+  fetchRewardUncached,
+  isRewardCouponCodeTaken,
+  updateReward,
+  updateRewardCouponFields,
+} from "@/lib/huntry/rewards/rewards-api";
 import { rewardFormSchema, RewardFormInput } from "@/lib/huntry/rewards/reward-form-schema";
 import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
 import { toSafeMessage } from "@/lib/errors/app-error";
@@ -12,13 +19,16 @@ import { logError } from "@/lib/errors/logger";
 const REWARD_NOT_FOUND_MESSAGE =
   "That reward no longer exists. It may have been deleted — reload the page to see the current list.";
 
-// couponCode/bcPromotionId/bcCouponCodeId/bcCustomerGroupId/status aren't
-// edit-form fields (BC-HUN-020/021's coupon-sync owns them) — unlike
-// updateHuntryEvent/updateHuntrySponsor, rewards-api.ts's UPDATE statement
-// never references those columns at all, so updateReward can't clobber them
-// regardless. The uncached re-fetch here is still worth doing first: it
-// gives a cleaner "no longer exists" message before attempting the write,
-// the same shape every other Huntry update action uses.
+// bcPromotionId/bcCouponCodeId/bcCustomerGroupId/status aren't edit-form
+// fields (coupon-sync.ts/BC-HUN-021 own them) — unlike updateHuntryEvent/
+// updateHuntrySponsor, rewards-api.ts's UPDATE statement never references
+// those columns at all, so updateReward can't clobber them regardless.
+// couponCode *is* a normal edit-form field now (BC-HUN-020: admin-typed,
+// can change on edit, re-syncs the existing Promotion's coupon rather than
+// creating a second one — see coupon-sync.ts). The uncached re-fetch here
+// is still worth doing first: it gives a cleaner "no longer exists" message
+// before attempting the write, the same shape every other Huntry update
+// action uses.
 export async function updateHuntryReward(
   id: number,
   input: RewardFormInput,
@@ -38,6 +48,7 @@ export async function updateHuntryReward(
     name,
     description,
     sponsorId,
+    couponCode,
     rewardStartsAt,
     rewardExpiresAt,
     eggCapacity,
@@ -46,6 +57,12 @@ export async function updateHuntryReward(
     discountScope,
     productIds,
   } = parsed.data;
+
+  // Same primary uniqueness check as createHuntryReward — excludeId so a
+  // reward doesn't collide with its own current code.
+  if (await isRewardCouponCodeTaken(storeHash, couponCode, id)) {
+    return { success: false, message: "That coupon code is already used by another reward." };
+  }
 
   try {
     const existing = await fetchRewardUncached(id, storeHash);
@@ -60,6 +77,7 @@ export async function updateHuntryReward(
         name,
         description,
         sponsorId: sponsorId === "" ? null : Number(sponsorId),
+        couponCode,
         eggCapacity,
         rewardStartsAt: new Date(rewardStartsAt),
         rewardExpiresAt: new Date(rewardExpiresAt),
@@ -73,6 +91,30 @@ export async function updateHuntryReward(
 
     if (!updated) {
       return { success: false, message: REWARD_NOT_FOUND_MESSAGE };
+    }
+
+    // BC-HUN-020: re-sync the BigCommerce Promotion + coupon code using the
+    // just-updated row (carries the current bcPromotionId/bcCouponCodeId
+    // for syncRewardCoupon's lookup-or-create/rename branch). See
+    // createHuntryReward's identical comment for why there's no
+    // compensating rollback of the reward row on failure here.
+    try {
+      const coupon = await syncRewardCoupon(updated, storeHash);
+
+      await updateRewardCouponFields(id, storeHash, coupon);
+    } catch (couponError) {
+      logError(`updateHuntryReward: coupon sync for reward ${id}`, couponError);
+
+      updateTag(REWARDS_LIST_TAG);
+      updateTag(rewardTag(id));
+
+      return {
+        success: false,
+        message: `Reward "${updated.name}" was updated, but syncing its BigCommerce coupon failed: ${toSafeMessage(
+          couponError,
+          "an unexpected error occurred",
+        )}. Edit and save again to retry.`,
+      };
     }
 
     updateTag(REWARDS_LIST_TAG);

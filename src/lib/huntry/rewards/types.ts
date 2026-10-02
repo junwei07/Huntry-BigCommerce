@@ -17,9 +17,11 @@ export type DiscountScope = "all" | "specific";
 export type RewardStatus = "active" | "archived";
 
 // camelCase, matching HuntryEvent/HuntrySponsor's convention — our own
-// schema, not a wire passthrough. couponCode/bc*Id fields are nullable
-// placeholders populated later by BC-HUN-020/021's coupon-sync — this DAL
-// only ever reads them back, never writes them.
+// schema, not a wire passthrough. couponCode is admin-typed (BC-HUN-020,
+// matching the legacy WP plugin's required "Gift Card Code" field) and
+// written by this DAL like any other field; bcPromotionId/bcCouponCodeId/
+// bcCustomerGroupId stay nullable placeholders this DAL only ever reads
+// back, written exclusively by coupon-sync.ts (BC-HUN-020/021).
 export interface HuntryReward {
   id: number;
   storeHash: string;
@@ -59,17 +61,37 @@ export interface RewardsQuery {
   direction: SortDirection;
 }
 
-// Every field a caller supplies to create/update a reward — omits
-// couponCode/bc*Id (BC-HUN-020/021's coupon-sync populates these, not this
-// DAL) and status (never settable here — see RewardStatus above).
+// Every field a caller supplies to create/update a reward — still omits
+// bc*Id (coupon-sync.ts is their sole writer) and status (never settable
+// here — see RewardStatus above). couponCode is admin-typed (BC-HUN-020)
+// and required here, narrower than HuntryReward.couponCode's
+// `string | null` (a pre-BC-HUN-020 row can still be null until next
+// edited, but every write going through this type always supplies one).
 export type CreateRewardInput = Omit<
   HuntryReward,
-  "id" | "storeHash" | "couponCode" | "bcPromotionId" | "bcCouponCodeId" | "bcCustomerGroupId" | "status" | "createdAt" | "updatedAt"
->;
+  | "id"
+  | "storeHash"
+  | "couponCode"
+  | "bcPromotionId"
+  | "bcCouponCodeId"
+  | "bcCustomerGroupId"
+  | "status"
+  | "createdAt"
+  | "updatedAt"
+> & { couponCode: string };
 
 // Same editable field set as creation — a plain alias, matching
 // UpdateEventInput/UpdateSponsorInput's precedent.
 export type UpdateRewardInput = CreateRewardInput;
+
+// The narrow shape updateRewardCouponFields (rewards-api.ts) writes —
+// coupon-sync.ts's (BC-HUN-020) sole output. Deliberately excludes
+// couponCode itself: that's an admin-typed, normal CreateRewardInput/
+// UpdateRewardInput field now, not something coupon-sync writes back.
+export interface RewardCouponFields {
+  bcPromotionId: string;
+  bcCouponCodeId: string;
+}
 
 // Mirrors channels/types.ts's CHANNELS_PATH precedent — co-located with the
 // type it fetches, shared by both the real fetch (rewards-api.ts) and the

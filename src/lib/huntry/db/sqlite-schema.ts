@@ -50,6 +50,10 @@ export const CREATE_HUNTRY_SCHEMA = `
   );
   CREATE INDEX IF NOT EXISTS huntry_sponsors_store_hash_idx ON huntry_sponsors (store_hash);
 
+  -- BC-HUN-020 added the UNIQUE (store_hash, coupon_code) constraint below
+  -- to an already-existing table — CREATE TABLE IF NOT EXISTS won't
+  -- retroactively apply it to an already-created local data/huntry.sqlite
+  -- file; delete that file once after pulling this change to pick it up.
   CREATE TABLE IF NOT EXISTS huntry_rewards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     store_hash TEXT NOT NULL,
@@ -68,7 +72,8 @@ export const CREATE_HUNTRY_SCHEMA = `
     bc_customer_group_id TEXT,
     status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE (store_hash, coupon_code)
   );
   CREATE INDEX IF NOT EXISTS huntry_rewards_store_hash_idx ON huntry_rewards (store_hash);
 

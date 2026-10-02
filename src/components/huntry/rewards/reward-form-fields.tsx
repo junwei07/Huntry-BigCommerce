@@ -21,23 +21,19 @@ const DISCOUNT_SCOPE_OPTIONS = [
 // value/onChange props. Field order matches
 // huntry/includes/rewards/meta-box.php's huntry_render_reward_details_meta_box()
 // exactly (see docs/HUNTRY-UI-REFERENCE.md): Description, Sponsor, Start/
-// Expiry dates, Number of Eggs, Discount Type, Value, Can be used on
-// (scope) + Products. Name is the WP post title, not part of the meta box
+// Expiry dates, Number of Eggs, Gift Card Code, Discount Type, Value, Can be
+// used on (scope) + Products. Name is the WP post title, not part of the meta box
 // itself, but still the form's first field here, matching events'/sponsors'
 // own precedent for the same WP-post-title mapping.
 //
-// couponCode is never submitted — it's BC-HUN-020's territory — so it's
-// rendered read-only only when the caller (the edit form) passes one.
 export function RewardFormFields({
   state,
   onChange,
   sponsors,
-  couponCode,
 }: {
   state: RewardFormInput;
   onChange: (patch: Partial<RewardFormInput>) => void;
   sponsors: HuntrySponsor[];
-  couponCode?: string | null;
 }) {
   const sponsorOptions = [
     { value: "", content: "None" },
@@ -103,6 +99,16 @@ export function RewardFormFields({
       </Box>
 
       <Box marginBottom="medium">
+        <Input
+          label="Gift Card Code"
+          onChange={(event) => onChange({ couponCode: event.target.value })}
+          placeholder="Enter gift card code"
+          required
+          value={state.couponCode}
+        />
+      </Box>
+
+      <Box marginBottom="medium">
         <Flex flexGap="1rem">
           <FlexItem flexGrow={1}>
             <Select
@@ -136,12 +142,6 @@ export function RewardFormFields({
 
       {state.discountScope === "specific" && (
         <ProductPicker onChange={(productIds) => onChange({ productIds })} productIds={state.productIds} />
-      )}
-
-      {couponCode !== undefined && (
-        <Box marginBottom="medium">
-          <Input disabled label="Gift Card Code" value={couponCode ?? "Not yet generated"} />
-        </Box>
       )}
     </>
   );

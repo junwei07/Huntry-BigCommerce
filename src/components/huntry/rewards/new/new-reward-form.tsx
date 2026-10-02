@@ -17,6 +17,7 @@ const INITIAL_STATE: RewardFormInput = {
   name: "",
   description: "",
   sponsorId: "",
+  couponCode: "",
   rewardStartsAt: "",
   rewardExpiresAt: "",
   eggCapacity: "1",
@@ -48,6 +49,7 @@ export function NewRewardForm({ sponsors }: { sponsors: HuntrySponsor[] }) {
   const canSubmit =
     state.name.trim() !== "" &&
     state.description.trim() !== "" &&
+    state.couponCode.trim() !== "" &&
     state.rewardStartsAt !== "" &&
     state.rewardExpiresAt !== "" &&
     state.eggCapacity !== "" &&

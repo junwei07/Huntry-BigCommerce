@@ -142,6 +142,7 @@ describe("events-api (SQLite)", () => {
       name: "Egg Cascade Reward",
       description: "",
       sponsorId: null,
+      couponCode: "EGGCASCADEHUNTREWARD",
       eggCapacity: 5,
       rewardStartsAt: null,
       rewardExpiresAt: null,

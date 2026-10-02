@@ -302,14 +302,16 @@ its searchable sponsor dropdown were considered but not ported — this app's
 plain `Input type="number"` and BigDesign `Select` already cover the same
 ground without a bespoke widget.
 
-**Gift Card Code is read-only, not a form field.** The WP form has a
-required "Gift Card Code" input, but in this app `couponCode`/
-`bcPromotionId`/`bcCouponCodeId`/`bcCustomerGroupId` are populated later by
-BC-HUN-020's Promotions/coupon sync — this ticket is local-DB-only. The edit
-form shows `couponCode` as a disabled `Input` ("Not yet generated" when
-null); the create form never renders it at all (a reward has no coupon code
-until coupon-sync exists). Don't add an editable coupon-code field here —
-that's BC-HUN-020's territory once it lands.
+**Gift Card Code is admin-editable, required, matching the WP form exactly**
+(BC-HUN-020, reversing this doc's earlier "read-only, BC-HUN-020's
+territory" note under BC-HUN-019 — per explicit user direction). Both
+create and edit forms render a required "Gift Card Code" `Input` at the same
+position the WP meta box uses (right after Number of Eggs, before Discount
+Type), feeding `couponCode` straight into `createReward`/`updateReward` like
+any other field. `coupon-sync.ts` uses the stored value verbatim as the real
+BigCommerce coupon code. `bcPromotionId`/`bcCouponCodeId`/
+`bcCustomerGroupId` are still populated later, exclusively by
+`coupon-sync.ts`/BC-HUN-021 — never form fields.
 
 **Hard delete only — no archive UI.** `docs/MIGRATION.md`'s original design
 had `huntry_rewards.status = 'archived'` disable a reward's Promotion while

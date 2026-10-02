@@ -13,9 +13,13 @@ import { DiscountScope, DiscountType } from "@/lib/huntry/rewards/types";
 // EVMS has no equivalent reward model (no discount type/value/scope/product
 // fields at all), so there's nothing to reconcile there.
 //
-// Unlike the WP form's required "Gift Card Code" input, couponCode isn't a
-// form field here at all — BC-HUN-020's coupon-sync populates it later; the
-// edit form only ever displays the DAL's existing value read-only.
+// couponCode matches the WP form's required "Gift Card Code" input exactly
+// (BC-HUN-020, reversing BC-HUN-019's original "system-generated, read-only"
+// design per explicit user direction) — the admin types the real
+// BigCommerce coupon code; coupon-sync.ts uses it verbatim when creating/
+// updating the Promotion's coupon-codes sub-resource. Character-set
+// restrictions beyond trim/length are deliberately not added here — left
+// for whatever BigCommerce's own API actually accepts.
 //
 // rewardStartsAt/rewardExpiresAt are both required, matching the WP form's
 // own `required` attributes on both date fields, even though the DB column
@@ -40,6 +44,7 @@ export const rewardFormSchema = z
       .min(1, "Description is required.")
       .max(2000, "Description must be 2000 characters or fewer."),
     sponsorId: z.string(),
+    couponCode: z.string().trim().min(1, "Coupon code is required.").max(50, "Coupon code must be 50 characters or fewer."),
     rewardStartsAt: z.string().trim().min(1, "Start date is required."),
     rewardExpiresAt: z.string().trim().min(1, "Expiry date is required."),
     eggCapacity: z.coerce
@@ -77,6 +82,7 @@ export interface RewardFormInput {
   name: string;
   description: string;
   sponsorId: string;
+  couponCode: string;
   rewardStartsAt: string;
   rewardExpiresAt: string;
   eggCapacity: string;

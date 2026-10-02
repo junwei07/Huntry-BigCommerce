@@ -3,7 +3,13 @@
 import { updateTag } from "next/cache";
 import { ActionResult } from "@/lib/actions/action-result";
 import { rewardTag, REWARDS_LIST_TAG } from "@/lib/huntry/rewards/cache-tags";
-import { createReward, fetchBcProductsForPicker } from "@/lib/huntry/rewards/rewards-api";
+import { syncRewardCoupon } from "@/lib/huntry/rewards/coupon-sync";
+import {
+  createReward,
+  fetchBcProductsForPicker,
+  isRewardCouponCodeTaken,
+  updateRewardCouponFields,
+} from "@/lib/huntry/rewards/rewards-api";
 import { rewardFormSchema, RewardFormInput } from "@/lib/huntry/rewards/reward-form-schema";
 import { BcProductSummary } from "@/lib/huntry/rewards/types";
 import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
@@ -28,6 +34,7 @@ export async function createHuntryReward(input: RewardFormInput, storeHash: stri
     name,
     description,
     sponsorId,
+    couponCode,
     rewardStartsAt,
     rewardExpiresAt,
     eggCapacity,
@@ -37,12 +44,22 @@ export async function createHuntryReward(input: RewardFormInput, storeHash: stri
     productIds,
   } = parsed.data;
 
+  // Primary uniqueness check (BC-HUN-020) — a fast, specific form error
+  // instead of a confusing write failure after the reward row is already
+  // committed. The DB's UNIQUE (store_hash, coupon_code) constraint
+  // (db/migrations/0002_reward_coupon_code_unique.sql) is the
+  // race-condition backstop, not the primary path.
+  if (await isRewardCouponCodeTaken(storeHash, couponCode)) {
+    return { success: false, message: "That coupon code is already used by another reward." };
+  }
+
   try {
     const reward = await createReward(
       {
         name,
         description,
         sponsorId: sponsorId === "" ? null : Number(sponsorId),
+        couponCode,
         eggCapacity,
         rewardStartsAt: new Date(rewardStartsAt),
         rewardExpiresAt: new Date(rewardExpiresAt),
@@ -57,6 +74,32 @@ export async function createHuntryReward(input: RewardFormInput, storeHash: stri
       },
       storeHash,
     );
+
+    // BC-HUN-020: create/update the BigCommerce Promotion + coupon code
+    // right after the local DB write succeeds. No compensating rollback of
+    // the reward row if this fails (unlike
+    // transferGiftCertificateBalanceToStoreCredit's two-mutation symmetry)
+    // — the reward row is cheap and safe to keep even coupon-less; the
+    // admin can retry by editing (bcPromotionId is still null, so
+    // syncRewardCoupon creates rather than updates on the retry).
+    try {
+      const coupon = await syncRewardCoupon(reward, storeHash);
+
+      await updateRewardCouponFields(reward.id, storeHash, coupon);
+    } catch (couponError) {
+      logError(`createHuntryReward: coupon sync for reward ${reward.id}`, couponError);
+
+      updateTag(REWARDS_LIST_TAG);
+      updateTag(rewardTag(reward.id));
+
+      return {
+        success: false,
+        message: `Reward "${reward.name}" was created, but creating its BigCommerce coupon failed: ${toSafeMessage(
+          couponError,
+          "an unexpected error occurred",
+        )}. Edit the reward again to retry.`,
+      };
+    }
 
     updateTag(REWARDS_LIST_TAG);
     updateTag(rewardTag(reward.id));
