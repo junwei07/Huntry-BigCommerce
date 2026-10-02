@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { MAX_EGGS_PER_REWARD } from "@/lib/huntry/eggs/limits";
-import { buildPromotionRequestBody, computeRewardUsageLimit } from "@/lib/huntry/rewards/coupon-sync";
+import { buildPromotionRequestBody, computeRewardUsageLimit, syncRewardCoupon } from "@/lib/huntry/rewards/coupon-sync";
 import { HuntryReward } from "@/lib/huntry/rewards/types";
 
 // Pure port of huntry_calculate_reward_usage_limit() (coupon-sync.php) — no
@@ -66,5 +66,44 @@ describe("buildPromotionRequestBody", () => {
     const body = buildPromotionRequestBody({ ...BASE_REWARD, bcCustomerGroupId: "42" });
 
     expect(body).toMatchObject({ customer: { group_ids: [42] } });
+  });
+});
+
+// BC-HUN-022: syncRewardCoupon short-circuits entirely in MOCK mode (never
+// calls getRestApiClient) — confirmed by reading coupon-sync.ts directly,
+// not by building unused Promotions/Customer-Group mock handlers that
+// nothing would ever exercise (MockRestApiClient only supports GET; this
+// path is a write).
+describe("syncRewardCoupon (MOCK mode)", () => {
+  const originalDataMode = process.env.DATA_MODE;
+
+  afterEach(() => {
+    if (originalDataMode === undefined) {
+      delete process.env.DATA_MODE;
+    } else {
+      process.env.DATA_MODE = originalDataMode;
+    }
+  });
+
+  it("returns deterministic placeholder ids when none exist yet", async () => {
+    process.env.DATA_MODE = "MOCK";
+
+    await expect(syncRewardCoupon(BASE_REWARD, "test-store")).resolves.toEqual({
+      bcPromotionId: "mock-promotion-1",
+      bcCouponCodeId: "mock-coupon-1",
+      bcCustomerGroupId: "mock-customer-group-1",
+    });
+  });
+
+  it("preserves already-set bc*Id fields instead of overwriting them", async () => {
+    process.env.DATA_MODE = "MOCK";
+
+    const reward = { ...BASE_REWARD, bcPromotionId: "real-promo", bcCouponCodeId: "real-coupon", bcCustomerGroupId: "real-group" };
+
+    await expect(syncRewardCoupon(reward, "test-store")).resolves.toEqual({
+      bcPromotionId: "real-promo",
+      bcCouponCodeId: "real-coupon",
+      bcCustomerGroupId: "real-group",
+    });
   });
 });
