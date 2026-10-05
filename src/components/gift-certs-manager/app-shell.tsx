@@ -1,6 +1,7 @@
 import { Box, Flex, FlexItem } from "@bigcommerce/big-design";
 import { AppExtensionStatusBanner } from "@/components/huntry/app-extension-status-banner";
 import { DataModeBanner } from "@/components/layout/data-mode-banner";
+import { BrandHeader } from "@/components/layout/brand-header";
 import { MainNav } from "@/components/layout/main-nav";
 import { StoreHashProvider } from "@/components/ui/store-hash-context";
 import { Suspense } from "react";
@@ -37,6 +38,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             alignItems={{ mobile: "stretch", wide: "flex-start" }}
           >
             <FlexItem flexGrow={1} flexShrink={1} flexBasis={{ mobile: "auto", wide: "0" }}>
+              <Box paddingBottom="medium">
+                <BrandHeader />
+              </Box>
               <Box paddingBottom="large">
                 <MainNav />
               </Box>

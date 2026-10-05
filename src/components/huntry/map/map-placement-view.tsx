@@ -693,8 +693,10 @@ export function MapPlacementView({
     return () => cancelAnimationFrame(frame);
   }, [editingEgg]);
 
-  // Keep-out circles (the event's marker radius around every egg) while
-  // placing/relocating, so the admin can see where a new egg won't fit.
+  // Keep-out circles around every egg while placing/relocating, so the admin
+  // can see where a new egg won't fit. Drawn at half the marker radius (as in
+  // huntry-admin-map.js): eggs must be a full radius apart, so valid
+  // neighbors' circles touch instead of overlapping.
   const editLat = editLocation?.lat;
   const editLng = editLocation?.lng;
 
@@ -719,7 +721,7 @@ export function MapPlacementView({
         features: centers.map((center) => ({
           type: "Feature",
           properties: {},
-          geometry: { type: "Polygon", coordinates: [circleRing(center, markerRadiusMeters)] },
+          geometry: { type: "Polygon", coordinates: [circleRing(center, markerRadiusMeters / 2)] },
         })),
       };
       const source = map.getSource(RADIUS_SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
@@ -1013,13 +1015,17 @@ export function MapPlacementView({
                   padding="small"
                   style={{ backgroundColor: HUNTRY_COLORS.background, borderBottom: "1px solid #E5E5EA" }}
                 >
-                  <Text margin="none">
+                  <Text margin="none" style={{ color: HUNTRY_COLORS.textMuted }}>
                     Click the map to place an egg.{" "}
                     {pending.length > 0 ? `${pending.length} pending — saved when you stop placing.` : ""}
                   </Text>
-                  <Button isLoading={isSaving} onClick={stopPlacing} variant="secondary">
-                    Stop Placing
-                  </Button>
+                  {/* BigDesign's Button drops style/className, so the red is
+                      applied to its .bd-button via this wrapper (egg-marker.css). */}
+                  <span className="huntry-stop-placing">
+                    <Button isLoading={isSaving} onClick={stopPlacing} variant="secondary">
+                      Stop Placing
+                    </Button>
+                  </span>
                 </Flex>
               ) : null}
               <div ref={mapContainerRef} style={{ flex: 1, height: "100%", width: "100%" }} />
@@ -1035,7 +1041,7 @@ export function MapPlacementView({
                   }}
                 >
                   <Box>
-                    <Text bold margin="none">
+                    <Text bold margin="none" style={{ color: HUNTRY_COLORS.textMuted }}>
                       Editing location of: {editLocation.name || editLocation.egg.name || "Unnamed egg"}
                     </Text>
                     <Text
@@ -1078,7 +1084,7 @@ export function MapPlacementView({
                       width: "0.75rem",
                     }}
                   />
-                  <Text margin="none">{reward.name}</Text>
+                  <Text margin="none" style={{ color: HUNTRY_COLORS.textMuted }}>{reward.name}</Text>
                 </Flex>
               ))}
             </Flex>

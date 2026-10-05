@@ -44,3 +44,17 @@
 .huntry-admin-egg-marker--ghost {
   filter: grayscale(1) opacity(0.55);
 }
+
+/* "Stop Placing": theme-red secondary button (HUNTRY_COLORS.destructive).
+   BigDesign's Button ignores style/className, so target its .bd-button. */
+.huntry-stop-placing .bd-button {
+  color: #e74c3c;
+  border-color: #e74c3c;
+}
+
+.huntry-stop-placing .bd-button:hover:not(:disabled),
+.huntry-stop-placing .bd-button:focus-visible {
+  color: #e74c3c;
+  border-color: #e74c3c;
+  background-color: #fdecea;
+}

@@ -130,10 +130,10 @@ export function EggPlaceDialog({
                   }}
                 />
                 <Box style={{ flex: 1, minWidth: 0 }}>
-                  <Text bold margin="none">
+                  <Text bold margin="none" style={{ color: HUNTRY_COLORS.textMuted }}>
                     {reward.name}
                   </Text>
-                  {meta ? <Small>{meta}</Small> : null}
+                  {meta ? <Small style={{ color: HUNTRY_COLORS.textMuted }}>{meta}</Small> : null}
                 </Box>
                 <span
                   style={{
@@ -154,7 +154,7 @@ export function EggPlaceDialog({
       </Box>
 
       <Flex alignItems="center" flexDirection="row" justifyContent="space-between" marginTop="medium">
-        <Small>
+        <Small style={{ color: HUNTRY_COLORS.textMuted }}>
           Lat: {lat.toFixed(6)} &nbsp; Lng: {lng.toFixed(6)}
         </Small>
         {mode === "edit" && onEditLocation ? (

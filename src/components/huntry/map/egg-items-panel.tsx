@@ -40,9 +40,11 @@ function RewardBadge({ rewardId, name, muted }: { rewardId: number; name: string
   return (
     <span
       style={{
-        backgroundColor: eggMarkerColor(rewardId),
+        // The reward color at ~20% opacity (hex alpha "33") so the badge reads
+        // as a soft tint; dark text keeps it legible on every palette color.
+        backgroundColor: `${eggMarkerColor(rewardId)}33`,
         borderRadius: "999px",
-        color: "#fff",
+        color: HUNTRY_COLORS.text,
         fontSize: "0.75rem",
         opacity: muted ? 0.65 : 1,
         padding: "0.125rem 0.5rem",
@@ -155,7 +157,7 @@ export function EggItemsPanel({
           <Text bold margin="none">
             Event Items
           </Text>
-          <Small>
+          <Small style={{ color: HUNTRY_COLORS.textMuted }}>
             Total placed: <strong>{eggs.length}</strong>
           </Small>
         </Box>
@@ -193,12 +195,12 @@ export function EggItemsPanel({
         {pending.map((egg) => (
           <div key={egg.key} style={ROW_STYLE}>
             <Box style={{ flex: 1, minWidth: 0 }}>
-              <Text bold margin="none">
+              <Text bold margin="none" style={{ color: HUNTRY_COLORS.textMuted }}>
                 {egg.name || "Pending — saved when you stop placing"}
               </Text>
               <Flex flexDirection="row" marginTop="xxSmall" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
                 <RewardBadge muted name={rewardName(egg.rewardId)} rewardId={egg.rewardId} />
-                <Small>Pending</Small>
+                <Small style={{ color: HUNTRY_COLORS.textMuted }}>Pending</Small>
               </Flex>
             </Box>
             <Button
@@ -244,7 +246,7 @@ export function EggItemsPanel({
                 }}
                 type="button"
               >
-                <Text bold margin="none">
+                <Text bold margin="none" style={{ color: HUNTRY_COLORS.textMuted }}>
                   {egg.name || "Unnamed egg"}
                 </Text>
                 <Flex flexDirection="row" marginTop="xxSmall" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
