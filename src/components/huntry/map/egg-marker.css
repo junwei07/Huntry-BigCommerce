@@ -1,0 +1,46 @@
+/*
+ * Egg marker + hover popup styles, ported from the plugin's
+ * huntry/assets/css/huntry-admin-map.css (.huntry-map-popup*, the
+ * .huntry-admin-egg-marker--* modifiers). Every marker modifier animates or
+ * sets `filter` only, never `transform` — MapLibre positions each marker via
+ * its own `transform` on the same element.
+ */
+
+.huntry-map-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.huntry-map-popup__meta {
+  color: #646970;
+  font-size: 12px;
+}
+
+/* Panel-row "jump to this egg" pulse. */
+@keyframes huntry-egg-marker-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0 rgba(232, 139, 89, 0));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(232, 139, 89, 0.9));
+  }
+}
+
+.huntry-admin-egg-marker--highlight {
+  animation: huntry-egg-marker-pulse 0.8s ease-in-out 3;
+}
+
+/* "Edit Location": the dragged marker glows... */
+.huntry-admin-egg-marker--dragging-active {
+  /* Chained drop-shadow() filter functions are space-separated, not
+     comma-separated — a comma makes the whole value invalid. */
+  filter: drop-shadow(0 0 6px rgba(232, 139, 89, 1)) drop-shadow(0 0 16px rgba(232, 139, 89, 0.85));
+}
+
+/* ...and the static ghost left at the original spot is greyed out. */
+.huntry-admin-egg-marker--ghost {
+  filter: grayscale(1) opacity(0.55);
+}

@@ -11,7 +11,7 @@ import { getAppUrl } from "@/lib/routing/app-url";
 // features, "/gift-certs" and "/customers"), Huntry is one feature mounted
 // at "/huntry" with these as nested sub-routes underneath it (see
 // app/store/[storeHash]/huntry/{page.tsx, map/, events/, rewards/,
-// sponsors/} and the matching app/(root)/huntry/... pass-throughs). isIndex
+// sponsors/, help/} and the matching app/(root)/huntry/... pass-throughs). isIndex
 // marks the item served at "/huntry" itself (also the app's root path, via
 // app/store/[storeHash]/page.tsx's pass-through) rather than a sub-route.
 const NAV_ITEMS = [
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { id: "events", title: "Events", isIndex: false },
   { id: "rewards", title: "Rewards", isIndex: false },
   { id: "sponsors", title: "Sponsors", isIndex: false },
+  { id: "help", title: "Help", isIndex: false },
 ];
 
 // A store-scoped path is "/store/<storeHash>/huntry/<subSection>" (see
