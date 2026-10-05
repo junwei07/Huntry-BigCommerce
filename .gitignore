@@ -27,6 +27,10 @@
 # local sqlite credentials store
 /data/*.sqlite*
 
+# maplibre-gl worker files, copied from node_modules by
+# scripts/copy-maplibre-worker.mjs at dev/build time
+/public/huntry/maplibre-worker/*
+
 # debug
 npm-debug.log*
 yarn-debug.log*
