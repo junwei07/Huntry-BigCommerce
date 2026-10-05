@@ -7,7 +7,7 @@ import styled from "styled-components";
 // BigDesign's Link visual styling (color/weight/hover-active transitions)
 // copied on top so it's a drop-in replacement visually. BigDesign's own Link
 // stays in use for genuinely external destinations (mailto:, tel:,
-// target="_blank" — see developer-info-panel.tsx).
+// target="_blank" — see help-page.tsx).
 export const AppLink = styled(NextLink)`
   color: ${({ theme }) => theme.colors.primary};
   cursor: pointer;

@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Box, Flex, H4, Link, Panel, Small, Text } from "@bigcommerce/big-design";
+import { Box, Flex, H1, H4, Link, Panel, Small, Text } from "@bigcommerce/big-design";
 import { BaselineHelpIcon } from "@bigcommerce/big-design-icons";
 
 const DEVELOPER_LOGO_FILENAME = process.env.DEVELOPER_LOGO_FILENAME || "developer-logo.svg";
@@ -8,9 +8,11 @@ const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@developer.dev";
 const SUPPORT_URL = process.env.SUPPORT_URL || "https://developer.dev/support";
 const SUPPORT_PHONE = process.env.SUPPORT_PHONE || "+1 (555) 010-0142";
 
-export function DeveloperInfoPanel() {
+export function HelpPage() {
   return (
-    <Panel>
+    <Box style={{ maxWidth: "480px" }}>
+      <H1>Help</H1>
+      <Panel>
       <Flex flexDirection="column" alignItems="center" marginBottom="large">
         <Image
           src={`/${DEVELOPER_LOGO_FILENAME}`}
@@ -42,6 +44,7 @@ export function DeveloperInfoPanel() {
           </Link>
         </Text>
       </Box>
-    </Panel>
+      </Panel>
+    </Box>
   );
 }
