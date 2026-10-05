@@ -3,7 +3,8 @@ import { getHuntryDb } from "@/lib/huntry/db/get-db";
 import { getDataMode, resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
 import { eggTag, EGGS_LIST_TAG, eventEggsTag } from "@/lib/huntry/eggs/cache-tags";
 import { addMockEggs, deleteMockEgg, MOCK_EGGS, updateMockEgg } from "@/lib/huntry/eggs/mock/mock-eggs";
-import { CreateEggInput, HuntryEgg, UpdateEggInput } from "@/lib/huntry/eggs/types";
+import { CreateEggInput, HuntryEgg, PlacedEggClaimCapacity, UpdateEggInput } from "@/lib/huntry/eggs/types";
+import { MOCK_EVENTS } from "@/lib/huntry/events/mock/mock-events";
 
 // @cache-components-only:drop-specifier cacheProfile
 import { cacheProfile, CACHE_PROFILE_STANDARD } from "@/lib/cache/cache-profiles";
@@ -228,6 +229,84 @@ export async function fetchEggUncached(id: string, storeHash: string | undefined
   ]);
 
   return result.rows[0] ? normalizePostgresRow(result.rows[0]) : undefined;
+}
+
+// BC-HUN-028: every egg currently placed for a reward, as the claim capacity
+// of its parent event — the input computeRewardUsageLimit sums. Uncached,
+// since it feeds a write to BigCommerce.
+export async function fetchPlacedEggCapacitiesUncached(
+  rewardId: number,
+  storeHash: string | undefined,
+): Promise<PlacedEggClaimCapacity[]> {
+  if (getDataMode() === "MOCK") {
+    return MOCK_EGGS.filter((egg) => egg.rewardId === rewardId).map((egg) => ({
+      eventClaimCapacity: MOCK_EVENTS.find((event) => event.id === egg.eventId)?.eggClaimCapacity ?? null,
+    }));
+  }
+
+  const resolvedStoreHash = resolveStoreHash(storeHash);
+
+  if (!resolvedStoreHash) {
+    return [];
+  }
+
+  const db = getHuntryDb();
+  let rows: { egg_claim_capacity: number | null }[];
+
+  if (db instanceof DatabaseSync) {
+    rows = db
+      .prepare(
+        `SELECT e.egg_claim_capacity FROM huntry_eggs g
+         LEFT JOIN huntry_events e ON e.id = g.event_id AND e.store_hash = g.store_hash
+         WHERE g.reward_id = ? AND g.store_hash = ?`,
+      )
+      .all(rewardId, resolvedStoreHash) as unknown as typeof rows;
+  } else {
+    rows = (
+      await db.query<(typeof rows)[number]>(
+        `SELECT e.egg_claim_capacity FROM huntry_eggs g
+         LEFT JOIN huntry_events e ON e.id = g.event_id AND e.store_hash = g.store_hash
+         WHERE g.reward_id = $1 AND g.store_hash = $2`,
+        [rewardId, resolvedStoreHash],
+      )
+    ).rows;
+  }
+
+  return rows.map((row) => ({ eventClaimCapacity: row.egg_claim_capacity }));
+}
+
+// BC-HUN-028: the distinct rewards with at least one egg in an event — the
+// fan-out set when the event's claim capacity changes or the event is deleted.
+export async function fetchRewardIdsForEventUncached(
+  eventId: number,
+  storeHash: string | undefined,
+): Promise<number[]> {
+  if (getDataMode() === "MOCK") {
+    return [...new Set(MOCK_EGGS.filter((egg) => egg.eventId === eventId).map((egg) => egg.rewardId))];
+  }
+
+  const resolvedStoreHash = resolveStoreHash(storeHash);
+
+  if (!resolvedStoreHash) {
+    return [];
+  }
+
+  const db = getHuntryDb();
+
+  if (db instanceof DatabaseSync) {
+    const rows = db
+      .prepare("SELECT DISTINCT reward_id FROM huntry_eggs WHERE event_id = ? AND store_hash = ?")
+      .all(eventId, resolvedStoreHash) as unknown as { reward_id: number }[];
+
+    return rows.map((row) => row.reward_id);
+  }
+
+  const result = await db.query<{ reward_id: number }>(
+    "SELECT DISTINCT reward_id FROM huntry_eggs WHERE event_id = $1 AND store_hash = $2",
+    [eventId, resolvedStoreHash],
+  );
+
+  return result.rows.map((row) => row.reward_id);
 }
 
 // Inserts every egg in one transaction (the Stop Placing batch commits or

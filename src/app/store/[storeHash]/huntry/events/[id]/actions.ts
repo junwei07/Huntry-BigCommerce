@@ -3,7 +3,9 @@
 import { updateTag } from "next/cache";
 import { ActionResult } from "@/lib/actions/action-result";
 import { eventTag, EVENTS_LIST_TAG } from "@/lib/huntry/events/cache-tags";
+import { fetchRewardIdsForEventUncached } from "@/lib/huntry/eggs/eggs-api";
 import { deleteEvent, fetchEventUncached, updateEvent } from "@/lib/huntry/events/events-api";
+import { recomputeRewardsUsageLimits, withUsageLimitWarning } from "@/lib/huntry/rewards/coupon-sync";
 import { eventFormSchema, EventFormInput } from "@/lib/huntry/events/event-form-schema";
 import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
 import { toSafeMessage } from "@/lib/errors/app-error";
@@ -74,7 +76,16 @@ export async function updateHuntryEvent(id: number, input: EventFormInput, store
     updateTag(EVENTS_LIST_TAG);
     updateTag(eventTag(id));
 
-    return { success: true, message: `Event "${updated.name}" updated.` };
+    // Every reward with an egg in this event draws its coupon max_uses from
+    // eggClaimCapacity, so a change fans out across all of them
+    // (recomputeRewardsUsageLimits bounds the concurrency). Other edits
+    // can't move any coupon's limit.
+    const recompute =
+      eggClaimCapacity !== existing.eggClaimCapacity
+        ? await recomputeRewardsUsageLimits(await fetchRewardIdsForEventUncached(id, storeHash), storeHash)
+        : { updated: 0, failed: [] };
+
+    return { success: true, message: withUsageLimitWarning(`Event "${updated.name}" updated.`, recompute) };
   } catch (error) {
     logError(`updateHuntryEvent: event ${id}`, error);
 
@@ -90,7 +101,14 @@ export async function deleteHuntryEvent(id: number, storeHash: string | undefine
     return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
   }
 
+  let rewardIds: number[] = [];
+
   try {
+    // Deleting the event cascades to its eggs, so capture the affected
+    // rewards first — afterwards there's no way to tell which coupons lost
+    // egg capacity.
+    rewardIds = await fetchRewardIdsForEventUncached(id, storeHash);
+
     const deleted = await deleteEvent(id, storeHash);
 
     if (!deleted) {
@@ -105,5 +123,7 @@ export async function deleteHuntryEvent(id: number, storeHash: string | undefine
   updateTag(EVENTS_LIST_TAG);
   updateTag(eventTag(id));
 
-  return { success: true, message: "Event deleted." };
+  const recompute = await recomputeRewardsUsageLimits(rewardIds, storeHash);
+
+  return { success: true, message: withUsageLimitWarning("Event deleted.", recompute) };
 }

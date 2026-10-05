@@ -15,6 +15,16 @@ vi.mock("next/cache", () => ({
   updateTag: vi.fn(),
 }));
 
+// BC-HUN-028: spy on the recompute so these tests can assert which rewards
+// each trigger asks about without a BigCommerce client (coupon-sync.test.ts
+// covers the recompute itself). The real withUsageLimitWarning stays.
+const recomputeMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/huntry/rewards/coupon-sync", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/huntry/rewards/coupon-sync")>()),
+  recomputeRewardsUsageLimits: recomputeMock,
+}));
+
 const cookieJar = new Map<string, string>();
 
 vi.mock("next/headers", () => ({
@@ -37,6 +47,7 @@ const OTHER_STORE = "store-b";
 
 beforeEach(() => {
   cookieJar.clear();
+  recomputeMock.mockReset().mockResolvedValue({ updated: 0, failed: [] });
   tempDir = mkdtempSync(path.join(tmpdir(), "huntry-map-actions-test-"));
   process.env.CREDENTIALS_STORE_DRIVER = "SQLITE";
   process.env.CREDENTIALS_SQLITE_PATH = path.join(tempDir, "credentials.sqlite");
@@ -269,5 +280,107 @@ describe("deleteHuntryEgg", () => {
     expect(await deleteHuntryEgg(egg.id, STORE)).toEqual({ success: true, message: "Egg deleted." });
     expect(await fetchEggUncached(egg.id, STORE)).toBeUndefined();
     expect((await deleteHuntryEgg(egg.id, STORE)).success).toBe(false);
+  });
+});
+
+// BC-HUN-028
+describe("usage-limit recompute triggers", () => {
+  async function placeOne(rewardId: number, eventId: number, step: number) {
+    const { createEggs } = await import("@/lib/huntry/eggs/eggs-api");
+
+    return (await createEggs([{ eventId, rewardId, name: "Egg", ...spot(step) }], STORE))[0];
+  }
+
+  it("recomputes each distinct reward once after a placement batch", async () => {
+    await authorize(STORE);
+
+    const { event, roomy, tiny } = await seed();
+    const { saveHuntryEggPlacements } = await import("@/app/store/[storeHash]/huntry/map/actions");
+
+    await saveHuntryEggPlacements(
+      event.id,
+      [
+        { rewardId: roomy.id, name: "A", ...spot(0) },
+        { rewardId: roomy.id, name: "B", ...spot(1) },
+        { rewardId: tiny.id, name: "C", ...spot(2) },
+      ],
+      STORE,
+    );
+
+    expect(recomputeMock).toHaveBeenCalledTimes(1);
+    expect([...recomputeMock.mock.calls[0][0]].sort()).toEqual([roomy.id, roomy.id, tiny.id].sort());
+    expect(recomputeMock.mock.calls[0][1]).toBe(STORE);
+  });
+
+  it("only recomputes rewards whose eggs were actually accepted", async () => {
+    await authorize(STORE);
+
+    const { event, roomy, tiny } = await seed();
+    const { saveHuntryEggPlacements } = await import("@/app/store/[storeHash]/huntry/map/actions");
+
+    await saveHuntryEggPlacements(
+      event.id,
+      [
+        { rewardId: roomy.id, name: "A", ...spot(0) },
+        { rewardId: tiny.id, name: "TooClose", ...spot(0) },
+      ],
+      STORE,
+    );
+
+    expect(recomputeMock.mock.calls[0][0]).toEqual([roomy.id]);
+  });
+
+  it("surfaces a recompute failure as a warning without undoing the placement", async () => {
+    await authorize(STORE);
+    recomputeMock.mockResolvedValue({ updated: 0, failed: [{ rewardId: 1, message: "rate limited" }] });
+
+    const { event, roomy } = await seed();
+    const { saveHuntryEggPlacements } = await import("@/app/store/[storeHash]/huntry/map/actions");
+    const { fetchEggsUncached } = await import("@/lib/huntry/eggs/eggs-api");
+
+    const result = await saveHuntryEggPlacements(event.id, [{ rewardId: roomy.id, name: "A", ...spot(0) }], STORE);
+
+    expect(result.success).toBe(true);
+    expect(result.message).toMatch(/1 egg placed\..*usage limit failed/);
+    expect(await fetchEggsUncached(event.id, STORE)).toHaveLength(1);
+  });
+
+  it("recomputes both the old and new reward when an egg changes reward", async () => {
+    await authorize(STORE);
+
+    const { event, roomy, tiny } = await seed();
+    const egg = await placeOne(roomy.id, event.id, 0);
+    const { updateHuntryEgg } = await import("@/app/store/[storeHash]/huntry/map/actions");
+
+    await updateHuntryEgg(egg.id, { rewardId: tiny.id, name: "Egg" }, STORE);
+
+    expect(recomputeMock).toHaveBeenCalledTimes(1);
+    expect(recomputeMock.mock.calls[0][0]).toEqual([roomy.id, tiny.id]);
+  });
+
+  it("does not recompute when an egg is only renamed or relocated", async () => {
+    await authorize(STORE);
+
+    const { event, roomy } = await seed();
+    const egg = await placeOne(roomy.id, event.id, 0);
+    const { updateHuntryEgg } = await import("@/app/store/[storeHash]/huntry/map/actions");
+
+    await updateHuntryEgg(egg.id, { rewardId: roomy.id, name: "Renamed", ...spot(4) }, STORE);
+
+    expect(recomputeMock).not.toHaveBeenCalled();
+  });
+
+  it("recomputes the egg's reward after a delete, and not for an already-gone egg", async () => {
+    await authorize(STORE);
+
+    const { event, roomy } = await seed();
+    const egg = await placeOne(roomy.id, event.id, 0);
+    const { deleteHuntryEgg } = await import("@/app/store/[storeHash]/huntry/map/actions");
+
+    await deleteHuntryEgg(egg.id, STORE);
+    await deleteHuntryEgg(egg.id, STORE);
+
+    expect(recomputeMock).toHaveBeenCalledTimes(1);
+    expect(recomputeMock.mock.calls[0][0]).toEqual([roomy.id]);
   });
 });

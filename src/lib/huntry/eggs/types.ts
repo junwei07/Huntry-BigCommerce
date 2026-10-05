@@ -32,3 +32,10 @@ export interface PendingEgg {
   lat: number;
   lng: number;
 }
+
+// One placed egg's contribution to its reward's coupon max_uses (BC-HUN-028):
+// the parent event's egg_claim_capacity, or null when the egg has no parent
+// event (the legacy huntry_calculate_reward_usage_limit() counts that as 1).
+export interface PlacedEggClaimCapacity {
+  eventClaimCapacity: number | null;
+}

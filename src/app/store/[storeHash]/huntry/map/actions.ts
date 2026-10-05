@@ -17,6 +17,7 @@ import { isFarEnough } from "@/lib/huntry/eggs/geo";
 import { MAX_EGGS_PER_REWARD } from "@/lib/huntry/eggs/limits";
 import { planEggPlacements } from "@/lib/huntry/eggs/placement";
 import { fetchEventUncached } from "@/lib/huntry/events/events-api";
+import { recomputeRewardsUsageLimits, withUsageLimitWarning } from "@/lib/huntry/rewards/coupon-sync";
 import { fetchRewardUncached } from "@/lib/huntry/rewards/rewards-api";
 import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
 import { toSafeMessage } from "@/lib/errors/app-error";
@@ -91,11 +92,17 @@ export async function saveHuntryEggPlacements(
       storeHash,
     );
 
-    // BC-HUN-028: recompute max_uses for every touched reward's coupon here.
     invalidateEggs(eventId);
 
+    const recompute = await recomputeRewardsUsageLimits(
+      plan.accepted.map((egg) => egg.rewardId),
+      storeHash,
+    );
     const skipped = plan.skippedTooClose + plan.skippedNoCapacity;
-    const placedMessage = `${plan.accepted.length} egg${plan.accepted.length === 1 ? "" : "s"} placed.`;
+    const placedMessage = withUsageLimitWarning(
+      `${plan.accepted.length} egg${plan.accepted.length === 1 ? "" : "s"} placed.`,
+      recompute,
+    );
 
     if (skipped === 0) {
       return { success: true, message: placedMessage };
@@ -195,10 +202,16 @@ export async function updateHuntryEgg(
       return { success: false, message: EGG_NOT_FOUND_MESSAGE };
     }
 
-    // BC-HUN-028: a reward change moves one egg between two coupons' budgets.
     invalidateEggs(egg.eventId, id);
 
-    return { success: true, message: "Egg updated." };
+    // A reward change moves one egg between two coupons' budgets; a rename or
+    // relocation leaves both unchanged, so there's nothing to recompute.
+    const recompute =
+      rewardId !== egg.rewardId
+        ? await recomputeRewardsUsageLimits([egg.rewardId, rewardId], storeHash)
+        : { updated: 0, failed: [] };
+
+    return { success: true, message: withUsageLimitWarning("Egg updated.", recompute) };
   } catch (error) {
     logError(`updateHuntryEgg: egg ${id}`, error);
 
@@ -220,10 +233,11 @@ export async function deleteHuntryEgg(id: string, storeHash: string | undefined)
       return { success: false, message: EGG_NOT_FOUND_MESSAGE };
     }
 
-    // BC-HUN-028: recompute max_uses for the egg's reward coupon here.
     invalidateEggs(egg.eventId, id);
 
-    return { success: true, message: "Egg deleted." };
+    const recompute = await recomputeRewardsUsageLimits([egg.rewardId], storeHash);
+
+    return { success: true, message: withUsageLimitWarning("Egg deleted.", recompute) };
   } catch (error) {
     logError(`deleteHuntryEgg: egg ${id}`, error);
 

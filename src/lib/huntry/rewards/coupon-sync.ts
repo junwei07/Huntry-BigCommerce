@@ -1,7 +1,12 @@
 import { getDataMode } from "@/lib/bc-api-client/resolve-store-credentials";
 import { getRestApiClient } from "@/lib/bc-api-client/get-rest-api-client";
+import { fetchPlacedEggCapacitiesUncached } from "@/lib/huntry/eggs/eggs-api";
 import { MAX_EGGS_PER_REWARD } from "@/lib/huntry/eggs/limits";
+import { PlacedEggClaimCapacity } from "@/lib/huntry/eggs/types";
+import { fetchRewardUncached } from "@/lib/huntry/rewards/rewards-api";
 import { HuntryReward, RewardCouponFields } from "@/lib/huntry/rewards/types";
+import { toSafeMessage } from "@/lib/errors/app-error";
+import { logError } from "@/lib/errors/logger";
 
 // Direct port of the legacy WP plugin's coupon-sync.php
 // (huntry_sync_reward_coupon()), called from the reward create/edit Server
@@ -17,38 +22,32 @@ import { HuntryReward, RewardCouponFields } from "@/lib/huntry/rewards/types";
 // the restricted product ids embedded directly as items.products, a plain
 // array — one rule covers every selected product) for product-restricted.
 // Confirmed by reading back a real promotion created through BigCommerce's
-// own admin UI, not guessed. The coupon-codes sub-resource body (max_uses/
-// max_uses_per_customer) and the PUT-rename-then-fallback behavior in
-// syncCouponCode are still unconfirmed live — adjust if a future save
-// surfaces another validation error there.
+// own admin UI, not guessed. BigCommerce's docs list only POST for a coupon
+// code (no PUT/update endpoint), so syncCouponCode's PUT always throws and
+// the delete+recreate fallback is the real rename path. The redemption
+// limit is set on the Promotion's own max_uses, which overrides the code's.
 
 export type CouponSyncResult = RewardCouponFields;
 
-interface PlacedEggClaimCapacity {
-  // null when the egg has no parent event — the legacy
-  // huntry_calculate_reward_usage_limit() counts that case as 1.
-  eventClaimCapacity: number | null;
-}
-
-// Direct port of huntry_calculate_reward_usage_limit(): if no eggs are
-// placed yet, fall back to the reward's own flat egg_capacity field (or
-// MAX_EGGS_PER_REWARD if that's <= 0); otherwise sum each placed egg's
-// parent event's claim capacity (or 1 with no parent event). Parameterized
-// so BC-HUN-028 (usage-limit recompute on egg/event changes) can reuse it
-// with real placed-egg data without duplicating the algorithm — BC-HUN-020
-// always calls this with an empty array, since no huntry_eggs query exists
-// yet (BC-HUN-024/025 land eggs in Week 3).
+// A reward's redemption budget = how many eggs it may have (egg_capacity) x
+// how many different players can claim each one (the event's claim
+// capacity), independent of how many eggs are placed yet. Deliberately NOT
+// a port of huntry_calculate_reward_usage_limit() (huntry/includes/rewards/
+// coupon-sync.php:76), which sums the claim capacity of each *placed* egg
+// and so only reaches eggs x claims once every egg is placed — a user-
+// directed departure so the coupon is sized for the reward's full capacity
+// from the start. A reward whose eggs span events uses the highest claim
+// capacity among them; with none placed (or no parent event) it counts as 1.
+// egg_capacity <= 0 keeps the MAX_EGGS_PER_REWARD fallback. Parameterized so
+// recomputeRewardUsageLimit (BC-HUN-028) can pass real placed-egg data.
 export function computeRewardUsageLimit(
   reward: Pick<HuntryReward, "eggCapacity">,
   placedEggs: PlacedEggClaimCapacity[],
 ): number {
-  if (placedEggs.length === 0) {
-    return reward.eggCapacity > 0 ? reward.eggCapacity : MAX_EGGS_PER_REWARD;
-  }
+  const eggs = reward.eggCapacity > 0 ? reward.eggCapacity : MAX_EGGS_PER_REWARD;
+  const claimCapacity = Math.max(1, ...placedEggs.map((egg) => egg.eventClaimCapacity ?? 1));
 
-  const usageLimit = placedEggs.reduce((sum, egg) => sum + (egg.eventClaimCapacity ?? 1), 0);
-
-  return usageLimit > 0 ? usageLimit : MAX_EGGS_PER_REWARD;
+  return eggs * claimCapacity;
 }
 
 type DiscountAmount = { percentage_amount: string } | { fixed_amount: string };
@@ -85,6 +84,12 @@ interface PromotionRequestBody {
   rules: PromotionRule[];
   // Present only once a reward has a synced Customer Group — BC-HUN-021.
   customer?: PromotionCustomerCondition;
+  // The reward's total redemption budget (computeRewardUsageLimit). Lives on
+  // the Promotion, not just the coupon code: BigCommerce documents that the
+  // parent promotion's max_uses overrides the code's, and the coupon list's
+  // "0/Unlimited" reads this one. There is no PUT for an existing coupon
+  // code at all (only POST), so this is also the only updatable place.
+  max_uses?: number;
 }
 
 interface PromotionResource {
@@ -151,7 +156,7 @@ function buildDiscountAction(reward: HuntryReward): PromotionRuleAction {
 // unit-testable without a REST client. Only includes `customer` once a
 // Customer Group has actually been synced (bcCustomerGroupId set) —
 // syncRewardCoupon always calls this with that already threaded through.
-export function buildPromotionRequestBody(reward: HuntryReward): PromotionRequestBody {
+export function buildPromotionRequestBody(reward: HuntryReward, maxUses?: number): PromotionRequestBody {
   const body: PromotionRequestBody = {
     name: reward.name,
     redemption_type: "COUPON",
@@ -162,6 +167,10 @@ export function buildPromotionRequestBody(reward: HuntryReward): PromotionReques
 
   if (reward.bcCustomerGroupId) {
     body.customer = { group_ids: [Number(reward.bcCustomerGroupId)] };
+  }
+
+  if (maxUses !== undefined) {
+    body.max_uses = maxUses;
   }
 
   return body;
@@ -205,12 +214,17 @@ async function syncCustomerGroup(
   return response.data;
 }
 
+async function computeUsageLimitForReward(reward: HuntryReward, storeHash: string | undefined): Promise<number> {
+  return computeRewardUsageLimit(reward, await fetchPlacedEggCapacitiesUncached(reward.id, storeHash));
+}
+
 async function syncPromotion(
   reward: HuntryReward,
+  maxUses: number,
   storeHash: string | undefined,
 ): Promise<PromotionResource> {
   const apiClient = await getRestApiClient(storeHash);
-  const body = buildPromotionRequestBody(reward);
+  const body = buildPromotionRequestBody(reward, maxUses);
 
   if (reward.bcPromotionId) {
     const response = await apiClient.put<V3SingleResponse<PromotionResource>>(
@@ -237,12 +251,13 @@ async function syncPromotion(
 async function syncCouponCode(
   reward: HuntryReward,
   promotionId: string,
+  maxUses: number,
   storeHash: string | undefined,
 ): Promise<CouponCodeResource> {
   const apiClient = await getRestApiClient(storeHash);
   const codeBody: CouponCodeRequestBody = {
     code: reward.couponCode as string,
-    max_uses: computeRewardUsageLimit(reward, []),
+    max_uses: maxUses,
     max_uses_per_customer: 1,
   };
 
@@ -306,12 +321,91 @@ export async function syncRewardCoupon(
   const customerGroup = await syncCustomerGroup(reward, storeHash);
   const rewardWithGroup: HuntryReward = { ...reward, bcCustomerGroupId: String(customerGroup.id) };
 
-  const promotion = await syncPromotion(rewardWithGroup, storeHash);
-  const couponCode = await syncCouponCode(rewardWithGroup, String(promotion.id), storeHash);
+  const maxUses = await computeUsageLimitForReward(reward, storeHash);
+  const promotion = await syncPromotion(rewardWithGroup, maxUses, storeHash);
+  const couponCode = await syncCouponCode(rewardWithGroup, String(promotion.id), maxUses, storeHash);
 
   return {
     bcPromotionId: String(promotion.id),
     bcCouponCodeId: String(couponCode.id),
     bcCustomerGroupId: String(customerGroup.id),
   };
+}
+
+// BC-HUN-028: re-derives a reward's redemption budget from its currently
+// placed eggs and PUTs it as the Promotion's max_uses. BigCommerce has no
+// update endpoint for an existing coupon code (POST only), and the
+// promotion-level max_uses overrides the code's anyway — so this never
+// touches the code, and the code the customers already hold stays valid. Sends the full promotion
+// body (what syncPromotion already sends) rather than a partial one. A
+// reward that was never synced has no promotion to update, and MOCK mode
+// never talks to BigCommerce. Throws on upstream failure.
+export async function recomputeRewardUsageLimit(
+  reward: HuntryReward,
+  storeHash: string | undefined,
+): Promise<void> {
+  if (getDataMode() === "MOCK" || !reward.bcPromotionId) {
+    return;
+  }
+
+  const apiClient = await getRestApiClient(storeHash);
+  const maxUses = await computeUsageLimitForReward(reward, storeHash);
+
+  await apiClient.put(`/v3/promotions/${reward.bcPromotionId}`, { body: buildPromotionRequestBody(reward, maxUses) });
+}
+
+// Bounds the burst of Promotions API calls an event-capacity edit can fan
+// out into (docs/MIGRATION.md §7 "Event-level max_uses fan-out") — a small
+// worker pool rather than Promise.all over every reward.
+const RECOMPUTE_CONCURRENCY = 4;
+
+export interface UsageLimitRecomputeResult {
+  updated: number;
+  failed: { rewardId: number; message: string }[];
+}
+
+// Recomputes every distinct reward id, isolating failures so one broken
+// coupon doesn't stop the rest. Never throws: callers run this after their
+// own DB write has committed and only need to report what failed.
+export async function recomputeRewardsUsageLimits(
+  rewardIds: number[],
+  storeHash: string | undefined,
+): Promise<UsageLimitRecomputeResult> {
+  const queue = [...new Set(rewardIds)];
+  const result: UsageLimitRecomputeResult = { updated: 0, failed: [] };
+
+  async function worker(): Promise<void> {
+    for (let rewardId = queue.shift(); rewardId !== undefined; rewardId = queue.shift()) {
+      try {
+        const reward = await fetchRewardUncached(rewardId, storeHash);
+
+        if (reward) {
+          await recomputeRewardUsageLimit(reward, storeHash);
+        }
+
+        result.updated += 1;
+      } catch (error) {
+        logError(`recomputeRewardsUsageLimits: reward ${rewardId}`, error);
+        result.failed.push({ rewardId, message: toSafeMessage(error, "an unexpected error occurred") });
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(RECOMPUTE_CONCURRENCY, queue.length) }, worker));
+
+  return result;
+}
+
+// Appends a coupon-limit warning to an action's success message when any
+// recompute failed — the egg/event write already committed, so this is a
+// "saved, but" notice rather than a failure (matches updateHuntryReward's
+// coupon-failure wording).
+export function withUsageLimitWarning(message: string, recompute: UsageLimitRecomputeResult): string {
+  if (recompute.failed.length === 0) {
+    return message;
+  }
+
+  return `${message} However, updating the coupon usage limit failed for ${recompute.failed.length} reward${
+    recompute.failed.length === 1 ? "" : "s"
+  } (${recompute.failed.map((failure) => `#${failure.rewardId}`).join(", ")}). Save the reward again to retry.`;
 }

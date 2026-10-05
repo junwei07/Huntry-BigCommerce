@@ -75,6 +75,7 @@ export function EventFormFields({
           </FlexItem>
           <FlexItem flexGrow={1}>
             <Input
+              description="Maximum number of eggs a single player can claim during this event. Use 0 for unlimited."
               label="Max user grab count"
               onChange={(event) => onChange({ maxGrabCount: event.target.value })}
               type="number"
@@ -83,6 +84,7 @@ export function EventFormFields({
           </FlexItem>
           <FlexItem flexGrow={1}>
             <Input
+              description="How many different players can claim the same egg before it becomes fully claimed."
               label="Item claim count"
               onChange={(event) => onChange({ eggClaimCapacity: event.target.value })}
               type="number"
