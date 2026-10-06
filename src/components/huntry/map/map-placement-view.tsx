@@ -6,7 +6,8 @@ import "@/components/huntry/map/egg-marker.css";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import * as maplibregl from "maplibre-gl";
-import { Box, Button, Flex, Select, Text } from "@bigcommerce/big-design";
+import { Box, Button, Flex, Text } from "@bigcommerce/big-design";
+import { FormSelect } from "@/components/ui/form-select";
 import {
   deleteHuntryEgg,
   saveHuntryEggPlacements,
@@ -982,7 +983,7 @@ export function MapPlacementView({
   return (
     <Box>
       <Box marginBottom="medium" style={{ maxWidth: "20rem" }}>
-        <Select
+        <FormSelect
           disabled={isPending}
           label="Event"
           onOptionChange={selectEvent}

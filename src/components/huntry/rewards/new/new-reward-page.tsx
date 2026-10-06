@@ -1,7 +1,6 @@
 import { Box } from "@bigcommerce/big-design";
 import { NewRewardForm } from "@/components/huntry/rewards/new/new-reward-form";
 import { fetchSponsors } from "@/lib/huntry/sponsors/sponsors-api";
-import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 
 // Fetches the sponsor dropdown's options server-side, unlike
 // NewSponsorPage/NewEventPage — neither of those forms depends on another
@@ -20,7 +19,7 @@ export async function NewRewardPage({
   const sponsors = await fetchSponsors({ direction: "ASC" }, storeHashString);
 
   return (
-    <Box padding="medium" style={{ backgroundColor: HUNTRY_COLORS.background }}>
+    <Box padding="medium">
       <NewRewardForm sponsors={sponsors} />
     </Box>
   );

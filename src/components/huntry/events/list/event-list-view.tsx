@@ -36,7 +36,7 @@ export async function EventListView({
   // @cache-components-only:end
 
   return (
-    <Box padding="medium" style={{ backgroundColor: HUNTRY_COLORS.background }}>
+    <Box padding="medium">
       <Panel header="Events" style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
         <Flex alignItems="center" justifyContent="space-between" marginBottom="medium">
           <SortToggle query={query} />

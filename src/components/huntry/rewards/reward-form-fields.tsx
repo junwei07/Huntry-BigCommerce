@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Flex, FlexItem, Input, Select, Textarea } from "@bigcommerce/big-design";
+import { Box, Flex, FlexItem, Input, Textarea } from "@bigcommerce/big-design";
+import { FormSelect } from "@/components/ui/form-select";
 import { ProductPicker } from "@/components/huntry/rewards/product-picker";
 import { RewardFormInput } from "@/lib/huntry/rewards/reward-form-schema";
 import { HuntrySponsor } from "@/lib/huntry/sponsors/types";
@@ -57,7 +58,7 @@ export function RewardFormFields({
       </Box>
 
       <Box marginBottom="medium">
-        <Select
+        <FormSelect
           label="Select Sponsor"
           onOptionChange={(value) => onChange({ sponsorId: value ?? "" })}
           options={sponsorOptions}
@@ -111,7 +112,7 @@ export function RewardFormFields({
       <Box marginBottom="medium">
         <Flex flexGap="1rem">
           <FlexItem flexGrow={1}>
-            <Select
+            <FormSelect
               label="Discount Type"
               onOptionChange={(value) => value && onChange({ discountType: value })}
               options={[...DISCOUNT_TYPE_OPTIONS]}
@@ -132,7 +133,7 @@ export function RewardFormFields({
       </Box>
 
       <Box marginBottom="medium">
-        <Select
+        <FormSelect
           label="Can be used on"
           onOptionChange={(value) => value && onChange({ discountScope: value })}
           options={[...DISCOUNT_SCOPE_OPTIONS]}

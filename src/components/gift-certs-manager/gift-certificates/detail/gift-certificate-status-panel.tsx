@@ -1,4 +1,5 @@
-import { Box, Panel, Select, Small, Text } from "@bigcommerce/big-design";
+import { Box, Panel, Small, Text } from "@bigcommerce/big-design";
+import { FormSelect } from "@/components/ui/form-select";
 import { GIFT_CERTIFICATE_STATUSES, GIFT_CERTIFICATE_STATUS_LABEL } from "@/lib/gift-certs-manager/gift-certificates/status";
 import { GiftCertificateStatus, GiftCertificateWithAccounts } from "@/lib/gift-certs-manager/gift-certificates/types";
 
@@ -35,7 +36,7 @@ export function GiftCertificateStatusPanel({ giftCertificate, status, onStatusCh
       <DetailField label="Original Value">{currencyFormatter.format(giftCertificate.amount)}</DetailField>
 
       <Box marginBottom="none">
-        <Select
+        <FormSelect
           label="Status"
           onOptionChange={(value) => value && onStatusChange(value)}
           options={STATUS_OPTIONS}

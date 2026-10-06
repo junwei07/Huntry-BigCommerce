@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Box, Button, Dropdown, DropdownItem, Flex, Input, Select, Small, Text } from "@bigcommerce/big-design";
+import { Box, Button, Dropdown, DropdownItem, Flex, Input, Small, Text } from "@bigcommerce/big-design";
+import { FormSelect } from "@/components/ui/form-select";
 import { MoreHorizIcon } from "@bigcommerce/big-design-icons";
 import { HuntryEgg, PendingEgg } from "@/lib/huntry/eggs/types";
 import { HuntryReward } from "@/lib/huntry/rewards/types";
@@ -174,13 +175,13 @@ export function EggItemsPanel({
       />
 
       <Flex flexDirection="row" marginTop="small" marginBottom="small" style={{ gap: "0.5rem" }}>
-        <Select
+        <FormSelect
           label="Reward"
           onOptionChange={(value) => setRewardFilter(value === null ? "" : String(value))}
           options={rewardOptions}
           value={rewardFilter}
         />
-        <Select
+        <FormSelect
           label="Status"
           onOptionChange={(value) => setStatusFilter((value ?? "") as StatusFilter)}
           options={STATUS_OPTIONS}

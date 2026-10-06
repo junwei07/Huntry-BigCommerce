@@ -1,0 +1,11 @@
+.huntry-select {
+  position: relative;
+}
+
+.huntry-select > div > div:last-child:has([role="option"]) {
+  width: 100%;
+}
+
+.huntry-select [role="option"] {
+  min-width: 0;
+}
