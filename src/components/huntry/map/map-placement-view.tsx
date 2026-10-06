@@ -10,6 +10,7 @@ import { Box, Button, Flex, Text } from "@bigcommerce/big-design";
 import { FormSelect } from "@/components/ui/form-select";
 import {
   deleteHuntryEgg,
+  forceClaimHuntryEgg,
   saveHuntryEggPlacements,
   updateHuntryEgg,
 } from "@/app/store/[storeHash]/huntry/map/actions";
@@ -25,6 +26,7 @@ import {
 import { HuntryGeolocateControl } from "@/components/huntry/map/geolocate-control";
 import {
   EggDeleteDialog,
+  EggForceClaimDialog,
   EggLimitDialog,
   EggProximityDialog,
   UnsavedChangesDialog,
@@ -43,6 +45,7 @@ type Dialog =
   | { kind: "place"; lat: number; lng: number }
   | { kind: "edit"; egg: HuntryEgg }
   | { kind: "delete"; egg: HuntryEgg }
+  | { kind: "forceClaim"; egg: HuntryEgg }
   | { kind: "limit" }
   | { kind: "proximity" }
   | { kind: "unsaved"; onLeave: () => void };
@@ -440,6 +443,7 @@ export function MapPlacementView({
 
   const openEdit = useCallback((egg: HuntryEgg) => setDialog({ kind: "edit", egg }), []);
   const openDelete = useCallback((egg: HuntryEgg) => setDialog({ kind: "delete", egg }), []);
+  const openForceClaim = useCallback((egg: HuntryEgg) => setDialog({ kind: "forceClaim", egg }), []);
 
   // Latest data for the hover popup, read at hover time through a ref so the
   // marker effect below only re-runs when the eggs themselves change (a
@@ -944,6 +948,19 @@ export function MapPlacementView({
     });
   };
 
+  // Unlike the plugin's form-POST flow, this doesn't reload the page, so queued
+  // (unsaved) placements survive a Force Claim. The dialog stays open on
+  // failure so the admin can correct the email.
+  const confirmForceClaim = (egg: HuntryEgg, email: string) => {
+    startSaving(async () => {
+      const result = await runServerAction(() => forceClaimHuntryEgg(egg.id, email, storeHash));
+
+      if (result.success) {
+        setDialog(null);
+      }
+    });
+  };
+
   // Cleans up the popup-closed poll below if this component unmounts
   // mid-flight (e.g. the admin navigates away before answering the prompt).
   useEffect(() => resetLocating, [resetLocating]);
@@ -1097,6 +1114,7 @@ export function MapPlacementView({
           highlight={highlight}
           onDeleteEgg={openDelete}
           onEditEgg={openEdit}
+          onForceClaimEgg={openForceClaim}
           onPlaceItem={() => setIsPlacing(true)}
           onRemovePending={(key) => setPending((current) => current.filter((egg) => egg.key !== key))}
           onSelectEgg={flyToEgg}
@@ -1138,6 +1156,14 @@ export function MapPlacementView({
           isDeleting={isSaving}
           onCancel={() => setDialog(null)}
           onConfirm={() => confirmDelete(dialog.egg)}
+        />
+      ) : null}
+      {dialog?.kind === "forceClaim" ? (
+        <EggForceClaimDialog
+          eggName={dialog.egg.name || "Unnamed egg"}
+          isSaving={isSaving}
+          onCancel={() => setDialog(null)}
+          onConfirm={(email) => confirmForceClaim(dialog.egg, email)}
         />
       ) : null}
       {dialog?.kind === "limit" ? <EggLimitDialog onClose={() => setDialog(null)} /> : null}

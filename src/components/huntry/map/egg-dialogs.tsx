@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Button, ButtonProps, Flex, Text } from "@bigcommerce/big-design";
+import { Button, ButtonProps, Flex, Input, Text } from "@bigcommerce/big-design";
 import { MAX_EGGS_PER_EVENT } from "@/lib/huntry/eggs/limits";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 
@@ -130,6 +130,60 @@ export function EggDeleteDialog({
             This item has already been claimed. Deleting it will not affect the player&apos;s claimed reward.
           </Text>
         ) : null}
+      </DialogBody>
+    </ConfirmDialog>
+  );
+}
+
+// The plugin's Force Claim modal, minus its "claim with a user" checkbox: a BC
+// admin has no customer account to credit, so the email is always required
+// (BC-HUN-029).
+export function EggForceClaimDialog({
+  eggName,
+  isSaving,
+  onConfirm,
+  onCancel,
+}: {
+  eggName: string;
+  isSaving?: boolean;
+  onConfirm: (email: string) => void;
+  onCancel: () => void;
+}) {
+  const [email, setEmail] = useState("");
+  const trimmed = email.trim();
+  const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+
+  return (
+    <ConfirmDialog
+      actions={[
+        { text: "Cancel", variant: "subtle", onClick: onCancel },
+        {
+          text: "Force Claim",
+          variant: "primary",
+          isLoading: isSaving,
+          onClick: () => {
+            if (isValid) {
+              onConfirm(trimmed);
+            }
+          },
+        },
+      ]}
+      onClose={onCancel}
+    >
+      <DialogBody headline="Force claim this item?" icon="⚠">
+        <Text bold style={{ color: HUNTRY_COLORS.textMuted }}>{eggName}</Text>
+        <Text style={{ color: HUNTRY_COLORS.textMuted }}>
+          Marks the egg as claimed by the customer below, bypassing every claim rule. Recorded as an admin override.
+        </Text>
+        <div style={{ width: "100%", marginTop: 12, textAlign: "left" }}>
+          <Input
+            label="Customer email"
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="customer@example.com"
+            type="email"
+            value={email}
+          />
+        </div>
       </DialogBody>
     </ConfirmDialog>
   );

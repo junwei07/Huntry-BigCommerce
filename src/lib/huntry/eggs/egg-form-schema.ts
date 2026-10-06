@@ -31,3 +31,6 @@ export const eggUpdateSchema = z.object({
 });
 
 export type EggUpdateInput = z.infer<typeof eggUpdateSchema>;
+
+// Force Claim (BC-HUN-029): the customer to credit is identified by email.
+export const forceClaimEmailSchema = z.string().trim().email("Enter a valid customer email.");

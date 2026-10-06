@@ -3,7 +3,17 @@
 import { updateTag } from "next/cache";
 import { z } from "zod";
 import { ActionResult } from "@/lib/actions/action-result";
-import { eggPlacementSchema, eggUpdateSchema, EggPlacementInput, EggUpdateInput } from "@/lib/huntry/eggs/egg-form-schema";
+import {
+  eggPlacementSchema,
+  eggUpdateSchema,
+  forceClaimEmailSchema,
+  EggPlacementInput,
+  EggUpdateInput,
+} from "@/lib/huntry/eggs/egg-form-schema";
+import { CLAIMS_LIST_TAG } from "@/lib/huntry/claims/cache-tags";
+import { createForcedClaim } from "@/lib/huntry/claims/claims-api";
+import { fetchCustomersByEmailUncached } from "@/lib/gift-certs-manager/customers/customers-api";
+import { getSessionUserId } from "@/lib/session/get-session-user-id";
 import { eggTag, EGGS_LIST_TAG, eventEggsTag } from "@/lib/huntry/eggs/cache-tags";
 import {
   createEggs,
@@ -216,6 +226,72 @@ export async function updateHuntryEgg(
     logError(`updateHuntryEgg: egg ${id}`, error);
 
     return { success: false, message: toSafeMessage(error, "Failed to update the egg.") };
+  }
+}
+
+// Port of the plugin's huntry_force_claim_egg (BC-HUN-029). An audited admin
+// override: credits the customer with the given email and records the acting
+// admin in forced_by_user_id. Deliberately skips the player-claim rules (live
+// status, geofence, capacity, per-player limit — BC-HUN-032's concern).
+export async function forceClaimHuntryEgg(
+  eggId: string,
+  customerEmail: string,
+  storeHash: string | undefined,
+): Promise<ActionResult> {
+  if (!(await isAuthorizedForStore(storeHash))) {
+    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  }
+
+  const email = forceClaimEmailSchema.safeParse(customerEmail);
+
+  if (!email.success) {
+    return { success: false, message: email.error.issues[0]?.message ?? "Enter a valid customer email." };
+  }
+
+  try {
+    const egg = await fetchEggUncached(eggId, storeHash);
+
+    if (!egg) {
+      return { success: false, message: EGG_NOT_FOUND_MESSAGE };
+    }
+
+    const reward = await fetchRewardUncached(egg.rewardId, storeHash);
+
+    if (!reward) {
+      return { success: false, message: "This egg's reward no longer exists. Edit the egg to pick another reward." };
+    }
+
+    const { items } = await fetchCustomersByEmailUncached([email.data], storeHash);
+    const customer = items.find((item) => item.email.toLowerCase() === email.data.toLowerCase());
+
+    if (!customer) {
+      return { success: false, message: "No customer account found with that email." };
+    }
+
+    const result = await createForcedClaim(
+      {
+        eggId: egg.id,
+        rewardId: reward.id,
+        eventId: egg.eventId,
+        rewardNameSnapshot: reward.name,
+        bcCustomerId: customer.id,
+        couponCode: reward.couponCode ?? "",
+        forcedByUserId: await getSessionUserId(),
+      },
+      storeHash,
+    );
+
+    if (result.status === "duplicate") {
+      return { success: false, message: "That customer has already claimed this egg." };
+    }
+
+    updateTag(CLAIMS_LIST_TAG);
+
+    return { success: true, message: `Egg force-claimed for ${customer.email}.` };
+  } catch (error) {
+    logError(`forceClaimHuntryEgg: egg ${eggId}`, error);
+
+    return { success: false, message: toSafeMessage(error, "Failed to force claim the egg.") };
   }
 }
 

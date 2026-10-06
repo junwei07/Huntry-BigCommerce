@@ -56,10 +56,19 @@ function RewardBadge({ rewardId, name, muted }: { rewardId: number; name: string
   );
 }
 
-// Edit / Delete only — Force Claim is BC-HUN-029's. Mirrors
-// RewardActionsMenu's Dropdown/kebab shape, including the key bump that
-// remounts downshift's reducer after a selection.
-function EggActionsMenu({ egg, onEdit, onDelete }: { egg: HuntryEgg; onEdit: () => void; onDelete: () => void }) {
+// Mirrors RewardActionsMenu's Dropdown/kebab shape, including the key bump
+// that remounts downshift's reducer after a selection.
+function EggActionsMenu({
+  egg,
+  onEdit,
+  onForceClaim,
+  onDelete,
+}: {
+  egg: HuntryEgg;
+  onEdit: () => void;
+  onForceClaim: () => void;
+  onDelete: () => void;
+}) {
   const [dropdownKey, setDropdownKey] = useState(0);
 
   const items: DropdownItem[] = [
@@ -67,6 +76,13 @@ function EggActionsMenu({ egg, onEdit, onDelete }: { egg: HuntryEgg; onEdit: () 
       content: "Edit",
       onItemClick: () => {
         onEdit();
+        setDropdownKey((key) => key + 1);
+      },
+    },
+    {
+      content: "Force Claim",
+      onItemClick: () => {
+        onForceClaim();
         setDropdownKey((key) => key + 1);
       },
     },
@@ -98,6 +114,7 @@ export function EggItemsPanel({
   onSelectEgg,
   onEditEgg,
   onDeleteEgg,
+  onForceClaimEgg,
   onRemovePending,
   highlight,
 }: {
@@ -108,6 +125,7 @@ export function EggItemsPanel({
   onSelectEgg: (egg: HuntryEgg) => void;
   onEditEgg: (egg: HuntryEgg) => void;
   onDeleteEgg: (egg: HuntryEgg) => void;
+  onForceClaimEgg: (egg: HuntryEgg) => void;
   onRemovePending: (key: string) => void;
   // Set when a marker is clicked: scrolls that egg's row into view and
   // highlights it until the parent clears it (plugin's highlightRow, 2.4 s).
@@ -265,7 +283,12 @@ export function EggItemsPanel({
                   </span>
                 </Flex>
               </button>
-              <EggActionsMenu egg={egg} onDelete={() => onDeleteEgg(egg)} onEdit={() => onEditEgg(egg)} />
+              <EggActionsMenu
+                egg={egg}
+                onDelete={() => onDeleteEgg(egg)}
+                onEdit={() => onEditEgg(egg)}
+                onForceClaim={() => onForceClaimEgg(egg)}
+              />
             </div>
           ))
         )}
