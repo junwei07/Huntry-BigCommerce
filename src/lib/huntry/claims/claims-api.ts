@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { getDataMode, resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
-import { addMockForcedClaim } from "@/lib/huntry/claims/mock/mock-claims";
+import { addMockForcedClaim, MOCK_CLAIMS } from "@/lib/huntry/claims/mock/mock-claims";
 import { CreateForcedClaimInput, CreateForcedClaimResult, HuntryClaim } from "@/lib/huntry/claims/types";
 import { getHuntryDb } from "@/lib/huntry/db/get-db";
 
@@ -117,4 +117,50 @@ export async function createForcedClaim(
 
     throw error;
   }
+}
+
+// Ids of this event's eggs that have reached `capacity` claims — the public
+// map's "fully claimed" marker state (BC-HUN-031). Forced claims count, since
+// they count toward capacity (docs/MIGRATION.md §7). Not cached: it changes on
+// every claim; the map-data route's short s-maxage bounds the query rate.
+export async function fetchFullEggIds(
+  eventId: number,
+  capacity: number,
+  storeHash: string | undefined,
+): Promise<Set<string>> {
+  if (getDataMode() === "MOCK") {
+    const counts = new Map<string, number>();
+
+    for (const claim of MOCK_CLAIMS.filter((item) => item.eventId === eventId)) {
+      counts.set(claim.eggId, (counts.get(claim.eggId) ?? 0) + 1);
+    }
+
+    return new Set([...counts].filter(([, count]) => count >= capacity).map(([eggId]) => eggId));
+  }
+
+  const resolvedStoreHash = resolveStoreHash(storeHash);
+
+  if (!resolvedStoreHash) {
+    return new Set();
+  }
+
+  const db = getHuntryDb();
+  let rows: { egg_id: string }[];
+
+  if (db instanceof DatabaseSync) {
+    rows = db
+      .prepare(
+        "SELECT egg_id FROM huntry_claims WHERE store_hash = ? AND event_id = ? GROUP BY egg_id HAVING COUNT(*) >= ?",
+      )
+      .all(resolvedStoreHash, eventId, capacity) as unknown as { egg_id: string }[];
+  } else {
+    rows = (
+      await db.query<{ egg_id: string }>(
+        "SELECT egg_id FROM huntry_claims WHERE store_hash = $1 AND event_id = $2 GROUP BY egg_id HAVING COUNT(*) >= $3",
+        [resolvedStoreHash, eventId, capacity],
+      )
+    ).rows;
+  }
+
+  return new Set(rows.map((row) => row.egg_id));
 }

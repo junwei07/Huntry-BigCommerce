@@ -15,6 +15,16 @@ export function resolveItemMarkerUrl(marker: EventItemMarker): string | null {
   return marker.presetIndex === null ? null : getItemMarkerPresetUrls(marker.presetIndex).unclaimedUrl;
 }
 
+// Claimed-state counterpart of resolveItemMarkerUrl, for the storefront map's
+// "this egg is fully claimed" icon.
+export function resolveItemMarkerClaimedUrl(marker: EventItemMarker): string | null {
+  if (marker.source === "custom") {
+    return marker.claimedIconUrl || null;
+  }
+
+  return marker.presetIndex === null ? null : getItemMarkerPresetUrls(marker.presetIndex).claimedUrl;
+}
+
 export function resolveLocationMarkerUrl(marker: EventLocationMarker): string | null {
   if (marker.source === "custom") {
     return marker.iconUrl || null;

@@ -54,15 +54,24 @@ export interface AppExtensionsResult {
   };
 }
 
-// This app's one App Extension: a top-level LINK-context menu item that
-// opens the Huntry admin experience. Unlike a record-scoped extension
-// (e.g. one on a customer detail page), a top-level link isn't attached to
-// a resource type, so there's no `model` field here. label.locales is
+// This app's one App Extension: a LINK-context link, shown on customer pages,
+// that opens the Huntry admin experience. BigCommerce requires all four of
+// context, model, url and label — an App Extension is always attached to an
+// entity page (AppExtensionModel: CATEGORIES, CUSTOMERS, ORDERS, PRODUCTS,
+// PRODUCT_DESCRIPTION), never a standalone nav entry (a missing `model` is
+// rejected with a 400; see HBC-CHANGELOG.md's BC-HUN-012 correction). Players
+// are customers, hence CUSTOMERS. `url` must be a plain path using
+// BigCommerce's `${id}` template as a path segment: a query-string form
+// (`/huntry?customerId=${id}`) was rejected with "URL field is incorrectly
+// formatted", and every documented example is path-only. The route it lands
+// on (app/store/[storeHash]/huntry/customers/[id]) currently just forwards to
+// the Overview, leaving room for a per-player view later. label.locales is
 // required by the schema despite being documented as optional — an empty
 // array satisfies it since there's no localized text.
 export const APP_EXTENSION_INPUT = {
   context: "LINK",
-  url: "/huntry",
+  model: "CUSTOMERS",
+  url: "/huntry/customers/${id}",
   label: {
     defaultValue: "Huntry",
     locales: [],
