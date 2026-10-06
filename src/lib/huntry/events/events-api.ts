@@ -7,11 +7,11 @@ import { buildCandidateSlug, slugify } from "@/lib/huntry/events/slug";
 import {
   CreateEventInput,
   EventFields,
+  EventSort,
   EventsQuery,
   EventStatus,
   EventTheme,
   HuntryEvent,
-  SortDirection,
   UpdateEventInput,
 } from "@/lib/huntry/events/types";
 
@@ -133,13 +133,13 @@ function normalizeSqliteRow(row: SqliteEventRow): EventFields {
   };
 }
 
-// Coerces to a known SQL keyword rather than interpolating the query's
-// direction field directly, even though EventsQuery's type already
-// restricts it to "ASC" | "DESC" — defense in depth against ever
+// Maps the query's sort field to a fixed ORDER BY fragment rather than
+// interpolating it directly, even though EventsQuery's type already
+// restricts it to "name" | "time" — defense in depth against ever
 // interpolating an unvalidated value into the ORDER BY clause below (the
 // only place in this file that can't use a parameterized placeholder).
-function directionSql(direction: SortDirection): "ASC" | "DESC" {
-  return direction === "DESC" ? "DESC" : "ASC";
+function orderBySql(sort: EventSort): string {
+  return sort === "name" ? "name ASC" : "starts_at IS NULL, starts_at ASC, name ASC";
 }
 
 async function fetchEventsFromDb(query: EventsQuery, storeHash: string): Promise<HuntryEvent[]> {
@@ -150,18 +150,18 @@ async function fetchEventsFromDb(query: EventsQuery, storeHash: string): Promise
   // @cache-components-only:end
 
   const db = getHuntryDb();
-  const direction = directionSql(query.direction);
+  const orderBy = orderBySql(query.sort);
   let eventFields: EventFields[];
 
   if (db instanceof DatabaseSync) {
     const rows = db
-      .prepare(`SELECT * FROM huntry_events WHERE store_hash = ? ORDER BY starts_at IS NULL, starts_at ${direction}`)
+      .prepare(`SELECT * FROM huntry_events WHERE store_hash = ? ORDER BY ${orderBy}`)
       .all(storeHash) as unknown as SqliteEventRow[];
 
     eventFields = rows.map(normalizeSqliteRow);
   } else {
     const result = await db.query<PostgresEventRow>(
-      `SELECT * FROM huntry_events WHERE store_hash = $1 ORDER BY starts_at IS NULL, starts_at ${direction}`,
+      `SELECT * FROM huntry_events WHERE store_hash = $1 ORDER BY ${orderBy}`,
       [storeHash],
     );
 
@@ -209,11 +209,18 @@ async function fetchEventFromDb(id: number, storeHash: string): Promise<HuntryEv
   return selectEventRow(id, storeHash);
 }
 
-// Nulls-last ordering, matching fetchEventsFromDb's
-// "starts_at IS NULL, starts_at <direction>" SQL — an unscheduled event has
-// nothing to compare, so it sorts last regardless of direction.
-function sortMockEvents(events: HuntryEvent[], direction: SortDirection): HuntryEvent[] {
+// Matches orderBySql's two orderings. "time" is nulls-last — an unscheduled
+// event has nothing to compare, so it sorts after every scheduled one.
+function sortMockEvents(events: HuntryEvent[], sort: EventSort): HuntryEvent[] {
   return [...events].sort((a, b) => {
+    if (sort === "name") {
+      return a.name.localeCompare(b.name);
+    }
+
+    if (!a.startsAt && !b.startsAt) {
+      return a.name.localeCompare(b.name);
+    }
+
     if (!a.startsAt) {
       return 1;
     }
@@ -222,9 +229,7 @@ function sortMockEvents(events: HuntryEvent[], direction: SortDirection): Huntry
       return -1;
     }
 
-    const diff = a.startsAt.getTime() - b.startsAt.getTime();
-
-    return direction === "DESC" ? -diff : diff;
+    return a.startsAt.getTime() - b.startsAt.getTime() || a.name.localeCompare(b.name);
   });
 }
 
@@ -237,7 +242,7 @@ export async function fetchEvents(query: EventsQuery, storeHash: string | undefi
   if (getDataMode() === "MOCK") {
     return sortMockEvents(
       MOCK_EVENTS.map((fields) => buildHuntryEvent(fields)),
-      query.direction,
+      query.sort,
     );
   }
 
@@ -285,6 +290,36 @@ export async function fetchEventUncached(id: number, storeHash: string | undefin
   }
 
   return selectEventRow(id, resolvedStoreHash);
+}
+
+// Uncached on purpose — used by createHuntryEvent to enforce MAX_EVENTS
+// right before an insert, which must never trust a cached read.
+export async function countEvents(storeHash: string | undefined): Promise<number> {
+  if (getDataMode() === "MOCK") {
+    return MOCK_EVENTS.length;
+  }
+
+  const resolvedStoreHash = resolveStoreHash(storeHash);
+
+  if (!resolvedStoreHash) {
+    return 0;
+  }
+
+  const db = getHuntryDb();
+
+  if (db instanceof DatabaseSync) {
+    const row = db.prepare("SELECT COUNT(*) AS count FROM huntry_events WHERE store_hash = ?").get(resolvedStoreHash) as unknown as {
+      count: number;
+    };
+
+    return Number(row.count);
+  }
+
+  const result = await db.query<{ count: string }>("SELECT COUNT(*) AS count FROM huntry_events WHERE store_hash = $1", [
+    resolvedStoreHash,
+  ]);
+
+  return Number(result.rows[0]?.count ?? 0);
 }
 
 // True when an error means "the (store_hash, slug) UNIQUE constraint was

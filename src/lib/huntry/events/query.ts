@@ -1,8 +1,13 @@
-import { EventsQuery, SortDirection } from "@/lib/huntry/events/types";
+import { EventsQuery, EventSort } from "@/lib/huntry/events/types";
 
 export const DEFAULT_QUERY: EventsQuery = {
-  direction: "ASC",
+  sort: "time",
 };
+
+export const EVENT_SORT_OPTIONS: { value: EventSort; content: string }[] = [
+  { value: "name", content: "A-Z" },
+  { value: "time", content: "Time (soonest first)" },
+];
 
 type RawSearchParams = Record<string, string | string[] | undefined>;
 
@@ -13,17 +18,17 @@ function getParam(searchParams: RawSearchParams, key: string): string | undefine
 }
 
 export function parseEventsQuery(searchParams: RawSearchParams): EventsQuery {
-  const directionParam = getParam(searchParams, "direction");
-  const direction: SortDirection = directionParam === "DESC" ? "DESC" : DEFAULT_QUERY.direction;
+  const sortParam = getParam(searchParams, "sort");
+  const sort: EventSort = sortParam === "name" || sortParam === "time" ? sortParam : DEFAULT_QUERY.sort;
 
-  return { direction };
+  return { sort };
 }
 
 export function buildEventsSearchParams(query: EventsQuery): URLSearchParams {
   const params = new URLSearchParams();
 
-  if (query.direction !== DEFAULT_QUERY.direction) {
-    params.set("direction", query.direction);
+  if (query.sort !== DEFAULT_QUERY.sort) {
+    params.set("sort", query.sort);
   }
 
   return params;

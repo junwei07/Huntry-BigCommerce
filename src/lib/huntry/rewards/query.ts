@@ -1,8 +1,13 @@
-import { RewardsQuery, SortDirection } from "@/lib/huntry/rewards/types";
+import { RewardsQuery, RewardSort } from "@/lib/huntry/rewards/types";
 
 export const DEFAULT_QUERY: RewardsQuery = {
-  direction: "ASC",
+  sort: "name",
 };
+
+export const REWARD_SORT_OPTIONS: { value: RewardSort; content: string }[] = [
+  { value: "name", content: "A-Z" },
+  { value: "time", content: "Time (soonest first)" },
+];
 
 type RawSearchParams = Record<string, string | string[] | undefined>;
 
@@ -13,17 +18,17 @@ function getParam(searchParams: RawSearchParams, key: string): string | undefine
 }
 
 export function parseRewardsQuery(searchParams: RawSearchParams): RewardsQuery {
-  const directionParam = getParam(searchParams, "direction");
-  const direction: SortDirection = directionParam === "DESC" ? "DESC" : DEFAULT_QUERY.direction;
+  const sortParam = getParam(searchParams, "sort");
+  const sort: RewardSort = sortParam === "name" || sortParam === "time" ? sortParam : DEFAULT_QUERY.sort;
 
-  return { direction };
+  return { sort };
 }
 
 export function buildRewardsSearchParams(query: RewardsQuery): URLSearchParams {
   const params = new URLSearchParams();
 
-  if (query.direction !== DEFAULT_QUERY.direction) {
-    params.set("direction", query.direction);
+  if (query.sort !== DEFAULT_QUERY.sort) {
+    params.set("sort", query.sort);
   }
 
   return params;

@@ -2,7 +2,7 @@ import { Box, Flex, Panel, Text } from "@bigcommerce/big-design";
 import { RewardCard } from "@/components/huntry/rewards/list/reward-card";
 import { RewardListHeader } from "@/components/huntry/rewards/list/reward-list-header";
 import { NewRewardButton } from "@/components/huntry/rewards/list/new-reward-button";
-import { SortToggle } from "@/components/huntry/rewards/list/sort-toggle";
+import { SortSelect } from "@/components/huntry/rewards/list/sort-select";
 import { fetchRewards } from "@/lib/huntry/rewards/rewards-api";
 import { parseRewardsQuery } from "@/lib/huntry/rewards/query";
 import { fetchSponsors } from "@/lib/huntry/sponsors/sponsors-api";
@@ -45,7 +45,7 @@ export async function RewardListView({
     <Box padding="medium" style={{ backgroundColor: HUNTRY_COLORS.background }}>
       <Panel header="Rewards" style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
         <Flex alignItems="center" justifyContent="space-between" marginBottom="medium">
-          <SortToggle query={query} />
+          <SortSelect query={query} />
           <NewRewardButton />
         </Flex>
 

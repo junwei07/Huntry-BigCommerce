@@ -1,9 +1,10 @@
-import { Box, Flex, Panel, Text } from "@bigcommerce/big-design";
+import { Box, Flex, InlineMessage, Panel, Text } from "@bigcommerce/big-design";
 import { EventCard } from "@/components/huntry/events/list/event-card";
 import { EventListHeader } from "@/components/huntry/events/list/event-list-header";
 import { NewEventButton } from "@/components/huntry/events/list/new-event-button";
-import { SortToggle } from "@/components/huntry/events/list/sort-toggle";
+import { SortSelect } from "@/components/huntry/events/list/sort-select";
 import { fetchEvents } from "@/lib/huntry/events/events-api";
+import { MAX_EVENTS } from "@/lib/huntry/events/limits";
 import { parseEventsQuery } from "@/lib/huntry/events/query";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 
@@ -35,12 +36,26 @@ export async function EventListView({
   }
   // @cache-components-only:end
 
+  // The events list is unfiltered (search params only affect sort order), so
+  // its length is the true count.
+  const limitReached = events.length >= MAX_EVENTS;
+
   return (
     <Box padding="medium">
       <Panel header="Events" style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
+        {limitReached ? (
+          <Box marginBottom="medium">
+            <InlineMessage
+              header="Event limit reached"
+              messages={[{ text: "You have reached your event limit." }]}
+              type="info"
+            />
+          </Box>
+        ) : null}
+
         <Flex alignItems="center" justifyContent="space-between" marginBottom="medium">
-          <SortToggle query={query} />
-          <NewEventButton />
+          <SortSelect query={query} />
+          <NewEventButton limitReached={limitReached} />
         </Flex>
 
         <EventListHeader />

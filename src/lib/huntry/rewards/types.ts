@@ -1,7 +1,9 @@
 // Deliberately local rather than imported from events/types.ts or
 // sponsors/types.ts — kept independent of its sibling Huntry DALs, the same
 // way those two stay independent of each other.
-export type SortDirection = "ASC" | "DESC";
+// Both options sort ascending: "name" is A-Z, "time" is soonest
+// reward_starts_at first (rewards with no start date last).
+export type RewardSort = "name" | "time";
 
 // Backs the two CHECK constraints on huntry_rewards.
 export type DiscountType = "percent" | "fixed_cart";
@@ -58,7 +60,7 @@ export type RewardFields = Omit<HuntryReward, "productIds">;
 // date field (reward_starts_at is optional, unlike events' starts_at),
 // matching sponsors' same reasoning.
 export interface RewardsQuery {
-  direction: SortDirection;
+  sort: RewardSort;
 }
 
 // Every field a caller supplies to create/update a reward — still omits

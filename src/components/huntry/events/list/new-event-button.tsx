@@ -22,9 +22,9 @@ import { getAppUrl } from "@/lib/routing/app-url";
 // never been revealed this session, so isPending resolves (and this button
 // unmounts) as soon as its fallback commits, well before the real form
 // does. NewEventForm calls useClearGlobalLoading() itself once it's actually
-// showing, instead of relying on isPending here. SortToggle's own
+// showing, instead of relying on isPending here. SortSelect's own
 // router.push navigation stays on the default (same page, no new boundary).
-export function NewEventButton() {
+export function NewEventButton({ limitReached = false }: { limitReached?: boolean }) {
   const router = useRouter();
   const storeHash = useStoreHash();
   const [isPending, startTransition] = useGlobalTransition({ autoResolve: false });
@@ -37,7 +37,7 @@ export function NewEventButton() {
 
   return (
     <Button
-      disabled={isPending}
+      disabled={isPending || limitReached}
       onClick={handleClick}
       style={{ backgroundColor: HUNTRY_COLORS.primary, borderColor: HUNTRY_COLORS.primary }}
       variant="primary"

@@ -217,16 +217,16 @@ describe("events-api (MOCK mode)", () => {
     }
   });
 
-  it("sorts an event with no startsAt last regardless of direction", async () => {
+  it("sorts an event with no startsAt last when sorting by time, and sorts A-Z by name", async () => {
     process.env.DATA_MODE = "MOCK";
 
     try {
-      const ascending = await fetchEvents({ direction: "ASC" }, undefined);
-      const descending = await fetchEvents({ direction: "DESC" }, undefined);
+      const byTime = await fetchEvents({ sort: "time" }, undefined);
+      const byName = await fetchEvents({ sort: "name" }, undefined);
 
       // mock-events.ts's id 1 ("Spring Scavenger Hunt") has startsAt: null.
-      expect(ascending[ascending.length - 1].id).toBe(1);
-      expect(descending[descending.length - 1].id).toBe(1);
+      expect(byTime[byTime.length - 1].id).toBe(1);
+      expect(byName.map((event) => event.name)).toEqual([...byName.map((event) => event.name)].sort((a, b) => a.localeCompare(b)));
     } finally {
       process.env.DATA_MODE = "MULTITENANT";
     }

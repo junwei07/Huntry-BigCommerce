@@ -21,9 +21,9 @@ import {
   PRODUCTS_PATH,
   RewardCouponFields,
   RewardFields,
+  RewardSort,
   RewardsQuery,
   RewardStatus,
-  SortDirection,
   UpdateRewardInput,
 } from "@/lib/huntry/rewards/types";
 
@@ -130,12 +130,12 @@ function normalizeSqliteRow(row: SqliteRewardRow): RewardFields {
   };
 }
 
-// Coerces to a known SQL keyword rather than interpolating the query's
-// direction field directly — defense in depth against ever interpolating an
+// Maps the query's sort field to a fixed ORDER BY fragment rather than
+// interpolating it directly — defense in depth against ever interpolating an
 // unvalidated value into the ORDER BY clause below, mirroring
-// events-api.ts/sponsors-api.ts's own directionSql.
-function directionSql(direction: SortDirection): "ASC" | "DESC" {
-  return direction === "DESC" ? "DESC" : "ASC";
+// events-api.ts's own orderBySql.
+function orderBySql(sort: RewardSort): string {
+  return sort === "time" ? "reward_starts_at IS NULL, reward_starts_at ASC, name ASC" : "name ASC";
 }
 
 // huntry_reward_products is only populated when discountScope === "specific"
@@ -173,18 +173,18 @@ async function fetchRewardsFromDb(query: RewardsQuery, storeHash: string): Promi
   // @cache-components-only:end
 
   const db = getHuntryDb();
-  const direction = directionSql(query.direction);
+  const orderBy = orderBySql(query.sort);
   let rewardFields: RewardFields[];
 
   if (db instanceof DatabaseSync) {
     const rows = db
-      .prepare(`SELECT * FROM huntry_rewards WHERE store_hash = ? ORDER BY name ${direction}`)
+      .prepare(`SELECT * FROM huntry_rewards WHERE store_hash = ? ORDER BY ${orderBy}`)
       .all(storeHash) as unknown as SqliteRewardRow[];
 
     rewardFields = rows.map(normalizeSqliteRow);
   } else {
     const result = await db.query<PostgresRewardRow>(
-      `SELECT * FROM huntry_rewards WHERE store_hash = $1 ORDER BY name ${direction}`,
+      `SELECT * FROM huntry_rewards WHERE store_hash = $1 ORDER BY ${orderBy}`,
       [storeHash],
     );
 
@@ -235,11 +235,27 @@ async function fetchRewardFromDb(id: number, storeHash: string): Promise<HuntryR
   return selectRewardRow(id, storeHash);
 }
 
-function sortMockRewards(rewards: HuntryReward[], direction: SortDirection): HuntryReward[] {
+// Matches orderBySql's two orderings. "time" is nulls-last — a reward with
+// no start date sorts after every dated one.
+function sortMockRewards(rewards: HuntryReward[], sort: RewardSort): HuntryReward[] {
   return [...rewards].sort((a, b) => {
-    const diff = a.name.localeCompare(b.name);
+    if (sort === "time" && (a.rewardStartsAt || b.rewardStartsAt)) {
+      if (!a.rewardStartsAt) {
+        return 1;
+      }
 
-    return direction === "DESC" ? -diff : diff;
+      if (!b.rewardStartsAt) {
+        return -1;
+      }
+
+      const diff = a.rewardStartsAt.getTime() - b.rewardStartsAt.getTime();
+
+      if (diff !== 0) {
+        return diff;
+      }
+    }
+
+    return a.name.localeCompare(b.name);
   });
 }
 
@@ -248,7 +264,7 @@ function sortMockRewards(rewards: HuntryReward[], direction: SortDirection): Hun
 // the app's DATA_MODE philosophy.
 export async function fetchRewards(query: RewardsQuery, storeHash: string | undefined): Promise<HuntryReward[]> {
   if (getDataMode() === "MOCK") {
-    return sortMockRewards(MOCK_REWARDS, query.direction);
+    return sortMockRewards(MOCK_REWARDS, query.sort);
   }
 
   const resolvedStoreHash = resolveStoreHash(storeHash);

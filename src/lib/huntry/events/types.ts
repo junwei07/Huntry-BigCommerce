@@ -1,7 +1,9 @@
 // Deliberately local rather than imported from
 // gift-certs-manager/customers/types.ts — Huntry code shouldn't depend on
 // the example feature slated for removal.
-export type SortDirection = "ASC" | "DESC";
+// Both options sort ascending: "name" is A-Z, "time" is soonest start first
+// (unscheduled events last).
+export type EventSort = "name" | "time";
 
 // Derived from starts_at/ends_at at read time — huntry_events has no status
 // column at all (see db/migrations/0001_huntry_schema.sql). Mirrors the
@@ -127,7 +129,7 @@ export interface HuntryEvent {
 // filtering (unlike gift-certs, which gets its own filtering enhancement).
 // This is a placeholder ready for a future ticket to extend.
 export interface EventsQuery {
-  direction: SortDirection;
+  sort: EventSort;
 }
 
 // Every HuntryEvent field except the computed status — the shape each

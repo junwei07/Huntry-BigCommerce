@@ -3,7 +3,8 @@
 import { updateTag } from "next/cache";
 import { ActionResult } from "@/lib/actions/action-result";
 import { eventTag, EVENTS_LIST_TAG } from "@/lib/huntry/events/cache-tags";
-import { createEvent, isUniqueSlugConstraintError } from "@/lib/huntry/events/events-api";
+import { countEvents, createEvent, isUniqueSlugConstraintError } from "@/lib/huntry/events/events-api";
+import { EVENT_LIMIT_MESSAGE, MAX_EVENTS } from "@/lib/huntry/events/limits";
 import { eventFormSchema, EventFormInput } from "@/lib/huntry/events/event-form-schema";
 import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
 import { toSafeMessage } from "@/lib/errors/app-error";
@@ -43,6 +44,12 @@ export async function createHuntryEvent(input: EventFormInput, storeHash: string
   } = parsed.data;
 
   try {
+    // The real gate (mirrors huntry_block_extra_event_creation in the WP
+    // plugin) — the UI's disabled button/notice is only UX.
+    if ((await countEvents(storeHash)) >= MAX_EVENTS) {
+      return { success: false, message: EVENT_LIMIT_MESSAGE };
+    }
+
     const event = await createEvent(
       {
         name,
