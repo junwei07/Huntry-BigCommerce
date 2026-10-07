@@ -1,5 +1,10 @@
 import type { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  CLAIM_RATE_LIMIT_MAX_CLAIMS,
+  CLAIM_RATE_LIMIT_WINDOW_SECONDS,
+  checkClaimRateLimit,
+} from "@/lib/huntry/claims/claim-rate-limit";
 import { createPlayerClaim } from "@/lib/huntry/claims/player-claim";
 import { getHuntryDb } from "@/lib/huntry/db/get-db";
 
@@ -213,4 +218,27 @@ describe.skipIf(!TEST_DATABASE_URL)("createPlayerClaim (Postgres)", () => {
     // The pool recovered: the same claim succeeds once the lock is free.
     expect((await createPlayerClaim(claimInput(42), STORE)).status).toBe("created");
   }, 20000);
+
+  // BC-HUN-033: exercises the pg clock_timestamp()/EXTRACT window math that the
+  // SQLite suite (claim-rate-limit.test.ts) can't.
+  it("rate-limits on a sliding window using the DB clock", async () => {
+    await seed();
+
+    for (let n = 1; n <= CLAIM_RATE_LIMIT_MAX_CLAIMS; n++) {
+      await pool.query(
+        `INSERT INTO huntry_claims (store_hash, egg_id, reward_id, event_id, reward_name_snapshot, bc_customer_id, coupon_code, claimed_at)
+         VALUES ($1, gen_random_uuid(), 1, 1, 'Coffee', 42, $2, now() - make_interval(secs => $3::double precision))`,
+        [STORE, `CODE${n}`, n],
+      );
+    }
+
+    const limited = await checkClaimRateLimit(STORE, 42, EGG_B);
+
+    expect(limited.limited).toBe(true);
+    expect(limited.limited && limited.retryAfterSeconds).toBeGreaterThanOrEqual(CLAIM_RATE_LIMIT_WINDOW_SECONDS - CLAIM_RATE_LIMIT_MAX_CLAIMS - 1);
+    expect(await checkClaimRateLimit(STORE, 7, EGG_B)).toEqual({ limited: false });
+
+    await pool.query("UPDATE huntry_claims SET claimed_at = now() - interval '1 hour'");
+    expect(await checkClaimRateLimit(STORE, 42, EGG_B)).toEqual({ limited: false });
+  });
 });

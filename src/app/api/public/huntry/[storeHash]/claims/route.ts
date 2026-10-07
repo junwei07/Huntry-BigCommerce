@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getDataMode } from "@/lib/bc-api-client/resolve-store-credentials";
 import { getCredentialsStore } from "@/lib/credentials-store/get-credentials-store";
 import { logError } from "@/lib/errors/logger";
+import { checkClaimRateLimit } from "@/lib/huntry/claims/claim-rate-limit";
 import { createPlayerClaim } from "@/lib/huntry/claims/player-claim";
 import { CreatePlayerClaimResult } from "@/lib/huntry/claims/types";
 import { buildCorsHeaders, buildPreflightHeaders } from "@/lib/huntry/public-api/cors";
@@ -19,7 +20,8 @@ const claimBodySchema = z.object({
 
 // How each refusal reaches the storefront script. The JWT is the access
 // control; the cooldown/speed pair is only a replay deterrent
-// (docs/MIGRATION.md §7).
+// (docs/MIGRATION.md §7). The BC-HUN-033 sliding window (claim-rate-limit.ts)
+// runs before this and answers `rate_limited` with its own 429 body.
 const STATUS_BY_RESULT: Record<Exclude<CreatePlayerClaimResult["status"], "created">, number> = {
   egg_not_found: 404,
   too_far: 403,
@@ -64,8 +66,8 @@ export async function POST(
 ): Promise<NextResponse> {
   const { storeHash } = await params;
   let cors: Record<string, string> = { Vary: "Origin" };
-  const respond = (body: unknown, status: number) =>
-    NextResponse.json(body, { status, headers: { ...cors, "Cache-Control": "no-store" } });
+  const respond = (body: unknown, status: number, extraHeaders: Record<string, string> = {}) =>
+    NextResponse.json(body, { status, headers: { ...cors, ...extraHeaders, "Cache-Control": "no-store" } });
 
   try {
     if (!(await isKnownStore(storeHash))) {
@@ -84,6 +86,14 @@ export async function POST(
 
     if (!auth.ok) {
       return respond({ error: "Unauthorized." }, 401);
+    }
+
+    const limit = await checkClaimRateLimit(storeHash, auth.customerId, body.data.eggId);
+
+    if (limit.limited) {
+      return respond({ error: "rate_limited", retryAfterSeconds: limit.retryAfterSeconds }, 429, {
+        "Retry-After": String(limit.retryAfterSeconds),
+      });
     }
 
     const result = await createPlayerClaim(

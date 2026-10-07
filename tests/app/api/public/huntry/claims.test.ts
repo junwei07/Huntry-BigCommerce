@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OPTIONS, POST } from "@/app/api/public/huntry/[storeHash]/claims/route";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), claim: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), claim: vi.fn(), limit: vi.fn() }));
 
 vi.mock("@/lib/errors/logger", () => ({ logError: vi.fn() }));
 vi.mock("@/lib/huntry/storefront-auth/is-authorized-for-storefront-customer", () => ({
   isAuthorizedForStorefrontCustomer: mocks.auth,
 }));
 vi.mock("@/lib/huntry/claims/player-claim", () => ({ createPlayerClaim: mocks.claim }));
+vi.mock("@/lib/huntry/claims/claim-rate-limit", () => ({ checkClaimRateLimit: mocks.limit }));
 
 const EGG_ID = "00000000-0000-4000-8000-00000000000a";
 const VALID = { jwt: "token", eggId: EGG_ID, lat: 1.3, lng: 103.8 };
@@ -27,6 +28,7 @@ beforeEach(() => {
   process.env.DATA_MODE = "MOCK";
   mocks.auth.mockReset().mockResolvedValue({ ok: true, customerId: 42 });
   mocks.claim.mockReset();
+  mocks.limit.mockReset().mockResolvedValue({ limited: false });
 });
 
 afterEach(() => {
@@ -79,6 +81,26 @@ describe("POST claims", () => {
     mocks.claim.mockResolvedValue({ status });
 
     expect((await post(VALID)).status).toBe(expected);
+  });
+
+  it("returns 429 rate_limited with Retry-After and never claims", async () => {
+    mocks.limit.mockResolvedValue({ limited: true, retryAfterSeconds: 120 });
+
+    const response = await post(VALID);
+
+    expect(response.status).toBe(429);
+    expect(response.headers.get("Retry-After")).toBe("120");
+    expect(await response.json()).toEqual({ error: "rate_limited", retryAfterSeconds: 120 });
+    expect(mocks.claim).not.toHaveBeenCalled();
+    // The customer id comes from the JWT, never from the body.
+    expect(mocks.limit).toHaveBeenCalledWith("abc123", 42, EGG_ID);
+  });
+
+  it("does not rate-limit an unauthenticated request", async () => {
+    mocks.auth.mockResolvedValue({ ok: false });
+
+    await post(VALID);
+    expect(mocks.limit).not.toHaveBeenCalled();
   });
 
   it("returns the existing code with a 409 duplicate", async () => {
