@@ -8,18 +8,21 @@ import {
   syncRewardCoupon,
   withUsageLimitWarning,
 } from "@/lib/huntry/rewards/coupon-sync";
+import { AppError } from "@/lib/errors/app-error";
 import { HuntryReward } from "@/lib/huntry/rewards/types";
 
 // The recompute tests below only care about the PUT body and orchestration,
 // not the DB or a real REST client — stub the three collaborators.
 const mocks = vi.hoisted(() => ({
   put: vi.fn(),
+  post: vi.fn(),
+  del: vi.fn(),
   fetchPlacedEggCapacitiesUncached: vi.fn(),
   fetchRewardUncached: vi.fn(),
 }));
 
 vi.mock("@/lib/bc-api-client/get-rest-api-client", () => ({
-  getRestApiClient: vi.fn(async () => ({ put: mocks.put })),
+  getRestApiClient: vi.fn(async () => ({ put: mocks.put, post: mocks.post, delete: mocks.del })),
 }));
 
 vi.mock("@/lib/huntry/eggs/eggs-api", () => ({
@@ -85,20 +88,19 @@ const BASE_REWARD: HuntryReward = {
   updatedAt: new Date(),
 };
 
-// BC-HUN-021: group-scoped eligibility is a top-level `customer` field on
-// the Promotion resource (confirmed live, docs/MIGRATION.md §8), present
-// only once a Customer Group has actually been synced.
+// BC-HUN-032: eligibility is per-claim codes, never a Customer Group. The
+// body always carries an explicit empty group list because a PUT omitting
+// `customer` does not clear group_ids on a promotion created under the old
+// group design (confirmed live, docs/MIGRATION.md §8).
 describe("buildPromotionRequestBody", () => {
-  it("omits customer when bcCustomerGroupId is null", () => {
-    const body = buildPromotionRequestBody(BASE_REWARD);
-
-    expect(body).not.toHaveProperty("customer");
+  it("always sends an empty customer.group_ids", () => {
+    expect(buildPromotionRequestBody(BASE_REWARD)).toMatchObject({ customer: { group_ids: [] } });
   });
 
-  it("includes customer.group_ids as a number when bcCustomerGroupId is set", () => {
-    const body = buildPromotionRequestBody({ ...BASE_REWARD, bcCustomerGroupId: "42" });
-
-    expect(body).toMatchObject({ customer: { group_ids: [42] } });
+  it("ignores a legacy bcCustomerGroupId", () => {
+    expect(buildPromotionRequestBody({ ...BASE_REWARD, bcCustomerGroupId: "42" })).toMatchObject({
+      customer: { group_ids: [] },
+    });
   });
 });
 
@@ -118,26 +120,81 @@ describe("syncRewardCoupon (MOCK mode)", () => {
     }
   });
 
-  it("returns deterministic placeholder ids when none exist yet", async () => {
+  it("returns a placeholder promotion id and no shared code or group", async () => {
     process.env.DATA_MODE = "MOCK";
 
     await expect(syncRewardCoupon(BASE_REWARD, "test-store")).resolves.toEqual({
       bcPromotionId: "mock-promotion-1",
-      bcCouponCodeId: "mock-coupon-1",
-      bcCustomerGroupId: "mock-customer-group-1",
+      bcCouponCodeId: null,
+      bcCustomerGroupId: null,
     });
   });
 
-  it("preserves already-set bc*Id fields instead of overwriting them", async () => {
+  it("preserves an already-set promotion id", async () => {
     process.env.DATA_MODE = "MOCK";
 
-    const reward = { ...BASE_REWARD, bcPromotionId: "real-promo", bcCouponCodeId: "real-coupon", bcCustomerGroupId: "real-group" };
-
-    await expect(syncRewardCoupon(reward, "test-store")).resolves.toEqual({
+    await expect(syncRewardCoupon({ ...BASE_REWARD, bcPromotionId: "real-promo" }, "test-store")).resolves.toEqual({
       bcPromotionId: "real-promo",
-      bcCouponCodeId: "real-coupon",
-      bcCustomerGroupId: "real-group",
+      bcCouponCodeId: null,
+      bcCustomerGroupId: null,
     });
+  });
+});
+
+describe("syncRewardCoupon (live)", () => {
+  const originalDataMode = process.env.DATA_MODE;
+
+  beforeEach(() => {
+    process.env.DATA_MODE = "MULTITENANT";
+    mocks.put.mockReset().mockResolvedValue({ data: { data: { id: 9 } } });
+    mocks.post.mockReset().mockResolvedValue({ data: { data: { id: 9 } } });
+    mocks.del.mockReset().mockResolvedValue(undefined);
+    mocks.fetchPlacedEggCapacitiesUncached.mockReset().mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    if (originalDataMode === undefined) {
+      delete process.env.DATA_MODE;
+    } else {
+      process.env.DATA_MODE = originalDataMode;
+    }
+  });
+
+  it("creates only the promotion: no customer group, no shared code", async () => {
+    const result = await syncRewardCoupon(BASE_REWARD, "test-store");
+
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+    expect(mocks.post.mock.calls[0][0]).toBe("/v3/promotions");
+    expect(mocks.post.mock.calls[0][1].body).toMatchObject({ customer: { group_ids: [] } });
+    expect(mocks.del).not.toHaveBeenCalled();
+    expect(result).toEqual({ bcPromotionId: "9", bcCouponCodeId: null, bcCustomerGroupId: null });
+  });
+
+  it("deletes the legacy shared code and un-scopes the old group on re-sync", async () => {
+    await syncRewardCoupon(
+      { ...BASE_REWARD, bcPromotionId: "promo-9", bcCouponCodeId: "code-9", bcCustomerGroupId: "2" },
+      "test-store",
+    );
+
+    expect(mocks.put.mock.calls[0][0]).toBe("/v3/promotions/promo-9");
+    expect(mocks.put.mock.calls[0][1].body).toMatchObject({ customer: { group_ids: [] } });
+    expect(mocks.del).toHaveBeenCalledWith("/v3/promotions/9/codes/code-9");
+  });
+
+  it("treats an already-deleted legacy code as done", async () => {
+    mocks.del.mockRejectedValue(new AppError("UPSTREAM_API", "gone", { status: 404 }));
+
+    await expect(
+      syncRewardCoupon({ ...BASE_REWARD, bcPromotionId: "promo-9", bcCouponCodeId: "code-9" }, "test-store"),
+    ).resolves.toMatchObject({ bcCouponCodeId: null });
+  });
+
+  it("fails loudly when the legacy code cannot be deleted (it would stay usable)", async () => {
+    mocks.del.mockRejectedValue(new AppError("UPSTREAM_API", "boom", { status: 500 }));
+
+    await expect(
+      syncRewardCoupon({ ...BASE_REWARD, bcPromotionId: "promo-9", bcCouponCodeId: "code-9" }, "test-store"),
+    ).rejects.toThrow("boom");
   });
 });
 
@@ -189,7 +246,7 @@ describe("recomputeRewardUsageLimit", () => {
 
     expect(mocks.put).toHaveBeenCalledTimes(1);
     expect(mocks.put).toHaveBeenCalledWith("/v3/promotions/promo-9", {
-      body: expect.objectContaining({ max_uses: 6, redemption_type: "COUPON", customer: { group_ids: [42] } }),
+      body: expect.objectContaining({ max_uses: 6, redemption_type: "COUPON", customer: { group_ids: [] } }),
     });
   });
 

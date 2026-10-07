@@ -5,7 +5,7 @@ import { MAX_EGGS_PER_REWARD } from "@/lib/huntry/eggs/limits";
 import { PlacedEggClaimCapacity } from "@/lib/huntry/eggs/types";
 import { fetchRewardUncached } from "@/lib/huntry/rewards/rewards-api";
 import { HuntryReward, RewardCouponFields } from "@/lib/huntry/rewards/types";
-import { toSafeMessage } from "@/lib/errors/app-error";
+import { AppError, toSafeMessage } from "@/lib/errors/app-error";
 import { logError } from "@/lib/errors/logger";
 
 // Direct port of the legacy WP plugin's coupon-sync.php
@@ -27,6 +27,12 @@ import { logError } from "@/lib/errors/logger";
 // the delete+recreate fallback is the real rename path. The redemption
 // limit is set on the Promotion's own max_uses, which overrides the code's.
 
+// BC-HUN-032 redesign: eligibility is per-claim single-use codes (claim-codes.ts),
+// not a shared code scoped by a Customer Group. This file therefore syncs only
+// the Promotion (discount rule + redemption budget); it no longer creates a
+// Customer Group or a shared coupon code, and it removes the shared code a
+// reward created before the redesign still carries — otherwise anyone who knew
+// it (e.g. COOKIE100) could keep using it. See docs/MIGRATION.md §2/§8.
 export type CouponSyncResult = RewardCouponFields;
 
 // A reward's redemption budget = how many eggs it may have (egg_capacity) x
@@ -100,32 +106,6 @@ interface V3SingleResponse<T> {
   data: T;
 }
 
-// BigCommerce's Customer Groups API is v2, not v3 (GET /v3/customer_groups
-// 404s "route not found"; GET /v2/customer_groups works — confirmed live,
-// docs/MIGRATION.md §8). v2 responses are bare resources, unlike v3's
-// { data: T } envelope.
-interface CustomerGroupResource {
-  id: number;
-}
-
-// v2 Customer Groups create/update body — confirmed live (docs/MIGRATION.md
-// §8): returns a bare resource, not a { data } envelope like v3.
-interface CustomerGroupRequestBody {
-  name: string;
-  is_default: boolean;
-  category_access: { type: "all" };
-}
-
-interface CouponCodeResource {
-  id: number | string;
-}
-
-interface CouponCodeRequestBody {
-  code: string;
-  max_uses: number;
-  max_uses_per_customer: number;
-}
-
 // discountType === "percent" -> percentage discount amount; "fixed_cart" ->
 // fixed-amount discount amount. Shared between both action types below.
 function buildDiscountAmount(reward: HuntryReward): DiscountAmount {
@@ -163,55 +143,14 @@ export function buildPromotionRequestBody(reward: HuntryReward, maxUses?: number
     status: "ENABLED",
     channels: [{ id: 1 }],
     rules: [{ action: buildDiscountAction(reward) }],
+    customer: { group_ids: [] },
   };
-
-  if (reward.bcCustomerGroupId) {
-    body.customer = { group_ids: [Number(reward.bcCustomerGroupId)] };
-  }
 
   if (maxUses !== undefined) {
     body.max_uses = maxUses;
   }
 
   return body;
-}
-
-// BC-HUN-021: one Customer Group per reward, the primary preventive
-// mechanism replacing the legacy plugin's per-request
-// woocommerce_coupon_is_valid account-ownership check (docs/MIGRATION.md
-// §2) — BigCommerce refuses the coupon for anyone not a member, rather
-// than this app policing it after the fact. Lookup-or-create by
-// reward.bcCustomerGroupId, same shape as syncPromotion/syncCouponCode.
-// Request/response shape confirmed live (docs/MIGRATION.md §8). Exported
-// (like buildPromotionRequestBody) so it's unit-testable without a REST
-// client.
-export function buildCustomerGroupRequestBody(reward: HuntryReward): CustomerGroupRequestBody {
-  return {
-    name: `Huntry Reward #${reward.id}: ${reward.name}`,
-    is_default: false,
-    category_access: { type: "all" },
-  };
-}
-
-async function syncCustomerGroup(
-  reward: HuntryReward,
-  storeHash: string | undefined,
-): Promise<CustomerGroupResource> {
-  const apiClient = await getRestApiClient(storeHash);
-  const body = buildCustomerGroupRequestBody(reward);
-
-  if (reward.bcCustomerGroupId) {
-    const response = await apiClient.put<CustomerGroupResource>(
-      `/v2/customer_groups/${reward.bcCustomerGroupId}`,
-      { body },
-    );
-
-    return response.data;
-  }
-
-  const response = await apiClient.post<CustomerGroupResource>("/v2/customer_groups", { body });
-
-  return response.data;
 }
 
 async function computeUsageLimitForReward(reward: HuntryReward, storeHash: string | undefined): Promise<number> {
@@ -240,55 +179,6 @@ async function syncPromotion(
   return response.data.data;
 }
 
-// Creates the coupon-codes sub-resource if none exists yet. If one already
-// exists, attempts PUT first (in case the live API supports renaming a
-// code in place — unconfirmed, see this file's header caveat); if that
-// throws, falls back to DELETE + POST, which works regardless of whether
-// PUT-based renaming turns out to be supported. The old code becomes
-// invalid either way once the admin changes it — an accepted, inherent
-// consequence of making the coupon code editable (decision 3,
-// docs/MIGRATION.md's BC-HUN-020 plan notes), not a bug to engineer around.
-async function syncCouponCode(
-  reward: HuntryReward,
-  promotionId: string,
-  maxUses: number,
-  storeHash: string | undefined,
-): Promise<CouponCodeResource> {
-  const apiClient = await getRestApiClient(storeHash);
-  const codeBody: CouponCodeRequestBody = {
-    code: reward.couponCode as string,
-    max_uses: maxUses,
-    max_uses_per_customer: 1,
-  };
-
-  if (!reward.bcCouponCodeId) {
-    const response = await apiClient.post<V3SingleResponse<CouponCodeResource>>(
-      `/v3/promotions/${promotionId}/codes`,
-      { body: codeBody },
-    );
-
-    return response.data.data;
-  }
-
-  try {
-    const response = await apiClient.put<V3SingleResponse<CouponCodeResource>>(
-      `/v3/promotions/${promotionId}/codes/${reward.bcCouponCodeId}`,
-      { body: codeBody },
-    );
-
-    return response.data.data;
-  } catch {
-    await apiClient.delete(`/v3/promotions/${promotionId}/codes/${reward.bcCouponCodeId}`);
-
-    const response = await apiClient.post<V3SingleResponse<CouponCodeResource>>(
-      `/v3/promotions/${promotionId}/codes`,
-      { body: codeBody },
-    );
-
-    return response.data.data;
-  }
-}
-
 // Called with the just-written HuntryReward (post createReward/
 // updateReward, so reward.couponCode is already the admin's current,
 // already-persisted value). Never touches huntry_rewards itself — pure
@@ -309,27 +199,40 @@ export async function syncRewardCoupon(
   if (getDataMode() === "MOCK") {
     return {
       bcPromotionId: reward.bcPromotionId ?? `mock-promotion-${reward.id}`,
-      bcCouponCodeId: reward.bcCouponCodeId ?? `mock-coupon-${reward.id}`,
-      bcCustomerGroupId: reward.bcCustomerGroupId ?? `mock-customer-group-${reward.id}`,
+      bcCouponCodeId: null,
+      bcCustomerGroupId: null,
     };
   }
 
-  // Group first: the Promotion's customer.group_ids field needs the
-  // group's id at build time. Threaded through a shallow copy rather than
-  // mutating the caller's reward, since buildPromotionRequestBody only
-  // reads bcCustomerGroupId off it.
-  const customerGroup = await syncCustomerGroup(reward, storeHash);
-  const rewardWithGroup: HuntryReward = { ...reward, bcCustomerGroupId: String(customerGroup.id) };
-
   const maxUses = await computeUsageLimitForReward(reward, storeHash);
-  const promotion = await syncPromotion(rewardWithGroup, maxUses, storeHash);
-  const couponCode = await syncCouponCode(rewardWithGroup, String(promotion.id), maxUses, storeHash);
+  const promotion = await syncPromotion(reward, maxUses, storeHash);
 
-  return {
-    bcPromotionId: String(promotion.id),
-    bcCouponCodeId: String(couponCode.id),
-    bcCustomerGroupId: String(customerGroup.id),
-  };
+  await deleteLegacySharedCode(reward, String(promotion.id), storeHash);
+
+  return { bcPromotionId: String(promotion.id), bcCouponCodeId: null, bcCustomerGroupId: null };
+}
+
+// A reward synced before the per-claim-code redesign still has its shared
+// admin-typed code on the promotion. Deleting it is what actually retires it;
+// an already-gone code (404) is the goal state, not a failure.
+async function deleteLegacySharedCode(
+  reward: HuntryReward,
+  promotionId: string,
+  storeHash: string | undefined,
+): Promise<void> {
+  if (!reward.bcCouponCodeId) {
+    return;
+  }
+
+  const apiClient = await getRestApiClient(storeHash);
+
+  try {
+    await apiClient.delete(`/v3/promotions/${promotionId}/codes/${reward.bcCouponCodeId}`);
+  } catch (error) {
+    if (!(error instanceof AppError && error.status === 404)) {
+      throw error;
+    }
+  }
 }
 
 // BC-HUN-028: re-derives a reward's redemption budget from its currently

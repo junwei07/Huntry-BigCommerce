@@ -25,6 +25,15 @@ vi.mock("@/lib/huntry/rewards/coupon-sync", async (importOriginal) => ({
   recomputeRewardsUsageLimits: recomputeMock,
 }));
 
+// BC-HUN-032: a forced claim issues its own single-use code (the reward's
+// shared code no longer exists in BigCommerce). Stub both BigCommerce-facing
+// collaborators; claim-codes.test.ts covers the code issuing itself.
+const issueCodeMock = vi.hoisted(() => vi.fn());
+const customersMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/huntry/rewards/claim-codes", () => ({ issueClaimCode: issueCodeMock }));
+vi.mock("@/lib/gift-certs-manager/customers/customers-api", () => ({ fetchCustomersByEmailUncached: customersMock }));
+
 const cookieJar = new Map<string, string>();
 
 vi.mock("next/headers", () => ({
@@ -382,5 +391,52 @@ describe("usage-limit recompute triggers", () => {
 
     expect(recomputeMock).toHaveBeenCalledTimes(1);
     expect(recomputeMock.mock.calls[0][0]).toEqual([roomy.id]);
+  });
+});
+
+describe("forceClaimHuntryEgg", () => {
+  async function placeEgg() {
+    const { event, roomy } = await seed();
+    const { createEggs } = await import("@/lib/huntry/eggs/eggs-api");
+    const [egg] = await createEggs([{ rewardId: roomy.id, eventId: event.id, name: "Egg", ...spot(0) }], STORE);
+
+    return { egg, roomy };
+  }
+
+  async function claimRows() {
+    const { getHuntryDb } = await import("@/lib/huntry/db/get-db");
+
+    return (getHuntryDb() as import("node:sqlite").DatabaseSync)
+      .prepare("SELECT coupon_code, is_forced, bc_customer_id FROM huntry_claims")
+      .all() as { coupon_code: string; is_forced: number; bc_customer_id: number }[];
+  }
+
+  beforeEach(() => {
+    issueCodeMock.mockReset().mockResolvedValue("ROOMY-ABCD2345");
+    customersMock.mockReset().mockResolvedValue({ items: [{ id: 77, email: "player@example.com" }] });
+  });
+
+  it("stores a freshly issued per-claim code, not the reward's shared prefix", async () => {
+    await authorize(STORE);
+
+    const { egg, roomy } = await placeEgg();
+    const { forceClaimHuntryEgg } = await import("@/app/store/[storeHash]/huntry/map/actions");
+
+    const result = await forceClaimHuntryEgg(egg.id, "player@example.com", STORE);
+
+    expect(result.success).toBe(true);
+    expect(issueCodeMock).toHaveBeenCalledWith(expect.objectContaining({ id: roomy.id }), STORE);
+    expect(await claimRows()).toEqual([{ coupon_code: "ROOMY-ABCD2345", is_forced: 1, bc_customer_id: 77 }]);
+  });
+
+  it("writes no claim when the code cannot be issued", async () => {
+    await authorize(STORE);
+    issueCodeMock.mockRejectedValue(new Error("BigCommerce down"));
+
+    const { egg } = await placeEgg();
+    const { forceClaimHuntryEgg } = await import("@/app/store/[storeHash]/huntry/map/actions");
+
+    expect((await forceClaimHuntryEgg(egg.id, "player@example.com", STORE)).success).toBe(false);
+    expect(await claimRows()).toEqual([]);
   });
 });

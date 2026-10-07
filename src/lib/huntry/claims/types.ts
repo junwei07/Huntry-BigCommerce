@@ -28,3 +28,31 @@ export interface CreateForcedClaimInput {
 export type CreateForcedClaimResult =
   | { status: "created"; claim: HuntryClaim }
   | { status: "duplicate" };
+
+// BC-HUN-032: a player's own claim. Only the egg id and the claimed position
+// come from the request; event/reward are read off the locked egg row.
+export interface CreatePlayerClaimInput {
+  eggId: string;
+  bcCustomerId: number;
+  lat: number;
+  lng: number;
+}
+
+// Every way a player claim can be refused, in the order the checks run.
+export type PlayerClaimRejection =
+  | "egg_not_found"
+  | "event_not_live"
+  | "reward_unavailable"
+  | "too_far"
+  | "capacity_full"
+  | "limit_reached"
+  | "cooldown"
+  | "too_fast";
+
+export type CreatePlayerClaimResult =
+  | { status: "created"; claim: HuntryClaim }
+  // Carries the customer's existing code so the UI can re-show it.
+  | { status: "duplicate"; couponCode: string }
+  | { status: PlayerClaimRejection }
+  | { status: "code_issue_failed" }
+  | { status: "lock_timeout" };

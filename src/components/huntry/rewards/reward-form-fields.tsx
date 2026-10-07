@@ -101,9 +101,10 @@ export function RewardFormFields({
 
       <Box marginBottom="medium">
         <Input
-          label="Gift Card Code"
+          description="Each player who claims this reward gets their own single-use code starting with this prefix (e.g. COOKIE-7K3QX9PM)."
+          label="Coupon Code Prefix"
           onChange={(event) => onChange({ couponCode: event.target.value })}
-          placeholder="Enter gift card code"
+          placeholder="Enter a coupon code prefix"
           required
           value={state.couponCode}
         />

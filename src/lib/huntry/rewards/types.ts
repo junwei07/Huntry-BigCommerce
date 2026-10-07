@@ -92,8 +92,11 @@ export type UpdateRewardInput = CreateRewardInput;
 // UpdateRewardInput field now, not something coupon-sync writes back.
 export interface RewardCouponFields {
   bcPromotionId: string;
-  bcCouponCodeId: string;
-  bcCustomerGroupId: string;
+  // Both always null since the per-claim-code redesign (BC-HUN-032): the
+  // shared code and the Customer Group are retired. Kept so the columns and
+  // the DAL's write shape stay unchanged.
+  bcCouponCodeId: string | null;
+  bcCustomerGroupId: string | null;
 }
 
 // Mirrors channels/types.ts's CHANNELS_PATH precedent — co-located with the

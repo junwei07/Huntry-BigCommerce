@@ -131,8 +131,8 @@ export function resetStorefrontOriginsCache(): void {
 // boundary (the customer JWT is, for the mutating routes).
 //
 // A plain GET with no custom headers is a CORS "simple request", so no
-// preflight/Allow-Methods/Allow-Headers are needed here; the POST claim route
-// (BC-HUN-032) will add them.
+// preflight/Allow-Methods/Allow-Headers are needed for it; the JSON POST claim
+// route (BC-HUN-032) is preflighted — see buildPreflightHeaders.
 export async function buildCorsHeaders(
   requestOrigin: string | null,
   storeHash: string,
@@ -150,6 +150,27 @@ export async function buildCorsHeaders(
 
   if ((await resolveStorefrontOrigins(storeHash)).includes(origin)) {
     headers["Access-Control-Allow-Origin"] = origin;
+  }
+
+  return headers;
+}
+
+const PREFLIGHT_MAX_AGE_SECONDS = "600";
+
+// BC-HUN-032: the claim POST sends a JSON Content-Type, so browsers preflight
+// it. The method/header allowances are sent only for a recognized origin —
+// same rule as Access-Control-Allow-Origin, so an unrecognized origin's
+// preflight fails closed.
+export async function buildPreflightHeaders(
+  requestOrigin: string | null,
+  storeHash: string,
+): Promise<Record<string, string>> {
+  const headers = await buildCorsHeaders(requestOrigin, storeHash);
+
+  if (headers["Access-Control-Allow-Origin"]) {
+    headers["Access-Control-Allow-Methods"] = "POST, OPTIONS";
+    headers["Access-Control-Allow-Headers"] = "Content-Type";
+    headers["Access-Control-Max-Age"] = PREFLIGHT_MAX_AGE_SECONDS;
   }
 
   return headers;

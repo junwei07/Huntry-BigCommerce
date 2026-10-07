@@ -12,6 +12,7 @@ import {
 } from "@/lib/huntry/eggs/egg-form-schema";
 import { CLAIMS_LIST_TAG } from "@/lib/huntry/claims/cache-tags";
 import { createForcedClaim } from "@/lib/huntry/claims/claims-api";
+import { issueClaimCode } from "@/lib/huntry/rewards/claim-codes";
 import { fetchCustomersByEmailUncached } from "@/lib/gift-certs-manager/customers/customers-api";
 import { getSessionUserId } from "@/lib/session/get-session-user-id";
 import { eggTag, EGGS_LIST_TAG, eventEggsTag } from "@/lib/huntry/eggs/cache-tags";
@@ -275,7 +276,9 @@ export async function forceClaimHuntryEgg(
         eventId: egg.eventId,
         rewardNameSnapshot: reward.name,
         bcCustomerId: customer.id,
-        couponCode: reward.couponCode ?? "",
+        // A forced claim also gets its own single-use code: the reward's
+        // shared code no longer exists in BigCommerce (claim-codes.ts).
+        couponCode: await issueClaimCode(reward, storeHash),
         forcedByUserId: await getSessionUserId(),
       },
       storeHash,
