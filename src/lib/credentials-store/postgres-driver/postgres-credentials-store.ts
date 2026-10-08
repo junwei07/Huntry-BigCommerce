@@ -5,6 +5,7 @@ import {
   CredentialsStore,
   StoreExtensionRecord,
   StoreRecord,
+  StoreStorefrontPageRecord,
   StoreStorefrontScriptRecord,
   StoreUserRecord,
   StoreWebhookRecord,
@@ -36,6 +37,11 @@ interface ExtensionIdRow {
 
 interface ScriptIdRow {
   script_id: string;
+}
+
+interface StorefrontPageRow {
+  page_id: number;
+  created_by_app: boolean;
 }
 
 interface HookIdRow {
@@ -162,6 +168,36 @@ export class PostgresCredentialsStore implements CredentialsStore {
     });
   }
 
+  // Written after provisioning the Huntry page (see
+  // register-storefront-page.ts); an upsert, so re-recording is harmless.
+  async setStoreStorefrontPage(storeStorefrontPage: StoreStorefrontPageRecord): Promise<void> {
+    await withDatabaseErrorHandling("setStoreStorefrontPage", async () => {
+      const pool = getPool();
+
+      await pool.query(
+        `INSERT INTO store_storefront_pages (store_hash, page_id, created_by_app)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (store_hash) DO UPDATE SET
+           page_id = excluded.page_id,
+           created_by_app = excluded.created_by_app`,
+        [storeStorefrontPage.storeHash, storeStorefrontPage.pageId, storeStorefrontPage.createdByApp],
+      );
+    });
+  }
+
+  async getStoreStorefrontPage(storeHash: string): Promise<StoreStorefrontPageRecord | undefined> {
+    return withDatabaseErrorHandling("getStoreStorefrontPage", async () => {
+      const pool = getPool();
+      const result = await pool.query<StorefrontPageRow>(
+        "SELECT page_id, created_by_app FROM store_storefront_pages WHERE store_hash = $1",
+        [storeHash],
+      );
+      const row = result.rows[0];
+
+      return row ? { storeHash, pageId: row.page_id, createdByApp: row.created_by_app } : undefined;
+    });
+  }
+
   // Only called after a successful Webhooks API create (see
   // register-webhooks.ts) — same non-conflict semantics as
   // setStoreExtension.
@@ -222,6 +258,7 @@ export class PostgresCredentialsStore implements CredentialsStore {
         await client.query("DELETE FROM store_users WHERE store_hash = $1", [storeHash]);
         await client.query("DELETE FROM store_extensions WHERE store_hash = $1", [storeHash]);
         await client.query("DELETE FROM store_storefront_scripts WHERE store_hash = $1", [storeHash]);
+        await client.query("DELETE FROM store_storefront_pages WHERE store_hash = $1", [storeHash]);
         await client.query("DELETE FROM store_webhooks WHERE store_hash = $1", [storeHash]);
         await client.query("DELETE FROM stores WHERE store_hash = $1", [storeHash]);
 

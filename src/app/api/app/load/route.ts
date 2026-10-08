@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { isSignedPayloadVerificationError, StoreNotInstalledError } from "@/lib/bc-auth/errors";
 import { getAppErrorUrl } from "@/lib/bc-auth/app-error-reason";
 import { loadStore } from "@/lib/bc-auth/load-store";
+import { provisionStorefrontPage } from "@/lib/huntry/register-storefront-page";
 import { getAbsoluteAppUrl } from "@/lib/routing/app-url";
 import { logError } from "@/lib/errors/logger";
 
@@ -40,6 +41,13 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
     return NextResponse.redirect(getAbsoluteAppUrl(undefined, getAppErrorUrl("LOAD_FAILED")));
   }
+
+  // Backfills the Huntry storefront page for stores installed before it
+  // existed (and retries a failed install-time attempt). After the response,
+  // so opening the admin is never delayed or failed by it; with a record
+  // already stored it makes no API call at all. Only reached once loadStore
+  // has verified the signed JWT.
+  after(() => provisionStorefrontPage(storeHash));
 
   return NextResponse.redirect(getAbsoluteAppUrl(storeHash, url));
 }

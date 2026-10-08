@@ -3,6 +3,7 @@ import { installStore } from "@/lib/bc-auth/install-store";
 import { InstallSaveFailedError, TokenExchangeFailedError } from "@/lib/bc-auth/errors";
 import { getAppErrorUrl } from "@/lib/bc-auth/app-error-reason";
 import { registerAppExtension } from "@/lib/huntry/register-app-extension";
+import { provisionStorefrontPage } from "@/lib/huntry/register-storefront-page";
 import { registerStorefrontScript } from "@/lib/huntry/register-storefront-script";
 import { registerWebhooks } from "@/lib/huntry/register-webhooks";
 import { getAbsoluteAppUrl } from "@/lib/routing/app-url";
@@ -56,10 +57,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   // Deliberately outside the try/catch above: registerAppExtension,
-  // registerStorefrontScript, and registerWebhooks all swallow and log
-  // their own failures.
+  // registerStorefrontScript, provisionStorefrontPage, and registerWebhooks
+  // all swallow and log their own failures.
   await registerAppExtension(storeHash, accessToken);
   await registerStorefrontScript(storeHash, accessToken);
+  await provisionStorefrontPage(storeHash, accessToken);
   await registerWebhooks(storeHash, accessToken);
 
   return NextResponse.redirect(getAbsoluteAppUrl(storeHash, "/"));

@@ -1,0 +1,47 @@
+// Huntry's own map styles, injected next to maplibre's stylesheet by
+// mount-map.ts. Everything is scoped under .huntry-map-* so nothing leaks into
+// the merchant's theme. Ported from the map parts of
+// huntry/assets/css/huntry-frontend-map.css (popup tweak, nearest-egg pill).
+export const HUNTRY_MAP_CSS = `
+.huntry-fullscreen {
+  position: fixed; inset: 0; z-index: 2147483000; box-sizing: border-box;
+  display: flex; flex-direction: column;
+  width: 100%; height: 100vh; height: 100dvh; margin: 0; padding: 0; background: #fff;
+}
+.huntry-fullscreen__header {
+  flex: 0 0 auto; position: relative; display: flex; align-items: center; justify-content: center;
+  height: 60px; padding: 0 64px; box-sizing: border-box; background: #0f1322;
+}
+.huntry-fullscreen__title {
+  margin: 0; padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: center;
+  color: #fff; font: 700 18px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; text-transform: none; letter-spacing: 0;
+}
+.huntry-fullscreen__back {
+  position: absolute; top: 10px; left: 12px; z-index: 10; width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center; border-radius: 50%;
+  background: #fff; color: #0f1322; text-decoration: none; font: 700 20px/1 system-ui, sans-serif;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+.huntry-fullscreen__back:hover, .huntry-fullscreen__back:focus { background: #eee; color: #0f1322; text-decoration: none; }
+.huntry-fullscreen__countdown {
+  position: absolute; top: 72px; left: 50%; transform: translateX(-50%); z-index: 5;
+  padding: 6px 14px; border-radius: 999px; background: #0f1322; color: #fff; white-space: nowrap;
+  font: 700 14px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif; pointer-events: none;
+}
+.huntry-fullscreen__countdown[hidden] { display: none; }
+.huntry-fullscreen__map { position: relative; flex: 1 1 auto; min-height: 0; width: 100%; }
+.huntry-map-status {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+  z-index: 5; max-width: calc(100% - 32px); box-sizing: border-box;
+  padding: 8px 14px; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.8); color: #fff;
+  font: 600 14px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
+  text-align: center; pointer-events: none;
+}
+.huntry-map-status[hidden] { display: none; }
+.huntry-map-status--problem { background: rgba(179, 38, 30, 0.92); }
+.huntry-map-pin { position: relative; width: 40px; height: 40px; cursor: pointer; }
+.huntry-map-pin img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.huntry-map-location img { width: 36px; height: 36px; object-fit: contain; display: block; }
+.maplibregl-popup-content { font: 600 13px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif; padding: 8px 12px; }
+`;

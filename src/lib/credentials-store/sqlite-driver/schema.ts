@@ -37,6 +37,15 @@ export const CREATE_CREDENTIALS_STORE_SCHEMA = `
     script_id TEXT NOT NULL
   );
 
+  -- One row per store (only one Huntry page is ever provisioned per
+  -- install). page_id is BigCommerce's own id; created_by_app is 0 when an
+  -- existing merchant-owned /huntry/ page was adopted instead of created.
+  CREATE TABLE IF NOT EXISTS store_storefront_pages (
+    store_hash TEXT PRIMARY KEY,
+    page_id INTEGER NOT NULL,
+    created_by_app INTEGER NOT NULL
+  );
+
   -- One row per registered webhook scope, not per store — more than one
   -- webhook scope may be registered over time. hook_id is BigCommerce's own
   -- opaque id.

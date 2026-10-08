@@ -7,6 +7,7 @@ import {
   CredentialsStore,
   StoreExtensionRecord,
   StoreRecord,
+  StoreStorefrontPageRecord,
   StoreStorefrontScriptRecord,
   StoreUserRecord,
   StoreWebhookRecord,
@@ -56,6 +57,11 @@ interface ExtensionIdRow {
 
 interface ScriptIdRow {
   script_id: string;
+}
+
+interface StorefrontPageRow {
+  page_id: number;
+  created_by_app: number;
 }
 
 interface HookIdRow {
@@ -189,6 +195,32 @@ export class SqliteCredentialsStore implements CredentialsStore {
     });
   }
 
+  // Written after provisioning the Huntry page (see
+  // register-storefront-page.ts); an upsert, so re-recording is harmless.
+  async setStoreStorefrontPage(storeStorefrontPage: StoreStorefrontPageRecord): Promise<void> {
+    withDatabaseErrorHandling("setStoreStorefrontPage", () => {
+      this.db
+        .prepare(
+          `INSERT INTO store_storefront_pages (store_hash, page_id, created_by_app)
+           VALUES (?, ?, ?)
+           ON CONFLICT(store_hash) DO UPDATE SET
+             page_id = excluded.page_id,
+             created_by_app = excluded.created_by_app`,
+        )
+        .run(storeStorefrontPage.storeHash, storeStorefrontPage.pageId, storeStorefrontPage.createdByApp ? 1 : 0);
+    });
+  }
+
+  async getStoreStorefrontPage(storeHash: string): Promise<StoreStorefrontPageRecord | undefined> {
+    return withDatabaseErrorHandling("getStoreStorefrontPage", () => {
+      const row = this.db
+        .prepare("SELECT page_id, created_by_app FROM store_storefront_pages WHERE store_hash = ?")
+        .get(storeHash) as unknown as StorefrontPageRow | undefined;
+
+      return row ? { storeHash, pageId: row.page_id, createdByApp: row.created_by_app === 1 } : undefined;
+    });
+  }
+
   // Only called after a successful Webhooks API create (see
   // register-webhooks.ts) — same non-conflict semantics as
   // setStoreExtension.
@@ -241,6 +273,7 @@ export class SqliteCredentialsStore implements CredentialsStore {
         this.db.prepare("DELETE FROM store_users WHERE store_hash = ?").run(storeHash);
         this.db.prepare("DELETE FROM store_extensions WHERE store_hash = ?").run(storeHash);
         this.db.prepare("DELETE FROM store_storefront_scripts WHERE store_hash = ?").run(storeHash);
+        this.db.prepare("DELETE FROM store_storefront_pages WHERE store_hash = ?").run(storeHash);
         this.db.prepare("DELETE FROM store_webhooks WHERE store_hash = ?").run(storeHash);
         this.db.prepare("DELETE FROM stores WHERE store_hash = ?").run(storeHash);
 

@@ -7,10 +7,11 @@
     "node": ">=24.0.0"
   },
   "scripts": {
-    "dev": "node scripts/copy-maplibre-worker.mjs && next dev",
-    "build": "node scripts/copy-maplibre-worker.mjs && vitest run && next build",
+    "dev": "node scripts/copy-maplibre-worker.mjs && node scripts/build-storefront-script.mjs && next dev",
+    "build": "node scripts/copy-maplibre-worker.mjs && node scripts/build-storefront-script.mjs && vitest run && next build",
     "start": "next start",
     "lint": "eslint",
+    "pretest": "node scripts/build-storefront-script.mjs",
     "test": "vitest run",
     "scaffold": "node scripts/scaffold.mjs"
   },
@@ -32,6 +33,7 @@
     "@types/pg": "8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "node-pg-migrate": "9.0.0",

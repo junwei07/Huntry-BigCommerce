@@ -40,6 +40,18 @@ export interface StoreStorefrontScriptRecord {
   scriptId: string;
 }
 
+// Links a store to the Huntry content page provisioned for it (Pages API),
+// so provisioning runs once per store and a page the merchant later deletes
+// is not silently recreated on every app load. pageId is BigCommerce's own
+// id. createdByApp is false when an existing, merchant-owned /huntry/ page
+// was found instead of created: the app must never delete that one on
+// uninstall. One row per store, like StoreStorefrontScriptRecord.
+export interface StoreStorefrontPageRecord {
+  storeHash: string;
+  pageId: number;
+  createdByApp: boolean;
+}
+
 // Links a store to one registered webhook (Webhooks API). hookId is
 // BigCommerce's own opaque id. Keyed by (storeHash, scope) rather than
 // storeHash alone, since more than one webhook scope may be registered over
@@ -64,6 +76,8 @@ export interface CredentialsStore {
   getStoreExtension(storeHash: string): Promise<string | undefined>;
   setStoreStorefrontScript(storeStorefrontScript: StoreStorefrontScriptRecord): Promise<void>;
   getStoreStorefrontScript(storeHash: string): Promise<string | undefined>;
+  setStoreStorefrontPage(storeStorefrontPage: StoreStorefrontPageRecord): Promise<void>;
+  getStoreStorefrontPage(storeHash: string): Promise<StoreStorefrontPageRecord | undefined>;
   setStoreWebhook(storeWebhook: StoreWebhookRecord): Promise<void>;
   getStoreWebhook(storeHash: string, scope: string): Promise<string | undefined>;
   isStoreUserLinked(storeHash: string, userId: number): Promise<boolean>;

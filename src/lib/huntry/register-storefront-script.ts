@@ -7,7 +7,18 @@ import { logError } from "@/lib/errors/logger";
 interface BcScript {
   uuid: string;
   api_client_id?: string;
+  consent_category?: string;
+  src?: string;
 }
+
+// essential, so the storefront script runs for every visitor. A functional
+// script is held back by BigCommerce's cookie-consent manager until the shopper
+// accepts the banner (it is injected as type="text/plain"), which left the Huntry
+// page showing only its placeholder. The script only reads the public map-data,
+// keeps per-event flags in localStorage and calls the claim route when the
+// player acts; it sets no cookies and does no tracking. A deliberate product
+// call — see docs/MIGRATION.md §7 (Open Risks).
+export const STOREFRONT_SCRIPT_CONSENT_CATEGORY = "essential";
 
 // The scaffold placeholder route this week — BC-HUN-034 replaces its
 // content with the real bundle, at this same URL.
@@ -28,11 +39,7 @@ function buildScriptInput(storeHash: string) {
     load_method: "defer",
     location: "footer",
     visibility: "storefront",
-    // functional (not essential) is a deliberate, revisitable product
-    // call — see docs/MIGRATION.md §8: essential guarantees the script
-    // always runs even under cookie-consent suppression, functional can be
-    // blocked by a privacy-conscious visitor's consent choice.
-    consent_category: "functional",
+    consent_category: STOREFRONT_SCRIPT_CONSENT_CATEGORY,
   };
 }
 
@@ -40,19 +47,50 @@ function buildScriptInput(storeHash: string) {
 // matched on api_client_id (the field this app's own API credentials
 // populate automatically, unlike name/url which could be renamed around) —
 // see docs/MIGRATION.md §4.
-async function findExistingStorefrontScriptId(restApiClient: BcRestApiClient): Promise<string | undefined> {
+async function findExistingStorefrontScript(restApiClient: BcRestApiClient): Promise<BcScript | undefined> {
   const result = await restApiClient.get<V3ListResponse<BcScript>>("/v3/content/scripts");
 
-  return result.data.data.find((script) => script.api_client_id === process.env.BIGCOMMERCE_CLIENT_ID)?.uuid;
+  return result.data.data.find((script) => script.api_client_id === process.env.BIGCOMMERCE_CLIENT_ID);
+}
+
+// A script registered earlier keeps whatever it was created with, so adopting
+// it also brings it up to date: the consent category (it changed to essential)
+// and the src, which embeds APP_ORIGIN and so goes stale whenever the app moves
+// (a new dev tunnel, a new deployment). Only the fields that differ are sent. A
+// failed update must not fail the adoption: the script still exists, it just
+// keeps its old settings.
+async function reconcileStorefrontScript(restApiClient: BcRestApiClient, script: BcScript, storeHash: string): Promise<void> {
+  const changes: { consent_category?: string; src?: string } = {};
+  const expectedSrc = getStorefrontScriptSrc(storeHash);
+
+  if (script.consent_category !== STOREFRONT_SCRIPT_CONSENT_CATEGORY) {
+    changes.consent_category = STOREFRONT_SCRIPT_CONSENT_CATEGORY;
+  }
+
+  if (script.src !== undefined && script.src !== expectedSrc) {
+    changes.src = expectedSrc;
+  }
+
+  if (Object.keys(changes).length === 0) {
+    return;
+  }
+
+  try {
+    await restApiClient.put(`/v3/content/scripts/${script.uuid}`, { body: changes });
+  } catch (error) {
+    logError(`reconcileStorefrontScript: script "${script.uuid}"`, error);
+  }
 }
 
 // Registers this app's storefront script, adopting an existing one instead
 // of creating a duplicate — safe to call more than once for the same store.
 export async function findOrCreateStorefrontScript(restApiClient: BcRestApiClient, storeHash: string): Promise<string> {
-  const existingScriptId = await findExistingStorefrontScriptId(restApiClient);
+  const existingScript = await findExistingStorefrontScript(restApiClient);
 
-  if (existingScriptId) {
-    return existingScriptId;
+  if (existingScript) {
+    await reconcileStorefrontScript(restApiClient, existingScript, storeHash);
+
+    return existingScript.uuid;
   }
 
   const result = await restApiClient.post<{ data: BcScript }>("/v3/content/scripts", {
