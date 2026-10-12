@@ -1,5 +1,6 @@
 import { fetchMapData, submitClaim } from "./api";
 import { renderListing, renderNotFound } from "./cards-view";
+import { startClaimUi } from "./claim-ui";
 import { loadEggFlags } from "./local-state";
 import type { HuntryMapApi } from "./map/mount-map";
 import { decideMode } from "./page-mode";
@@ -11,10 +12,11 @@ import { StorefrontConfig, StorefrontEvent } from "./types";
 // container it does nothing.
 //
 // The map and geolocation live in a separate, lazily loaded bundle (map/). The
-// claim dialogs (BC-HUN-037) plug in through window.HuntryStorefront, the
-// "huntry:ready" event and the map's "huntry:egg-nearby" event. Any
-// API-sourced text they render must use textContent, never innerHTML — it is
-// admin-authored and runs on the merchant's origin.
+// claim dialogs (claim-ui/, BC-HUN-037) are part of this loader and plug in
+// through window.HuntryStorefront.map and the map's "huntry:egg-nearby" /
+// "huntry:map-ready" events. Any API-sourced text they render must use
+// textContent, never innerHTML — it is admin-authored and runs on the
+// merchant's origin.
 const CONTAINER_SELECTOR = "[data-huntry-map], #huntry-map";
 
 export interface HuntryStorefrontApi {
@@ -94,6 +96,15 @@ async function start(): Promise<void> {
       break;
     case "map":
       loadMapScript(config);
+
+      // The dialogs are an add-on to the map: if they fail to start the map
+      // must still work.
+      try {
+        startClaimUi(window.HuntryStorefront);
+      } catch (error) {
+        console.error("[Huntry] Claim dialogs failed to start.", error);
+      }
+
       break;
     case "not-found":
       renderNotFound(container);

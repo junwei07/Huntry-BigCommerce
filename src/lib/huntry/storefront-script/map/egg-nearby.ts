@@ -3,8 +3,8 @@ import { EggFlags, StorefrontEgg } from "../types";
 
 // What the player is standing next to. Mirrors the legacy geolocate handler
 // (huntry-frontend-map.js L901-929): a claimable egg wins, then a claimed
-// egg whose "fully claimed" notice they haven't dismissed, then a revisitable one. Dialogs are
-// BC-HUN-037; the map only reports this through the huntry:egg-nearby event.
+// egg whose "fully claimed" notice they haven't dismissed, then a revisitable one. The dialogs
+// (claim-ui/, BC-HUN-037) react to the huntry:egg-nearby event; the map only reports it.
 export type EggNearbyKind = "claimable" | "claimed-unseen" | "revisitable";
 
 export interface EggNearby {
@@ -47,24 +47,33 @@ export function evaluateNearby(
   };
 }
 
+export interface NearbyChange {
+  changed: boolean;
+  // The new state when `changed`; null means the player left every radius
+  // (the bell badge must clear), so callers can't tell "unchanged" from "gone"
+  // by `nearby` alone.
+  nearby: EggNearby | null;
+}
+
 // GPS fixes arrive continuously with trackUserLocation, so without this the
-// event (and any dialog 037 opens from it) would fire on every fix. It emits
-// only when the {kind, egg} pair changes; losing the egg (leaving the radius)
-// re-arms it, and rearm() forgets the last value so the next fix re-emits.
+// event (and any dialog opened from it) would fire on every fix. It reports a
+// change only when the {kind, egg, revisitable egg} triple differs from the
+// last one, including the change to "nothing nearby"; rearm() forgets the last
+// value so the next fix re-emits.
 export function createNearbyTracker() {
   let lastKey: string | null = null;
 
   return {
-    next(current: EggNearby | null): EggNearby | null {
-      const key = current ? `${current.kind}:${current.egg.id}` : null;
+    next(current: EggNearby | null): NearbyChange {
+      const key = current ? `${current.kind}:${current.egg.id}:${current.revisitable?.egg.id ?? ""}` : null;
 
       if (key === lastKey) {
-        return null;
+        return { changed: false, nearby: null };
       }
 
       lastKey = key;
 
-      return current;
+      return { changed: true, nearby: current };
     },
     rearm(): void {
       lastKey = null;

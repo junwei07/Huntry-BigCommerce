@@ -49,3 +49,8 @@ export interface EggFlags {
   claimedDismissed: ReadonlySet<string>;
   mine: ReadonlySet<string>;
 }
+
+// The same four sets, mutable. The map owns the live instances and shares them
+// through HuntryMapApi.flags, so the claim dialogs change what the map's
+// proximity checks see instead of editing a private copy.
+export type MutableEggFlags = { [K in keyof EggFlags]: Set<string> };

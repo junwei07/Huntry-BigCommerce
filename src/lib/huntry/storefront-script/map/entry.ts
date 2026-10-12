@@ -11,6 +11,9 @@ function boot(): void {
 
   try {
     api.map = mountMap(api) ?? undefined;
+
+    // The claim UI adds its notification bell to the map's control stack.
+    if (api.map) window.dispatchEvent(new CustomEvent("huntry:map-ready"));
   } catch (error) {
     console.error("[Huntry] Map failed to start.", error);
   }

@@ -1,5 +1,5 @@
 import { buildCards, endsCountdown, EventCard, formatDateRange } from "./cards";
-import { HUNTRY_CARDS_CSS } from "./cards-styles";
+import { HUNTRY_CARDS_CSS } from "./styles.generated";
 import { StorefrontEvent } from "./types";
 
 // DOM for the /huntry/ listing and its empty / not-found states. Everything

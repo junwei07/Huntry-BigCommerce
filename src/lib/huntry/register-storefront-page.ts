@@ -73,7 +73,7 @@ async function adoptExistingPage(restApiClient: BcRestApiClient, pageId: number)
     // storefront script finds no container there, so nothing renders.
     logError(
       "findOrCreateStorefrontPage",
-      new Error(`A page already exists at ${STOREFRONT_PAGE_URL} (id ${pageId}) and is not managed by Huntry; leaving it alone.`),
+      new Error(`A page already exists at ${STOREFRONT_PAGE_URL} (id ${pageId}) and is not managed by Huntry.`),
     );
   }
 

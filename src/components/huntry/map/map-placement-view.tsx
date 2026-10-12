@@ -100,7 +100,11 @@ function eggMarkerOptions(itemMarkerUrl: string | null, rewardId: number): mapli
   const image = document.createElement("img");
   const badge = document.createElement("span");
 
-  element.style.cssText = "position:relative;width:40px;height:40px;cursor:pointer";
+  // No `position` here: maplibre's .maplibregl-marker is position:absolute and
+  // is placed only via transform, so overriding it (e.g. relative) puts the
+  // marker in normal flow and offsets it by a fixed number of pixels. The badge
+  // below still anchors to this element because absolute is a positioned value.
+  element.style.cssText = "width:40px;height:40px;cursor:pointer";
   image.src = itemMarkerUrl;
   image.alt = "";
   image.draggable = false;

@@ -42,8 +42,12 @@ describe("generated storefront bundles", () => {
     expect(WORKER_SOURCE.length).toBeGreaterThan(10_000);
     expect(STOREFRONT_MAP_BUNDLE).toContain("maplibregl");
     expect(STOREFRONT_BUNDLE.length).toBeLessThan(60 * 1024);
-    // The loader must not drag maplibre into every storefront page.
-    expect(STOREFRONT_BUNDLE).not.toContain("maplibregl");
+    // The loader must not drag maplibre into every storefront page. It does carry
+    // the "maplibregl-ctrl" CSS class names (the claim UI's bell sits in the map's
+    // control stack), so check for the library itself, not the bare word.
+    expect(STOREFRONT_BUNDLE).not.toContain("setWorkerUrl");
+    expect(STOREFRONT_BUNDLE).not.toContain("GeolocateControl");
+    expect(STOREFRONT_BUNDLE).not.toContain("maplibregl.Map");
   });
 
   it("has the loader inject the map script from the new route, once", async () => {

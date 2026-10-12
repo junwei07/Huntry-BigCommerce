@@ -2,13 +2,12 @@ import * as maplibregl from "maplibre-gl";
 import type { HuntryStorefrontApi } from "../index";
 import { persistFlag } from "../local-state";
 import { nearestUnclaimedDistance } from "../proximity";
-import { StorefrontEgg, StorefrontEvent } from "../types";
+import { MutableEggFlags, StorefrontEgg, StorefrontEvent } from "../types";
 import { enterFullscreen } from "./chrome";
 import { createNearbyTracker, evaluateNearby } from "./egg-nearby";
 import { describeGeolocationError } from "./geolocation";
-import { MAPLIBRE_CSS, WORKER_SOURCE } from "./map-assets.generated";
+import { HUNTRY_MAP_CSS, MAPLIBRE_CSS, WORKER_SOURCE } from "./map-assets.generated";
 import { markerAppearance } from "./marker-state";
-import { HUNTRY_MAP_CSS } from "./styles";
 import { initialView, pickEvent } from "./view";
 
 // Same keyless OpenFreeMap style the admin map and the legacy plugin use. The
@@ -16,8 +15,19 @@ import { initialView, pickEvent } from "./view";
 const MAP_STYLE_URL = "https://tiles.openfreemap.org/styles/bright";
 
 export interface HuntryMapApi {
+  // The live flag sets the map's proximity checks read; mutate these, not a copy.
+  flags: MutableEggFlags;
   markEggClaimed: (eggId: string) => void;
+  // Rebuilds one egg's marker from its current state (e.g. after it turned out full).
+  refreshMarker: (eggId: string) => void;
   rearm: () => void;
+  // Latest geolocation fix, so a claim sends where the player is now rather
+  // than where they were when the egg-nearby event fired.
+  position: () => { lat: number; lng: number } | null;
+  // Adds a control to the top-right stack (the claim UI's notification bell).
+  addControl: (element: HTMLElement) => void;
+  // Stops the nearest-egg readout once the player has no claims left.
+  setClaimLimitReached: () => void;
   // Tears the map down and puts the container back where the theme had it.
   leave: () => void;
 }
@@ -96,7 +106,7 @@ export function mountMap(api: HuntryStorefrontApi): HuntryMapApi | null {
     primaryColor: event.colors?.primaryColor ?? null,
   });
   const mapHost = fullscreen.mapHost;
-  const flags = api.loadEggFlags(event.id);
+  const flags = api.loadEggFlags(event.id) as MutableEggFlags;
   const view = initialView(event);
   const map = new maplibregl.Map({ container: mapHost, style: MAP_STYLE_URL, center: view.center, zoom: view.zoom });
   const status = document.createElement("div");
@@ -127,19 +137,25 @@ export function mountMap(api: HuntryStorefrontApi): HuntryMapApi | null {
     return marker;
   };
 
-  const markEggClaimed = (eggId: string) => {
+  const refreshMarker = (eggId: string) => {
     const egg = event.eggs.find((item) => item.id === eggId);
 
     if (!egg) return;
 
-    (flags.mine as Set<string>).add(eggId);
-    persistFlag(config.storeHash, event.id, "mine", flags.mine);
     markers.get(eggId)?.remove();
-
-    const marker = buildMarker(egg).addTo(map);
-
-    markers.set(eggId, marker);
+    markers.set(eggId, buildMarker(egg).addTo(map));
   };
+
+  const markEggClaimed = (eggId: string) => {
+    if (!event.eggs.some((item) => item.id === eggId)) return;
+
+    flags.mine.add(eggId);
+    persistFlag(config.storeHash, event.id, "mine", flags.mine);
+    refreshMarker(eggId);
+  };
+
+  let lastPosition: { lat: number; lng: number } | null = null;
+  let claimLimitReached = false;
 
   const geolocate = new maplibregl.GeolocateControl({
     positionOptions: { enableHighAccuracy: true },
@@ -162,16 +178,25 @@ export function mountMap(api: HuntryStorefrontApi): HuntryMapApi | null {
   geolocate.on("geolocate", (position) => {
     const { latitude, longitude } = position.coords;
 
+    lastPosition = { lat: latitude, lng: longitude };
     locationMarker?.setLngLat([longitude, latitude]).addTo(map);
+
+    // Out of claims: no readout and no more prompts (legacy returns early here).
+    if (claimLimitReached) {
+      showStatus(null);
+
+      return;
+    }
 
     const nearest = nearestUnclaimedDistance(event.eggs, latitude, longitude, flags);
 
     showStatus(nearest === null ? null : `Nearest egg: ${Math.round(nearest)} m away`);
 
-    const nearby = tracker.next(evaluateNearby(event.eggs, latitude, longitude, event.markerRadiusMeters, flags));
+    const change = tracker.next(evaluateNearby(event.eggs, latitude, longitude, event.markerRadiusMeters, flags));
 
-    if (nearby) {
-      window.dispatchEvent(new CustomEvent("huntry:egg-nearby", { detail: nearby }));
+    // `detail: null` means nothing is nearby any more; the bell badge clears on it.
+    if (change.changed) {
+      window.dispatchEvent(new CustomEvent("huntry:egg-nearby", { detail: change.nearby }));
     }
   });
 
@@ -194,8 +219,18 @@ export function mountMap(api: HuntryStorefrontApi): HuntryMapApi | null {
   });
 
   return {
+    flags,
     markEggClaimed,
+    refreshMarker,
     rearm: () => tracker.rearm(),
+    position: () => lastPosition,
+    addControl: (element) => {
+      map.addControl({ onAdd: () => element, onRemove: () => element.remove() }, "top-right");
+    },
+    setClaimLimitReached: () => {
+      claimLimitReached = true;
+      showStatus(null);
+    },
     leave: () => {
       map.remove();
       fullscreen.restore();

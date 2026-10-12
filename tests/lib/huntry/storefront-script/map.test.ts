@@ -110,15 +110,31 @@ describe("evaluateNearby / createNearbyTracker", () => {
     const tracker = createNearbyTracker();
     const here = evaluateNearby(eggs, 0, 0, 50, flags());
 
-    expect(tracker.next(here)?.egg.id).toBe("near");
-    expect(tracker.next(here)).toBeNull();
-    expect(tracker.next(here)).toBeNull();
-    expect(tracker.next(null)).toBeNull();
-    expect(tracker.next(here)?.egg.id).toBe("near");
+    expect(tracker.next(here).nearby?.egg.id).toBe("near");
+    expect(tracker.next(here)).toEqual({ changed: false, nearby: null });
+    expect(tracker.next(here).changed).toBe(false);
+    // Leaving the radius is a change to "nothing", so the bell badge can clear.
+    expect(tracker.next(null)).toEqual({ changed: true, nearby: null });
+    expect(tracker.next(null).changed).toBe(false);
+    expect(tracker.next(here).nearby?.egg.id).toBe("near");
 
     tracker.rearm();
 
-    expect(tracker.next(here)?.egg.id).toBe("near");
+    expect(tracker.next(here).nearby?.egg.id).toBe("near");
+  });
+
+  it("reports a change when only the revisitable egg changes", () => {
+    const tracker = createNearbyTracker();
+    const both = [egg("a", 0.0001, 0), egg("b", 0, 0.0001)];
+
+    expect(tracker.next(evaluateNearby(both, 0, 0, 50, flags())).changed).toBe(true);
+    // "a" is skipped: it stops being claimable and "b" stays the primary egg, but the
+    // bell now has something to reopen.
+    const afterSkip = evaluateNearby(both, 0, 0, 50, flags({ skipped: ["a"], dismissed: ["a"] }));
+
+    expect(afterSkip?.kind).toBe("claimable");
+    expect(afterSkip?.revisitable?.egg.id).toBe("a");
+    expect(tracker.next(afterSkip).changed).toBe(true);
   });
 });
 

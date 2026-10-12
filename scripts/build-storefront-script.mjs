@@ -7,6 +7,11 @@
 //   storefront-script/index.ts     -> STOREFRONT_BUNDLE      (loader, every page)
 //   storefront-script/map/entry.ts -> STOREFRONT_MAP_BUNDLE  (maplibre, lazy)
 //
+// The storefront CSS lives in real .css files (cards.css, claim-ui/claim-ui.css,
+// map/map.css) and is inlined here as strings, so the routes still need no file
+// read at runtime: styles.generated.ts (loader) and map/map-assets.generated.ts
+// (map, next to maplibre's own CSS).
+//
 // maplibre-gl@6 is ESM-only and starts a module worker from a file URL, which
 // a cross-origin storefront can't do. So its worker is bundled here into one
 // self-contained script and embedded as a string (map/map-assets.generated.ts);
@@ -60,6 +65,15 @@ await writeFile(
   asModule("maplibre worker and CSS", {
     WORKER_SOURCE: workerSource,
     MAPLIBRE_CSS: await readFile(join(maplibreDist, "maplibre-gl.css"), "utf8"),
+    HUNTRY_MAP_CSS: await readFile(join(dir, "map", "map.css"), "utf8"),
+  }),
+);
+
+await writeFile(
+  join(dir, "styles.generated.ts"),
+  asModule("storefront loader CSS", {
+    HUNTRY_CARDS_CSS: await readFile(join(dir, "cards.css"), "utf8"),
+    CLAIM_UI_CSS: await readFile(join(dir, "claim-ui", "claim-ui.css"), "utf8"),
   }),
 );
 
