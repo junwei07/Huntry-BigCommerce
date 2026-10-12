@@ -433,3 +433,13 @@ describe("claim-ui source rules", () => {
     expect(cart).not.toMatch(/appOrigin|api\/public\/huntry/);
   });
 });
+
+describe("storefront views source rules", () => {
+  it("rewards and nav views never use innerHTML", () => {
+    for (const name of ["rewards-view.ts", "page-nav.ts"]) {
+      const source = readFileSync(path.join(process.cwd(), "src/lib/huntry/storefront-script", name), "utf8");
+
+      expect(source, name).not.toMatch(/innerHTML|insertAdjacentHTML|outerHTML/);
+    }
+  });
+});

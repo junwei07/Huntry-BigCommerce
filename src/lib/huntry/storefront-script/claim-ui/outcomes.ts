@@ -18,6 +18,7 @@ export const STRINGS = {
   applying: "Applying",
   viewCart: "View cart",
   logInToClaim: "Log in to claim this reward.",
+  joinHunt: "Log in or create an account to join the hunt.",
   logIn: "Log In",
   back: "Back",
   alreadyClaimedTitle: "Someone beat you to it!",
@@ -29,7 +30,7 @@ export const STRINGS = {
   backToHunts: "Back to all hunts",
   genericError: "Couldn't claim this right now. Please try again.",
   skippedItems: "Skipped items",
-  myRewards: "My rewards",
+  myRewards: "My Rewards",
   viewRewards: "View Rewards",
   savedToRewards: "Saved to My Rewards. Find it any time from the View Rewards button.",
 } as const;

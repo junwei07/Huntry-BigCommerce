@@ -1,4 +1,5 @@
 import { safeColor } from "../map/chrome";
+import { loginUrl } from "../page-mode";
 import type { BlockedView, ClaimedView, ClaimUi, FoundView } from "./controller";
 import { STRINGS } from "./outcomes";
 import { CLAIM_UI_CSS } from "../styles.generated";
@@ -41,6 +42,29 @@ function injectStyles(): void {
   style.dataset.huntryClaimCss = "";
   style.textContent = CLAIM_UI_CSS;
   document.head.appendChild(style);
+}
+
+// The guest gate for a live event's map (legacy: showLoginPrompt in
+// huntry-frontend-map.js). A modal with no dismiss: the map is never loaded for
+// a guest; it sits over the fullscreen shell, whose ← link is the way back.
+export function showJoinPrompt(successColor: string | null = null): void {
+  injectStyles();
+
+  const overlay = el("div", "huntry-claim-overlay");
+  const card = el("div", "huntry-claim-dialog");
+  const wrap = el("div", "huntry-claim-dialog__content");
+  const login = el("a", "huntry-claim-dialog__button huntry-claim-dialog__button--claim", STRINGS.logIn);
+  const color = safeColor(successColor);
+
+  if (color) overlay.style.setProperty("--huntry-claim-success", color);
+
+  login.href = loginUrl();
+  card.setAttribute("role", "dialog");
+  card.setAttribute("aria-modal", "true");
+  wrap.append(el("p", "huntry-claim-dialog__message", STRINGS.joinHunt), login);
+  card.appendChild(wrap);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
 }
 
 export interface DomUiOptions {
@@ -230,9 +254,8 @@ export function createDomUi(options: DomUiOptions): DomUi {
       const wrap = content();
       const login = el("a", "huntry-claim-dialog__button huntry-claim-dialog__button--claim", STRINGS.logIn);
 
-      // BigCommerce's own login page, not a Google flow; it has no supported
-      // return-URL parameter here, so the shopper lands wherever it sends them.
-      login.href = "/login.php";
+      // BigCommerce's own login page, not a Google flow.
+      login.href = loginUrl();
       wrap.append(
         message(STRINGS.logInToClaim),
         login,

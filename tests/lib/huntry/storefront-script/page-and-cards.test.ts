@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { buildCards, endsCountdown, formatDateRange } from "@/lib/huntry/storefront-script/cards";
 import { safeColor } from "@/lib/huntry/storefront-script/map/chrome";
-import { decideMode } from "@/lib/huntry/storefront-script/page-mode";
+import { pageNavItems } from "@/lib/huntry/storefront-script/page-nav";
+import { decideMode, readView } from "@/lib/huntry/storefront-script/page-mode";
 import { StorefrontEvent } from "@/lib/huntry/storefront-script/types";
 
 const event = (slug: string, overrides: Partial<StorefrontEvent> = {}): StorefrontEvent => ({
@@ -43,6 +44,24 @@ describe("decideMode", () => {
     expect(decideMode(events, "b")).toEqual({ kind: "map", event: events[1] });
     expect(decideMode(events, "nope")).toEqual({ kind: "not-found" });
     expect(decideMode([], "a")).toEqual({ kind: "not-found" });
+  });
+});
+
+describe("readView", () => {
+  it("reads ?view= or a #rewards link", () => {
+    expect(readView("?view=rewards", "")).toBe("rewards");
+    expect(readView("", "#rewards")).toBe("rewards");
+    expect(readView("?event=a", "#other")).toBeUndefined();
+    expect(decideMode([], undefined, readView("", "#rewards"))).toEqual({ kind: "rewards" });
+  });
+});
+
+describe("pageNavItems", () => {
+  it("marks the active section and links both", () => {
+    expect(pageNavItems("rewards", "/huntry/", "/huntry/?view=rewards")).toEqual([
+      { label: "Hunts", href: "/huntry/", active: false },
+      { label: "My Rewards", href: "/huntry/?view=rewards", active: true },
+    ]);
   });
 });
 

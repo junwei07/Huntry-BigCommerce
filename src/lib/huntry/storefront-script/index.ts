@@ -1,9 +1,11 @@
-import { fetchMapData, fetchMyRewards, submitClaim } from "./api";
-import { renderListing, renderNotFound } from "./cards-view";
+import { fetchMapData, fetchMyRewards, isLoggedIn, submitClaim } from "./api";
+import { listingUrl, renderListing, renderNotFound } from "./cards-view";
 import { startClaimUi } from "./claim-ui";
+import { showJoinPrompt } from "./claim-ui/dom-ui";
 import { loadEggFlags } from "./local-state";
+import { enterFullscreen } from "./map/chrome";
 import type { HuntryMapApi } from "./map/mount-map";
-import { decideMode } from "./page-mode";
+import { decideMode, readView } from "./page-mode";
 import { renderRewards } from "./rewards-view";
 import { StorefrontConfig, StorefrontEvent } from "./types";
 
@@ -75,7 +77,7 @@ async function start(): Promise<void> {
 
   const params = new URLSearchParams(window.location.search);
   const slug = params.get("event")?.trim() || undefined;
-  const view = params.get("view")?.trim() || undefined;
+  const view = readView(window.location.search, window.location.hash);
 
   // Always the full live list, never narrowed by ?event=: the server would
   // return just that one event (or none), so the listing could not be built and
@@ -100,6 +102,21 @@ async function start(): Promise<void> {
       renderListing(container, mode.events);
       break;
     case "map":
+      // A live event's map is for signed-in customers only. Guests get the
+      // fullscreen hunt shell (title bar, back link, countdown) with the login
+      // prompt on top, and never download maplibre. Client-side only, like the
+      // plugin: the coordinates are still in the public map-data.
+      if (!(await isLoggedIn(config))) {
+        enterFullscreen(container, {
+          title: mode.event.name,
+          backHref: listingUrl(),
+          endsAt: mode.event.endsAt,
+          primaryColor: mode.event.colors?.primaryColor ?? null,
+        });
+        showJoinPrompt(mode.event.colors?.successColor ?? null);
+        break;
+      }
+
       loadMapScript(config);
 
       // The dialogs are an add-on to the map: if they fail to start the map

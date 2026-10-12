@@ -7,7 +7,9 @@ const STORE_HASH_PATTERN = /^[a-z0-9]{1,32}$/;
 // The loader's prelude embeds env-derived values, so keep the shared-cache
 // lifetime short enough that a config change reaches storefronts quickly. The
 // map bundle uses the same lifetime so loader and map never drift far apart.
-const CACHE_CONTROL = "public, max-age=300, s-maxage=300";
+// Not in `next dev`: there a rebuilt bundle must show up on the next reload.
+const cacheControl = () =>
+  process.env.NODE_ENV === "development" ? "no-store" : "public, max-age=300, s-maxage=300";
 
 const JS_TYPE = "application/javascript; charset=utf-8";
 
@@ -32,6 +34,6 @@ export async function serveStorefrontScript(
   }
 
   return new NextResponse(buildSource(storeHash), {
-    headers: { "Content-Type": JS_TYPE, "Cache-Control": CACHE_CONTROL },
+    headers: { "Content-Type": JS_TYPE, "Cache-Control": cacheControl() },
   });
 }

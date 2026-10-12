@@ -18,7 +18,7 @@ export async function fetchMapData(config: StorefrontConfig, eventSlug?: string)
 }
 
 // Same-origin request to the storefront's own BigCommerce endpoint. Returns
-// null for a guest (404) — the caller redirects to /login.php. The token is
+// null for a guest (404) — the caller sends them to loginUrl(). The token is
 // short-lived, so it is fetched right before each claim and never stored.
 export async function fetchCustomerJwt(config: StorefrontConfig): Promise<string | null> {
   const response = await fetch(`/customer/current.jwt?app_client_id=${encodeURIComponent(config.clientId)}`, {
@@ -31,6 +31,16 @@ export async function fetchCustomerJwt(config: StorefrontConfig): Promise<string
   const jwt = (await response.text()).trim();
 
   return jwt || null;
+}
+
+// Gate check for the map page. Fails open on an error: the claims route still
+// requires a valid customer JWT, so a flaky probe must not lock players out.
+export async function isLoggedIn(config: StorefrontConfig): Promise<boolean> {
+  try {
+    return (await fetchCustomerJwt(config)) !== null;
+  } catch {
+    return true;
+  }
 }
 
 // One claim attempt: fresh JWT, then POST. Never throws — network failures

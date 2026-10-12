@@ -1,5 +1,7 @@
 import { MyRewardsResult } from "./api";
 import { listingUrl } from "./cards-view";
+import { loginUrl, rewardsUrl } from "./page-mode";
+import { renderPageNav } from "./page-nav";
 import { HUNTRY_CARDS_CSS } from "./styles.generated";
 import { StorefrontReward } from "./types";
 
@@ -18,7 +20,6 @@ export const REWARDS_STRINGS = {
   claimedAt: "Claimed at:",
   expired: "Expired",
   validOn: "Valid on:",
-  back: "Back to all hunts",
 } as const;
 
 function injectStyles(): void {
@@ -142,13 +143,14 @@ function buildCard(reward: StorefrontReward): HTMLElement {
 export function renderRewards(container: HTMLElement, result: MyRewardsResult): void {
   injectStyles();
   container.textContent = "";
+  container.appendChild(renderPageNav("rewards", listingUrl(), rewardsUrl()));
   container.appendChild(element("h2", "huntry-rewards-title", REWARDS_STRINGS.title));
 
   if (result.kind === "guest") {
     const message = element("p", "huntry-cards-message", `${REWARDS_STRINGS.guest} `);
     const login = element("a", "", REWARDS_STRINGS.logIn);
 
-    login.href = "/login.php";
+    login.href = loginUrl();
     message.appendChild(login);
     container.appendChild(message);
 
@@ -172,9 +174,4 @@ export function renderRewards(container: HTMLElement, result: MyRewardsResult): 
 
     container.appendChild(grid);
   }
-
-  const back = element("a", "", REWARDS_STRINGS.back);
-
-  back.href = listingUrl();
-  container.appendChild(back);
 }

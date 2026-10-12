@@ -1,4 +1,6 @@
 import { buildCards, endsCountdown, EventCard, formatDateRange } from "./cards";
+import { renderPageNav } from "./page-nav";
+import { rewardsUrl } from "./page-mode";
 import { HUNTRY_CARDS_CSS } from "./styles.generated";
 import { StorefrontEvent } from "./types";
 
@@ -82,6 +84,7 @@ function buildCard(card: EventCard): { node: HTMLAnchorElement; tick: (now: numb
 export function renderListing(container: HTMLElement, events: StorefrontEvent[]): () => void {
   injectStyles();
   container.textContent = "";
+  container.appendChild(renderPageNav("hunts", listingUrl(), rewardsUrl()));
 
   const cards = buildCards(events);
 

@@ -32,7 +32,12 @@ interface FakeNode {
   children: FakeNode[];
   hidden: boolean;
   src?: string;
+  href?: string;
+  style: { overflow?: string; background?: string; setProperty: (name: string, value: string) => void };
+  classList: { add: (name: string) => void; remove: (name: string) => void };
   appendChild: (child: FakeNode) => FakeNode;
+  append: (...children: (FakeNode | string)[]) => void;
+  setAttribute: (name: string, value: string) => void;
 }
 
 function fakeNode(tag: string): FakeNode {
@@ -43,11 +48,19 @@ function fakeNode(tag: string): FakeNode {
     dataset: {},
     children: [],
     hidden: false,
+    style: { setProperty() {} },
+    classList: { add() {}, remove() {} },
     appendChild(child) {
       node.children.push(child);
 
       return child;
     },
+    append(...children) {
+      for (const child of children) {
+        if (typeof child !== "string") node.children.push(child);
+      }
+    },
+    setAttribute() {},
   };
 
   return node;
@@ -56,15 +69,22 @@ function fakeNode(tag: string): FakeNode {
 let container: FakeNode;
 let headChildren: FakeNode[];
 let fetchedUrls: string[];
+let body: FakeNode;
 
-function setUp(search: string, events: unknown[]) {
+const JWT_URL = "/customer/current.jwt?app_client_id=client-1";
+
+// `guest` makes BigCommerce's current.jwt answer 404, as it does when no
+// customer is signed in.
+function setUp(search: string, events: unknown[], guest = false) {
   container = fakeNode("div");
+  body = fakeNode("body");
   headChildren = [];
   fetchedUrls = [];
 
   vi.stubGlobal("window", {
     __HUNTRY_STOREFRONT__: { appOrigin: "https://app.example.com", storeHash: "abc123", clientId: "client-1" },
-    location: { search, pathname: "/huntry/" },
+    location: { search, hash: "", pathname: "/huntry/" },
+    addEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
     setInterval: () => 1,
     clearInterval: vi.fn(),
@@ -76,13 +96,19 @@ function setUp(search: string, events: unknown[]) {
     readyState: "complete",
     querySelector: (selector: string) => (selector === "[data-huntry-map], #huntry-map" ? container : null),
     createElement: (tag: string) => fakeNode(tag),
+    createComment: () => fakeNode("#comment"),
     head: { appendChild: (child: FakeNode) => headChildren.push(child) },
+    body,
     addEventListener: vi.fn(),
   });
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
       fetchedUrls.push(url);
+
+      if (url === JWT_URL) {
+        return guest ? new Response("", { status: 404 }) : new Response("a.jwt.token", { status: 200 });
+      }
 
       return new Response(JSON.stringify({ events }), { status: 200 });
     }),
@@ -110,8 +136,51 @@ describe("storefront loader", () => {
     setUp("?event=hunt", [EVENT]);
     await runLoader();
 
-    expect(fetchedUrls).toEqual(["https://app.example.com/api/public/huntry/abc123/map-data"]);
+    expect(fetchedUrls.slice(0, 2)).toEqual(["https://app.example.com/api/public/huntry/abc123/map-data", JWT_URL]);
     expect(headChildren.some((node) => node.src?.endsWith("/storefront-map.js"))).toBe(true);
+  });
+
+  it("gates a live event's map behind login: no map script, a login prompt that returns to the event", async () => {
+    setUp("?event=hunt", [EVENT], true);
+    await runLoader();
+
+    expect(headChildren.some((node) => node.src?.endsWith("/storefront-map.js"))).toBe(false);
+
+    // The hunt shell (title bar with a back link to the listing) sits under the popup.
+    const [header] = container.children;
+
+    expect(body.children[0]).toBe(container);
+    expect(header?.className).toBe("huntry-fullscreen__header");
+    expect(header?.children[0]?.href).toBe("/huntry/");
+    expect(header?.children[1]?.textContent).toBe("Hunt");
+
+    const overlay = body.children[1];
+    const [message, login] = overlay?.children[0]?.children[0]?.children ?? [];
+
+    expect(overlay?.className).toBe("huntry-claim-overlay");
+    expect(message?.textContent).toBe("Log in or create an account to join the hunt.");
+    expect(login?.href).toBe("/login.php?from=huntry%2F%3Fevent%3Dhunt");
+  });
+
+  it("still loads the map when the login check itself fails", async () => {
+    setUp("?event=hunt", [EVENT]);
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === JWT_URL) throw new Error("offline");
+
+      return new Response(JSON.stringify({ events: [EVENT] }), { status: 200 });
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+    await runLoader();
+
+    expect(headChildren.some((node) => node.src?.endsWith("/storefront-map.js"))).toBe(true);
+  });
+
+  it("does not check login for the listing", async () => {
+    setUp("", [EVENT], true);
+    await runLoader();
+
+    expect(fetchedUrls).not.toContain(JWT_URL);
   });
 
   it("renders the listing with no slug and does not load maplibre", async () => {
@@ -127,7 +196,11 @@ describe("storefront loader", () => {
     setUp("", []);
     await runLoader();
 
-    expect(container.children[0]?.textContent).toBe("No hunts are live right now. Check back soon!");
+    expect(container.children.find((child) => child.className === "huntry-cards-message")?.textContent).toBe(
+      "No hunts are live right now. Check back soon!",
+    );
+    // The Hunts / My Rewards tabs sit above it.
+    expect(container.children[0]?.className).toBe("huntry-page-nav");
   });
 
   it("reports an unknown slug instead of showing the first event, and loads no map", async () => {

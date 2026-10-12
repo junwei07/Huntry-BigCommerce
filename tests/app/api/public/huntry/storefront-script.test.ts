@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GET } from "@/app/api/public/huntry/[storeHash]/storefront-script.js/route";
 
 const call = (storeHash = "abc123") =>
@@ -31,6 +31,16 @@ describe("GET storefront-script.js (MOCK mode)", () => {
     expect(text).toContain('"storeHash":"abc123"');
     expect(text).toContain('"clientId":"client-1"');
     expect(text.length).toBeGreaterThan(500);
+  });
+
+  it("is not cached under `next dev`, so a rebuilt bundle shows on the next reload", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+
+    try {
+      expect((await call()).headers.get("Cache-Control")).toBe("no-store");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("emits a null config (bundle no-ops) when the client id is unset", async () => {

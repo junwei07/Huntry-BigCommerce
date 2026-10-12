@@ -1,4 +1,5 @@
 import { endsCountdown } from "../cards";
+import { HUNTRY_FULLSCREEN_CSS } from "../styles.generated";
 
 // The fullscreen takeover for one event's map, the counterpart of the
 // WordPress plugin's templates/huntry-fullscreen.php: a title bar with a back
@@ -25,7 +26,19 @@ export function safeColor(value: string | null | undefined): string | null {
   return value && HEX_COLOR.test(value) ? value : null;
 }
 
+function injectShellStyles(): void {
+  if (document.querySelector("style[data-huntry-fullscreen-css]")) return;
+
+  const style = document.createElement("style");
+
+  style.dataset.huntryFullscreenCss = "";
+  style.textContent = HUNTRY_FULLSCREEN_CSS;
+  document.head.appendChild(style);
+}
+
 export function enterFullscreen(container: HTMLElement, options: FullscreenOptions): Fullscreen {
+  injectShellStyles();
+
   // position: fixed is relative to the nearest ancestor with a transform,
   // filter or contain, and Stencil themes often have one around the page
   // content, which would clip the overlay to the content column. Moving the

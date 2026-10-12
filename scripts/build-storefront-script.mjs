@@ -7,8 +7,8 @@
 //   storefront-script/index.ts     -> STOREFRONT_BUNDLE      (loader, every page)
 //   storefront-script/map/entry.ts -> STOREFRONT_MAP_BUNDLE  (maplibre, lazy)
 //
-// The storefront CSS lives in real .css files (cards.css, claim-ui/claim-ui.css,
-// map/map.css) and is inlined here as strings, so the routes still need no file
+// The storefront CSS lives in real .css files (cards.css, fullscreen.css,
+// claim-ui/claim-ui.css, map/map.css) and is inlined here as strings, so the routes still need no file
 // read at runtime: styles.generated.ts (loader) and map/map-assets.generated.ts
 // (map, next to maplibre's own CSS).
 //
@@ -73,6 +73,7 @@ await writeFile(
   join(dir, "styles.generated.ts"),
   asModule("storefront loader CSS", {
     HUNTRY_CARDS_CSS: await readFile(join(dir, "cards.css"), "utf8"),
+    HUNTRY_FULLSCREEN_CSS: await readFile(join(dir, "fullscreen.css"), "utf8"),
     CLAIM_UI_CSS: await readFile(join(dir, "claim-ui", "claim-ui.css"), "utf8"),
   }),
 );
