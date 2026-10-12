@@ -1,8 +1,10 @@
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getDataMode } from "@/lib/bc-api-client/resolve-store-credentials";
 import { getCredentialsStore } from "@/lib/credentials-store/get-credentials-store";
 import { logError } from "@/lib/errors/logger";
+import { eventClaimsTag } from "@/lib/huntry/claims/cache-tags";
 import { checkClaimRateLimit } from "@/lib/huntry/claims/claim-rate-limit";
 import { createPlayerClaim } from "@/lib/huntry/claims/player-claim";
 import { CreatePlayerClaimResult } from "@/lib/huntry/claims/types";
@@ -102,6 +104,14 @@ export async function POST(
     );
 
     if (result.status === "created") {
+      // The admin Map tab's egg panel and hover popup are cached per event;
+      // expire them so this claim shows up. Never fails the claim itself.
+      try {
+        revalidateTag(eventClaimsTag(result.claim.eventId), { expire: 0 });
+      } catch (error) {
+        logError(`claims: store "${storeHash}" cache revalidation`, error);
+      }
+
       return respond({ couponCode: result.claim.couponCode }, 200);
     }
 

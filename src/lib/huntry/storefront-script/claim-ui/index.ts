@@ -1,6 +1,7 @@
 import type { HuntryStorefrontApi } from "../index";
 import type { EggNearby } from "../map/egg-nearby";
 import { pickEvent } from "../map/view";
+import { rewardsUrl } from "../page-mode";
 import { createClaimController } from "./controller";
 import { createDomUi } from "./dom-ui";
 
@@ -19,6 +20,7 @@ export function startClaimUi(api: HuntryStorefrontApi): void {
     container: api.container,
     successColor: event.colors?.successColor ?? null,
     backHref: window.location.pathname,
+    rewardsHref: rewardsUrl(),
     onBellClick: () => controller.current?.openRevisit(),
     addMapControl: (element) => api.map?.addControl(element),
   });
@@ -35,4 +37,15 @@ export function startClaimUi(api: HuntryStorefrontApi): void {
   });
   window.addEventListener("huntry:map-ready", mountBell);
   mountBell();
+
+  // Seed the "My rewards" link from the server (a guest or a failure just leaves
+  // it hidden); claims made on this page show it through the controller.
+  void api.fetchMyRewards().then((result) => {
+    if (result.kind !== "ok") return;
+
+    controller.current?.setClaimCounts({
+      any: result.rewards.length,
+      thisEvent: result.rewards.filter((reward) => reward.eventId === event.id).length,
+    });
+  });
 }

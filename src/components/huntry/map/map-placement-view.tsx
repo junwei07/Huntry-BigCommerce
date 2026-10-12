@@ -35,6 +35,8 @@ import { EggItemsPanel } from "@/components/huntry/map/egg-items-panel";
 import { EggPlaceDialog, RewardChoice } from "@/components/huntry/map/egg-place-dialog";
 import { circleRing, isFarEnough } from "@/lib/huntry/eggs/geo";
 import { MAX_EGGS_PER_EVENT, MAX_EGGS_PER_REWARD } from "@/lib/huntry/eggs/limits";
+import { eggClaimStatus } from "@/lib/huntry/claims/egg-claim-status";
+import type { EggClaimCount } from "@/lib/huntry/claims/types";
 import { HuntryEgg, PendingEgg } from "@/lib/huntry/eggs/types";
 import { locationMarkerAnchor, resolveItemMarkerUrl, resolveLocationMarkerUrl } from "@/lib/huntry/events/marker-urls";
 import { HuntryEvent } from "@/lib/huntry/events/types";
@@ -150,6 +152,7 @@ export function MapPlacementView({
   eggs,
   rewards,
   rewardEggCounts,
+  claimCounts,
   sponsorNames,
 }: {
   events: HuntryEvent[];
@@ -158,6 +161,8 @@ export function MapPlacementView({
   rewards: HuntryReward[];
   // reward id -> eggs it has across every event (what egg_capacity bounds).
   rewardEggCounts: Record<number, number>;
+  // egg id -> claims on it (forced included); eggs with no claims are absent.
+  claimCounts: Record<string, EggClaimCount>;
   sponsorNames: Record<number, string>;
 }) {
   const router = useRouter();
@@ -458,6 +463,7 @@ export function MapPlacementView({
     sponsorNames,
     pending,
     claimCapacity,
+    claimCounts,
     isEditingLocation: false,
   });
 
@@ -468,6 +474,7 @@ export function MapPlacementView({
       sponsorNames,
       pending,
       claimCapacity,
+      claimCounts,
       isEditingLocation: editLocation !== null,
     };
   });
@@ -478,7 +485,7 @@ export function MapPlacementView({
   }, []);
 
   // Port of the plugin's openEggInfoPopup: reward, sponsor, eggs placed,
-  // claims (always 0 until BC-HUN-032) and coordinates. No close button — it
+  // claims and coordinates. No close button — it
   // only ever opens/closes with the marker's mouseenter/mouseleave.
   const showEggInfo = useCallback(
     (egg: HuntryEgg) => {
@@ -499,7 +506,7 @@ export function MapPlacementView({
         `Reward: ${reward?.name ?? "Unknown reward"}`,
         `Sponsor: ${sponsor ?? "-"}`,
         ...(reward ? [`Eggs Placed: ${(context.rewardEggCounts[reward.id] ?? 0) + queued}/${reward.eggCapacity}`] : []),
-        `Claims: 0/${context.claimCapacity}`,
+        `Claims: ${context.claimCounts[egg.id]?.count ?? 0}/${context.claimCapacity}`,
         `Lat: ${egg.lat.toFixed(6)}, Lng: ${egg.lng.toFixed(6)}`,
       ];
 
@@ -1114,6 +1121,8 @@ export function MapPlacementView({
         </Box>
 
         <EggItemsPanel
+          claimCapacity={claimCapacity}
+          claimCounts={claimCounts}
           eggs={eggs}
           highlight={highlight}
           onDeleteEgg={openDelete}
@@ -1156,7 +1165,7 @@ export function MapPlacementView({
       {dialog?.kind === "delete" ? (
         <EggDeleteDialog
           eggName={dialog.egg.name || "Unnamed egg"}
-          isClaimed={false}
+          isClaimed={eggClaimStatus(claimCounts[dialog.egg.id], claimCapacity).claimed}
           isDeleting={isSaving}
           onCancel={() => setDialog(null)}
           onConfirm={() => confirmDelete(dialog.egg)}

@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OPTIONS, POST } from "@/app/api/public/huntry/[storeHash]/claims/route";
 
-const mocks = vi.hoisted(() => ({ auth: vi.fn(), claim: vi.fn(), limit: vi.fn() }));
+const mocks = vi.hoisted(() => ({ auth: vi.fn(), claim: vi.fn(), limit: vi.fn(), revalidate: vi.fn() }));
 
+vi.mock("next/cache", () => ({ revalidateTag: mocks.revalidate }));
 vi.mock("@/lib/errors/logger", () => ({ logError: vi.fn() }));
 vi.mock("@/lib/huntry/storefront-auth/is-authorized-for-storefront-customer", () => ({
   isAuthorizedForStorefrontCustomer: mocks.auth,
@@ -29,10 +30,41 @@ beforeEach(() => {
   mocks.auth.mockReset().mockResolvedValue({ ok: true, customerId: 42 });
   mocks.claim.mockReset();
   mocks.limit.mockReset().mockResolvedValue({ limited: false });
+  mocks.revalidate.mockReset();
 });
 
 afterEach(() => {
   delete process.env.DATA_MODE;
+});
+
+describe("POST claims: admin cache invalidation", () => {
+  it("expires the event's claims tag after a created claim", async () => {
+    mocks.claim.mockResolvedValue({ status: "created", claim: { couponCode: "COFFEE", eventId: 7 } });
+
+    await post(VALID);
+
+    expect(mocks.revalidate).toHaveBeenCalledWith("huntry-claim:event:7", { expire: 0 });
+  });
+
+  it("does not invalidate when no claim was created", async () => {
+    mocks.claim.mockResolvedValue({ status: "duplicate", couponCode: "COFFEE" });
+
+    await post(VALID);
+
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+
+  it("still returns the code when invalidation throws", async () => {
+    mocks.claim.mockResolvedValue({ status: "created", claim: { couponCode: "COFFEE", eventId: 7 } });
+    mocks.revalidate.mockImplementation(() => {
+      throw new Error("no cache store");
+    });
+
+    const response = await post(VALID);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ couponCode: "COFFEE" });
+  });
 });
 
 describe("POST claims", () => {

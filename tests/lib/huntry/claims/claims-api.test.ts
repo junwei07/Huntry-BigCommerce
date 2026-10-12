@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createForcedClaim } from "@/lib/huntry/claims/claims-api";
+import { createForcedClaim, fetchEggClaimCounts, listClaimsForCustomer } from "@/lib/huntry/claims/claims-api";
 import { addMockForcedClaim, MOCK_CLAIMS } from "@/lib/huntry/claims/mock/mock-claims";
 import { CreateForcedClaimInput } from "@/lib/huntry/claims/types";
 import { getHuntryDb } from "@/lib/huntry/db/get-db";
@@ -81,5 +81,55 @@ describe("addMockForcedClaim", () => {
     expect(addMockForcedClaim({ ...input, bcCustomerId: 9001 }).status).toBe("created");
     expect(addMockForcedClaim({ ...input, bcCustomerId: 9001 }).status).toBe("duplicate");
     expect(MOCK_CLAIMS.length).toBe(before + 1);
+  });
+});
+
+describe("listClaimsForCustomer (SQLite)", () => {
+  it("returns only this store's and customer's claims, newest first, with claimed_at read as UTC", async () => {
+    const egg = (n: number) => `00000000-0000-4000-8000-0000000001${n}0`;
+
+    await createForcedClaim({ ...input, eggId: egg(1), couponCode: "OLD", bcCustomerId: 4242 }, "store1");
+    await createForcedClaim({ ...input, eggId: egg(2), couponCode: "NEW", bcCustomerId: 4242 }, "store1");
+    await createForcedClaim({ ...input, eggId: egg(3), couponCode: "OTHER-CUSTOMER", bcCustomerId: 4299 }, "store1");
+    await createForcedClaim({ ...input, eggId: egg(4), couponCode: "OTHER-STORE", bcCustomerId: 4242 }, "store2");
+
+    const db = getHuntryDb() as DatabaseSync;
+
+    db.prepare("UPDATE huntry_claims SET claimed_at = '2026-10-01 10:00:00' WHERE coupon_code = 'OLD'").run();
+    db.prepare("UPDATE huntry_claims SET claimed_at = '2026-10-02 10:00:00' WHERE coupon_code = 'NEW'").run();
+
+    const claims = await listClaimsForCustomer("store1", 4242);
+
+    expect(claims.map((claim) => claim.couponCode)).toEqual(["NEW", "OLD"]);
+    // datetime('now') is UTC; reading it as local time would shift this by the host's offset.
+    expect(claims[0].claimedAt.toISOString()).toBe("2026-10-02T10:00:00.000Z");
+  });
+
+  it("returns nothing for a customer with no claims", async () => {
+    expect(await listClaimsForCustomer("store1", 1)).toEqual([]);
+  });
+});
+
+describe("fetchEggClaimCounts (SQLite)", () => {
+  it("counts claims per egg for the event, forced ones included and flagged", async () => {
+    const egg = (n: number) => `00000000-0000-4000-8000-0000000002${n}0`;
+    const forced = (eggId: string, bcCustomerId: number, eventId = 31) =>
+      createForcedClaim({ ...input, eggId, eventId, bcCustomerId, couponCode: `CODE-${eggId.slice(-4)}-${bcCustomerId}` }, "store1");
+
+    await forced(egg(1), 501);
+    await forced(egg(1), 502);
+    await forced(egg(2), 501);
+    await forced(egg(3), 501, 32);
+
+    // Make egg 2's claim a player claim.
+    (getHuntryDb() as DatabaseSync).prepare("UPDATE huntry_claims SET is_forced = 0 WHERE egg_id = ?").run(egg(2));
+
+    const counts = await fetchEggClaimCounts(31, "store1");
+
+    expect(counts.get(egg(1))).toEqual({ count: 2, forced: 2 });
+    expect(counts.get(egg(2))).toEqual({ count: 1, forced: 0 });
+    // Another event's claims, other stores and unclaimed eggs are absent.
+    expect(counts.has(egg(3))).toBe(false);
+    expect((await fetchEggClaimCounts(31, "store2")).size).toBe(0);
   });
 });

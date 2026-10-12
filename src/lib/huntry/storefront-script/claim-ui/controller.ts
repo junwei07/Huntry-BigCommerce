@@ -48,9 +48,14 @@ export interface ClaimUi {
   showLogin: (onBack: () => void) => void;
   showLimit: () => void;
   setBadge: (visible: boolean) => void;
+  // The bottom-right "My rewards" link (BC-HUN-046).
+  setRewardsLink: (visible: boolean) => void;
 }
 
 export interface ClaimController {
+  // Seeds the shopper's claim counts from the server's rewards list: any event,
+  // and this page's event (the per-player limit is per event).
+  setClaimCounts: (counts: { any: number; thisEvent: number }) => void;
   handleNearby: (detail: EggNearby | null) => void;
   // The bell: reopen the dialog for the egg the player is standing next to.
   openRevisit: () => void;
@@ -65,6 +70,8 @@ export function createClaimController(
   applyCoupon: (code: string) => Promise<CartResult> = applyCouponToCart,
 ): ClaimController {
   let limitReached = false;
+  let anyClaims = false;
+  let serverEventClaims = 0;
   let claiming = false;
   // Where the player last was, for the claim POST when the map has no fix yet.
   let lastKnown: { lat: number; lng: number } | null = null;
@@ -93,9 +100,22 @@ export function createClaimController(
     ui.setBadge(next !== null);
   };
 
+  // Legacy rule (map.php L336): shown with at least one claim and hidden once
+  // the limit is hit, where the limit overlay carries its own link. Unlike the
+  // plugin it also appears right after the first claim, with no reload.
+  // Claims in this event: the server count, or this device's if it knows more
+  // (before the rewards list has loaded). The server decides the real limit.
+  const atEventLimit = () =>
+    event.maxGrabCount > 0 && Math.max(serverEventClaims, api.map?.flags.mine.size ?? 0) >= event.maxGrabCount;
+
+  const syncRewardsLink = () => {
+    ui.setRewardsLink((anyClaims || (api.map?.flags.mine.size ?? 0) > 0) && !limitReached && !atEventLimit());
+  };
+
   const showLimit = () => {
     limitReached = true;
     api.map?.setClaimLimitReached();
+    syncRewardsLink();
     ui.showLimit();
   };
 
@@ -117,10 +137,10 @@ export function createClaimController(
   };
 
   const showClaimed = (egg: StorefrontEgg, couponCode: string) => {
-    // Same test as legacy (L801): a proactive hint only. map-data has no
-    // per-player count, so this is "claims made on this device"; the server's
+    // Same test as legacy (L801): a proactive hint only, from this event's
+    // claim count (the rewards list, plus this page's claims); the server's
     // limit_reached reply stays authoritative.
-    const reachedLimit = event.maxGrabCount > 0 && (api.map?.flags.mine.size ?? 0) >= event.maxGrabCount;
+    const reachedLimit = atEventLimit();
 
     ui.showClaimed({
       rewardName: egg.rewardName,
@@ -141,6 +161,9 @@ export function createClaimController(
       case "claimed":
         // Adds the egg to `mine`, so it stops being claimable and the bell can reopen it.
         api.map?.markEggClaimed(egg.id);
+        anyClaims = true;
+        serverEventClaims += 1;
+        syncRewardsLink();
         showClaimed(egg, action.couponCode);
         return;
       case "login":
@@ -232,8 +255,16 @@ export function createClaimController(
   }
 
   return {
+    setClaimCounts(counts) {
+      anyClaims = counts.any > 0;
+      serverEventClaims = counts.thisEvent;
+      syncRewardsLink();
+    },
+
     handleNearby(detail) {
       if (detail) lastKnown = { lat: detail.lat, lng: detail.lng };
+
+      syncRewardsLink();
 
       setRevisit(detail?.revisitable ?? null);
 

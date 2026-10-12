@@ -40,7 +40,7 @@ function setup(options: { maxGrabCount?: number; outcome?: ClaimOutcome; positio
   };
   const submitClaim = vi.fn(async () => options.outcome ?? ({ kind: "claimed", couponCode: "CODE1" } as ClaimOutcome));
   let open = false;
-  const shown = { found: [] as FoundView[], claimed: [] as ClaimedView[], blocked: [] as BlockedView[], login: 0, limit: 0, badge: false };
+  const shown = { found: [] as FoundView[], claimed: [] as ClaimedView[], blocked: [] as BlockedView[], login: 0, limit: 0, badge: false, rewardsLink: false };
   const handle: FoundHandle & { busy: boolean[]; messages: string[] } = {
     busy: [],
     messages: [],
@@ -78,6 +78,9 @@ function setup(options: { maxGrabCount?: number; outcome?: ClaimOutcome; positio
     setBadge: (visible) => {
       shown.badge = visible;
     },
+    setRewardsLink: (visible) => {
+      shown.rewardsLink = visible;
+    },
   };
   const controller = createClaimController(
     { config: { appOrigin: "https://app", storeHash: "abc", clientId: "c" }, submitClaim, map: map as never },
@@ -104,6 +107,60 @@ function setup(options: { maxGrabCount?: number; outcome?: ClaimOutcome; positio
     },
   };
 }
+
+describe("claim controller: My rewards link (BC-HUN-046)", () => {
+  it("is hidden until the shopper holds a claim, then shows without a reload", async () => {
+    const t = setup();
+
+    t.controller.handleNearby(t.nearby("claimable", egg("a")));
+    expect(t.shown.rewardsLink).toBe(false);
+
+    t.shown.found[0].onClaim(t.handle);
+    await vi.waitFor(() => expect(t.shown.claimed).toHaveLength(1));
+
+    expect(t.shown.rewardsLink).toBe(true);
+  });
+
+  it("shows for a shopper who already has server-side claims", () => {
+    const t = setup();
+
+    t.controller.setClaimCounts({ any: 1, thisEvent: 1 });
+
+    expect(t.shown.rewardsLink).toBe(true);
+  });
+
+  it("hides once the claim limit is reached, where the limit overlay links instead", async () => {
+    const t = setup({ maxGrabCount: 2 });
+
+    t.controller.setClaimCounts({ any: 1, thisEvent: 1 });
+    expect(t.shown.rewardsLink).toBe(true);
+
+    t.controller.handleNearby(t.nearby("claimable", egg("a")));
+    t.shown.found[0].onClaim(t.handle);
+    await vi.waitFor(() => expect(t.shown.claimed).toHaveLength(1));
+    t.shown.claimed[0].onKeepHunting();
+
+    // The server count (1) plus this claim reaches the limit of 2.
+    expect(t.shown.limit).toBe(1);
+    expect(t.shown.rewardsLink).toBe(false);
+  });
+
+  it("is hidden on load when this event's limit is already reached", () => {
+    const t = setup({ maxGrabCount: 2 });
+
+    t.controller.setClaimCounts({ any: 2, thisEvent: 2 });
+
+    expect(t.shown.rewardsLink).toBe(false);
+  });
+
+  it("counts only this event: claims elsewhere show the link without hitting the limit", () => {
+    const t = setup({ maxGrabCount: 1 });
+
+    t.controller.setClaimCounts({ any: 3, thisEvent: 0 });
+
+    expect(t.shown.rewardsLink).toBe(true);
+  });
+});
 
 describe("claim controller: found dialog and the skip flow", () => {
   it("opens the found dialog once for a claimable egg and ignores events while it is open", () => {

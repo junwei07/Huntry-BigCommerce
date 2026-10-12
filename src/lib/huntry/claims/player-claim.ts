@@ -2,11 +2,13 @@ import { DatabaseSync } from "node:sqlite";
 import type { PoolClient } from "pg";
 import { getDataMode, resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
 import { logError } from "@/lib/errors/logger";
+import { toDate } from "@/lib/huntry/claims/dates";
 import { addMockPlayerClaim } from "@/lib/huntry/claims/mock/mock-claims";
 import { CreatePlayerClaimInput, CreatePlayerClaimResult, HuntryClaim } from "@/lib/huntry/claims/types";
 import { getHuntryDb } from "@/lib/huntry/db/get-db";
 import { computeRewardUsageLimit } from "@/lib/huntry/rewards/coupon-sync";
 import { issueClaimCode } from "@/lib/huntry/rewards/claim-codes";
+import { isRewardWindowOpen } from "@/lib/huntry/rewards/reward-display";
 import { computeEventStatus } from "@/lib/huntry/events/events-api";
 import { haversineMeters } from "@/lib/huntry/eggs/geo";
 
@@ -66,11 +68,7 @@ export function evaluateClaim(
     return { status: "event_not_live" };
   }
 
-  const rewardIsOpen =
-    reward.status === "active" &&
-    reward.bcPromotionId &&
-    (!reward.startsAt || reward.startsAt <= now) &&
-    (!reward.expiresAt || reward.expiresAt > now);
+  const rewardIsOpen = Boolean(reward.bcPromotionId) && isRewardWindowOpen(reward, now);
 
   if (!rewardIsOpen) {
     return { status: "reward_unavailable" };
@@ -122,18 +120,6 @@ export function evaluateClaim(
 interface ClaimTx {
   dialect: "pg" | "sqlite";
   query<T>(sql: string, params: unknown[]): Promise<T[]>;
-}
-
-function toDate(value: unknown): Date | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  // SQLite TEXT timestamps written by the app are ISO; zone-less
-  // `datetime('now')` strings are UTC.
-  const text = String(value);
-
-  return new Date(value instanceof Date || /[zZ]|[+-]\d\d:?\d\d$/.test(text) ? value as string | Date : `${text.replace(" ", "T")}Z`);
 }
 
 interface EggRow {

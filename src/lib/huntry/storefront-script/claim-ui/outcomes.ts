@@ -23,12 +23,15 @@ export const STRINGS = {
   alreadyClaimedTitle: "Someone beat you to it!",
   alreadyClaimed: "This treasure has been fully claimed. Keep hunting — there are more waiting to be found!",
   claimedByMeTitle: "You've already claimed this reward",
-  claimedByMe: "You already found and claimed this one. Keep hunting — there's more to discover!",
+  claimedByMe: "Keep hunting!",
   limitTitle: "You're Out Of Claims!",
   limitMessage: "You've reached your claim limit for this hunt.  Use your rewards before they expire!",
   backToHunts: "Back to all hunts",
   genericError: "Couldn't claim this right now. Please try again.",
   skippedItems: "Skipped items",
+  myRewards: "My rewards",
+  viewRewards: "View Rewards",
+  savedToRewards: "Saved to My Rewards. Find it any time from the View Rewards button.",
 } as const;
 
 export type OutcomeAction =

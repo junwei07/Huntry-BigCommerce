@@ -47,6 +47,8 @@ export interface DomUiOptions {
   container: HTMLElement;
   successColor: string | null;
   backHref: string;
+  // The "My rewards" page (BC-HUN-046).
+  rewardsHref: string;
   onBellClick: () => void;
   // The map's top-right control stack; null until the map has mounted.
   addMapControl: (element: HTMLElement) => void;
@@ -99,9 +101,25 @@ export function createDomUi(options: DomUiOptions): DomUi {
 
   let badge: HTMLElement | null = null;
   let bellMounted = false;
+  let rewardsLink: HTMLAnchorElement | null = null;
 
   return {
     isOpen: () => open,
+
+    setRewardsLink(visible) {
+      if (!rewardsLink) {
+        if (!visible) return;
+
+        rewardsLink = el("a", "huntry-view-rewards", STRINGS.myRewards);
+        rewardsLink.href = options.rewardsHref;
+
+        if (color) rewardsLink.style.setProperty("--huntry-claim-success", color);
+
+        document.body.appendChild(rewardsLink);
+      }
+
+      rewardsLink.hidden = !visible;
+    },
 
     showFound(view: FoundView) {
       const wrap = content();
@@ -148,7 +166,7 @@ export function createDomUi(options: DomUiOptions): DomUi {
 
       if (view.rewardName) card2.append(el("p", "huntry-claim-dialog__reward-title", view.rewardName));
 
-      card2.append(code);
+      card2.append(code, el("p", "huntry-claim-dialog__message", STRINGS.savedToRewards));
 
       const apply = fullButton(STRINGS.applyToCart, () => {
         apply.disabled = true;
@@ -234,9 +252,16 @@ export function createDomUi(options: DomUiOptions): DomUi {
 
         const inner = el("div", "huntry-claim-limit__content");
         const back = el("a", "huntry-claim-limit__button", STRINGS.backToHunts);
+        const rewards = el("a", "huntry-claim-limit__button", STRINGS.viewRewards);
 
         back.href = options.backHref;
-        inner.append(el("h2", "huntry-claim-limit__title", STRINGS.limitTitle), el("p", "huntry-claim-limit__message", STRINGS.limitMessage), back);
+        rewards.href = options.rewardsHref;
+        inner.append(
+          el("h2", "huntry-claim-limit__title", STRINGS.limitTitle),
+          el("p", "huntry-claim-limit__message", STRINGS.limitMessage),
+          rewards,
+          back,
+        );
         limit.appendChild(inner);
 
         const successColor = safeColor(options.successColor);

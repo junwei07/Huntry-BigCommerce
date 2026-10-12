@@ -2,6 +2,8 @@ import { Box, Panel, Text } from "@bigcommerce/big-design";
 import { MapPlacementView } from "@/components/huntry/map/map-placement-view";
 import { DEFAULT_QUERY } from "@/lib/huntry/events/query";
 import { fetchEvents } from "@/lib/huntry/events/events-api";
+import { fetchEggClaimCounts } from "@/lib/huntry/claims/claims-api";
+import type { EggClaimCount } from "@/lib/huntry/claims/types";
 import { fetchEggs, fetchRewardEggCounts } from "@/lib/huntry/eggs/eggs-api";
 import { DEFAULT_QUERY as DEFAULT_REWARDS_QUERY } from "@/lib/huntry/rewards/query";
 import { fetchRewards } from "@/lib/huntry/rewards/rewards-api";
@@ -13,6 +15,7 @@ import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 // @cache-components-only:start
 import { cacheLife, cacheTag } from "next/cache";
 import { cacheProfile, CACHE_PROFILE_STANDARD } from "@/lib/cache/cache-profiles";
+import { eventClaimsTag } from "@/lib/huntry/claims/cache-tags";
 import { eventTag, EVENTS_LIST_TAG } from "@/lib/huntry/events/cache-tags";
 import { eggTag, EGGS_LIST_TAG, eventEggsTag } from "@/lib/huntry/eggs/cache-tags";
 import { rewardTag, REWARDS_LIST_TAG } from "@/lib/huntry/rewards/cache-tags";
@@ -57,11 +60,14 @@ export async function MapView({
   const requestedEvent = events.find((event) => event.id === requestedEventId);
   const liveEvent = events.find((event) => event.status === "live");
   const selectedEventId = (requestedEvent ?? liveEvent ?? events[0])?.id ?? null;
-  const eggs = selectedEventId === null ? [] : await fetchEggs(selectedEventId, storeHash);
+  const [eggs, claimCounts] =
+    selectedEventId === null
+      ? [[], new Map<string, EggClaimCount>()]
+      : await Promise.all([fetchEggs(selectedEventId, storeHash), fetchEggClaimCounts(selectedEventId, storeHash)]);
 
   // @cache-components-only:start
   if (selectedEventId !== null) {
-    cacheTag(eventEggsTag(selectedEventId));
+    cacheTag(eventEggsTag(selectedEventId), eventClaimsTag(selectedEventId));
   }
 
   for (const egg of eggs) {
@@ -80,6 +86,7 @@ export async function MapView({
           </Text>
         ) : (
           <MapPlacementView
+            claimCounts={Object.fromEntries(claimCounts)}
             eggs={eggs}
             events={events}
             rewardEggCounts={Object.fromEntries(rewardEggCounts)}

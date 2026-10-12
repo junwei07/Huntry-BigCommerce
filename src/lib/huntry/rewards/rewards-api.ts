@@ -4,6 +4,7 @@ import { getHuntryDb, HuntryDb } from "@/lib/huntry/db/get-db";
 import { getDataMode, resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
 import { getRestApiClient } from "@/lib/bc-api-client/get-rest-api-client";
 import { ApiRequestParams, V3ListResponse } from "@/lib/bc-api-client/rest-client/types";
+import { safeStorefrontPath } from "@/lib/huntry/rewards/reward-display";
 import { rewardTag, REWARDS_LIST_TAG } from "@/lib/huntry/rewards/cache-tags";
 import {
   addMockReward,
@@ -749,4 +750,39 @@ export async function fetchBcProductsForPicker(
   const { data: body } = await apiClient.get<V3ListResponse<BcProductSummary>>(PRODUCTS_PATH, { params });
 
   return body.data;
+}
+
+// BC-HUN-046: names and storefront paths for a reward's product scope, for the
+// rewards list's "Valid on" line (plugin: huntry_render_reward_product_links).
+// Only visible products with a safe same-origin path are returned. Never
+// throws: a catalog failure just means no links, not a broken rewards page.
+export async function fetchBcProductLinks(
+  storeHash: string | undefined,
+  productIds: number[],
+): Promise<{ name: string; url: string }[]> {
+  if (productIds.length === 0) {
+    return [];
+  }
+
+  try {
+    const apiClient = await getRestApiClient(storeHash);
+    const { data: body } = await apiClient.get<
+      V3ListResponse<{ id: number; name: string; custom_url?: { url?: string } }>
+    >(PRODUCTS_PATH, {
+      params: { "id:in": productIds.join(","), include_fields: "name,custom_url", is_visible: true, limit: 250 },
+    });
+    const links: { name: string; url: string }[] = [];
+
+    for (const product of body.data) {
+      const url = safeStorefrontPath(product.custom_url?.url);
+
+      if (url && product.name) {
+        links.push({ name: product.name, url });
+      }
+    }
+
+    return links;
+  } catch {
+    return [];
+  }
 }

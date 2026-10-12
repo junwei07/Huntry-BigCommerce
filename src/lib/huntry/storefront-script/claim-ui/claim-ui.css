@@ -250,6 +250,35 @@ class is huntry-prefixed so it can't collide with the merchant's theme.
   background: var(--huntry-claim-success);
   color: #0f1322;
 }
+.huntry-claim-limit__button + .huntry-claim-limit__button {
+  margin-left: 8px;
+}
+
+/* Bottom-right "My rewards" link (BC-HUN-046), ported from the plugin's
+   .huntry-view-rewards-button. Fixed to the viewport, above the fullscreen map
+   wrapper (2147483000) and below the claim dialog overlay (2147483600). */
+.huntry-view-rewards {
+  --huntry-claim-success: #5dc564;
+  --huntry-claim-success-dark: color-mix(in srgb, var(--huntry-claim-success) 85%, #000);
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 2147483100;
+  padding: 10px 18px;
+  border-radius: 10px;
+  background: var(--huntry-claim-success-dark);
+  color: #0f1322 !important;
+  font: 700 14px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif !important;
+  text-decoration: none !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+.huntry-view-rewards[hidden] {
+  display: none;
+}
+.huntry-view-rewards:hover,
+.huntry-view-rewards:focus {
+  background: var(--huntry-claim-success);
+}
 
 .huntry-notification-ctrl {
   overflow: visible !important;

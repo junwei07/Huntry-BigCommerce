@@ -1,9 +1,10 @@
-import { fetchMapData, submitClaim } from "./api";
+import { fetchMapData, fetchMyRewards, submitClaim } from "./api";
 import { renderListing, renderNotFound } from "./cards-view";
 import { startClaimUi } from "./claim-ui";
 import { loadEggFlags } from "./local-state";
 import type { HuntryMapApi } from "./map/mount-map";
 import { decideMode } from "./page-mode";
+import { renderRewards } from "./rewards-view";
 import { StorefrontConfig, StorefrontEvent } from "./types";
 
 // Entry point of the storefront bundle (served by storefront-script.js/
@@ -25,6 +26,7 @@ export interface HuntryStorefrontApi {
   events: StorefrontEvent[];
   loadEggFlags: (eventId: number) => ReturnType<typeof loadEggFlags>;
   submitClaim: (eggId: string, lat: number, lng: number) => ReturnType<typeof submitClaim>;
+  fetchMyRewards: () => ReturnType<typeof fetchMyRewards>;
   // Set by the map bundle (map/entry.ts) once the map is mounted.
   map?: HuntryMapApi;
 }
@@ -71,14 +73,16 @@ async function start(): Promise<void> {
 
   if (!config) return;
 
-  const slug = new URLSearchParams(window.location.search).get("event")?.trim() || undefined;
+  const params = new URLSearchParams(window.location.search);
+  const slug = params.get("event")?.trim() || undefined;
+  const view = params.get("view")?.trim() || undefined;
 
   // Always the full live list, never narrowed by ?event=: the server would
   // return just that one event (or none), so the listing could not be built and
   // a mistyped slug would look like "no hunts are live". The mode is decided
   // here from the whole list instead.
   const { events } = await fetchMapData(config);
-  const mode = decideMode(events, slug);
+  const mode = decideMode(events, slug, view);
 
   window.HuntryStorefront = {
     config,
@@ -86,6 +90,7 @@ async function start(): Promise<void> {
     events,
     loadEggFlags: (eventId) => loadEggFlags(config.storeHash, eventId),
     submitClaim: (eggId, lat, lng) => submitClaim(config, eggId, lat, lng),
+    fetchMyRewards: () => fetchMyRewards(config),
   };
 
   window.dispatchEvent(new CustomEvent("huntry:ready", { detail: { events } }));
@@ -105,6 +110,9 @@ async function start(): Promise<void> {
         console.error("[Huntry] Claim dialogs failed to start.", error);
       }
 
+      break;
+    case "rewards":
+      renderRewards(container, await fetchMyRewards(config));
       break;
     case "not-found":
       renderNotFound(container);

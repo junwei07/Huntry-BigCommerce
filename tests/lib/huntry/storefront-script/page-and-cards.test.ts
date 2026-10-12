@@ -33,6 +33,12 @@ describe("decideMode", () => {
     expect(decideMode(events, "")).toEqual({ kind: "listing", events });
   });
 
+  it("shows the rewards list for ?view=rewards, ahead of any slug", () => {
+    expect(decideMode(events, undefined, "rewards")).toEqual({ kind: "rewards" });
+    expect(decideMode(events, "b", "rewards")).toEqual({ kind: "rewards" });
+    expect(decideMode(events, undefined, "other")).toEqual({ kind: "listing", events });
+  });
+
   it("opens the map for a known slug and reports an unknown one", () => {
     expect(decideMode(events, "b")).toEqual({ kind: "map", event: events[1] });
     expect(decideMode(events, "nope")).toEqual({ kind: "not-found" });

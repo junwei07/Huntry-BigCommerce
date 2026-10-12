@@ -10,7 +10,7 @@ import {
   EggPlacementInput,
   EggUpdateInput,
 } from "@/lib/huntry/eggs/egg-form-schema";
-import { CLAIMS_LIST_TAG } from "@/lib/huntry/claims/cache-tags";
+import { CLAIMS_LIST_TAG, eventClaimsTag } from "@/lib/huntry/claims/cache-tags";
 import { createForcedClaim } from "@/lib/huntry/claims/claims-api";
 import { issueClaimCode } from "@/lib/huntry/rewards/claim-codes";
 import { fetchCustomersByEmailUncached } from "@/lib/gift-certs-manager/customers/customers-api";
@@ -289,6 +289,7 @@ export async function forceClaimHuntryEgg(
     }
 
     updateTag(CLAIMS_LIST_TAG);
+    updateTag(eventClaimsTag(egg.eventId));
 
     return { success: true, message: `Egg force-claimed for ${customer.email}.` };
   } catch (error) {

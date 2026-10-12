@@ -4,13 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { Box, Button, Dropdown, DropdownItem, Flex, Input, Small, Text } from "@bigcommerce/big-design";
 import { FormSelect } from "@/components/ui/form-select";
 import { MoreHorizIcon } from "@bigcommerce/big-design-icons";
+import { eggClaimStatus } from "@/lib/huntry/claims/egg-claim-status";
+import type { EggClaimCount } from "@/lib/huntry/claims/types";
 import { HuntryEgg, PendingEgg } from "@/lib/huntry/eggs/types";
 import { HuntryReward } from "@/lib/huntry/rewards/types";
 import { eggMarkerColor, HUNTRY_COLORS } from "@/lib/huntry/theme";
 
-// Claims have no data layer yet (BC-HUN-032), so every egg is "not_claimed"
-// for now; the status filter is kept so the layout matches the plugin's
-// huntry_render_map_items_panel and starts working once claim counts exist.
+// Layout matches the plugin's huntry_render_map_items_panel. "Claimed" means
+// at least one claim (forced ones included), as in the plugin.
 type StatusFilter = "" | "not_claimed" | "claimed";
 
 const STATUS_OPTIONS = [
@@ -106,7 +107,36 @@ function EggActionsMenu({
   );
 }
 
+const PILL_STYLE = {
+  borderRadius: "999px",
+  fontSize: "0.75rem",
+  padding: "0.125rem 0.5rem",
+} as const;
+
+// "Not Claimed" / "Claimed n/capacity", plus "Force Claimed" when an admin
+// override is among the claims (plugin: huntry-map-items-badge--*).
+function ClaimPill({ status }: { status: ReturnType<typeof eggClaimStatus> }) {
+  return (
+    <>
+      <span
+        style={{
+          ...PILL_STYLE,
+          backgroundColor: status.claimed ? "#E6F4EA" : HUNTRY_COLORS.background,
+          color: status.claimed ? "#1E7B34" : HUNTRY_COLORS.textMuted,
+        }}
+      >
+        {status.label}
+      </span>
+      {status.forced ? (
+        <span style={{ ...PILL_STYLE, backgroundColor: "#FFF4E0", color: "#8A5300" }}>Force Claimed</span>
+      ) : null}
+    </>
+  );
+}
+
 export function EggItemsPanel({
+  claimCapacity,
+  claimCounts,
   eggs,
   pending,
   rewards,
@@ -118,6 +148,9 @@ export function EggItemsPanel({
   onRemovePending,
   highlight,
 }: {
+  claimCapacity: number;
+  // egg id -> claims on it; eggs with none are absent.
+  claimCounts: Record<string, EggClaimCount>;
   eggs: HuntryEgg[];
   pending: PendingEgg[];
   rewards: HuntryReward[];
@@ -156,7 +189,7 @@ export function EggItemsPanel({
       return false;
     }
 
-    if (statusFilter === "claimed") {
+    if (statusFilter && eggClaimStatus(claimCounts[egg.id], claimCapacity).claimed !== (statusFilter === "claimed")) {
       return false;
     }
 
@@ -270,17 +303,7 @@ export function EggItemsPanel({
                 </Text>
                 <Flex flexDirection="row" marginTop="xxSmall" style={{ gap: "0.5rem", flexWrap: "wrap" }}>
                   <RewardBadge name={rewardName(egg.rewardId)} rewardId={egg.rewardId} />
-                  <span
-                    style={{
-                      backgroundColor: HUNTRY_COLORS.background,
-                      borderRadius: "999px",
-                      color: HUNTRY_COLORS.textMuted,
-                      fontSize: "0.75rem",
-                      padding: "0.125rem 0.5rem",
-                    }}
-                  >
-                    Not Claimed
-                  </span>
+                  <ClaimPill status={eggClaimStatus(claimCounts[egg.id], claimCapacity)} />
                 </Flex>
               </button>
               <EggActionsMenu

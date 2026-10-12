@@ -56,3 +56,9 @@ export type CreatePlayerClaimResult =
   | { status: PlayerClaimRejection }
   | { status: "code_issue_failed" }
   | { status: "lock_timeout" };
+
+export interface EggClaimCount {
+  // Every claim on the egg, forced ones included (they count toward capacity).
+  count: number;
+  forced: number;
+}

@@ -100,8 +100,8 @@ function ConfirmDialog({
 
 // huntry_render_map_delete_egg_modal / ..._delete_claimed_egg_modal. The
 // claimed variant reassures the admin that the player's reward is unaffected
-// (deleting never touches huntry_claims); it only becomes reachable once
-// claim data exists (BC-HUN-032).
+// (deleting never touches huntry_claims); it shows for an egg with at least one
+// claim.
 export function EggDeleteDialog({
   eggName,
   isClaimed,

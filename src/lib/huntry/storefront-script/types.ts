@@ -41,6 +41,18 @@ export interface StorefrontConfig {
   clientId: string;
 }
 
+// One row of POST .../rewards (BC-HUN-046); claimedAt is an ISO string.
+export interface StorefrontReward {
+  rewardName: string;
+  couponCode: string;
+  claimedAt: string;
+  eventId: number;
+  // Live state of the reward (the claim only snapshots its name).
+  expired: boolean;
+  headline: string | null;
+  products: { name: string; url: string }[];
+}
+
 // Per-player egg flags, persisted per event in local-state.ts. "Full" is not
 // here: it comes from the public map-data (StorefrontEgg.isFull).
 export interface EggFlags {

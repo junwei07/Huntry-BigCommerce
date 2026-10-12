@@ -1,5 +1,5 @@
 import { ClaimOutcome, toClaimOutcome } from "./claim-outcome";
-import { StorefrontConfig, StorefrontMapData } from "./types";
+import { StorefrontConfig, StorefrontMapData, StorefrontReward } from "./types";
 
 const publicUrl = (config: StorefrontConfig, path: string) =>
   `${config.appOrigin}/api/public/huntry/${encodeURIComponent(config.storeHash)}/${path}`;
@@ -53,6 +53,34 @@ export async function submitClaim(
     });
 
     return toClaimOutcome(response.status, await response.json().catch(() => null));
+  } catch {
+    return { kind: "error" };
+  }
+}
+
+// BC-HUN-046: the signed-in shopper's claims. "guest" when there is no session
+// (the caller shows a login prompt); "error" for anything else, so callers have
+// a single non-throwing path like submitClaim.
+export type MyRewardsResult = { kind: "ok"; rewards: StorefrontReward[] } | { kind: "guest" } | { kind: "error" };
+
+export async function fetchMyRewards(config: StorefrontConfig): Promise<MyRewardsResult> {
+  try {
+    const jwt = await fetchCustomerJwt(config);
+
+    if (!jwt) return { kind: "guest" };
+
+    const response = await fetch(publicUrl(config, "rewards"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jwt }),
+    });
+
+    if (response.status === 401) return { kind: "guest" };
+    if (!response.ok) return { kind: "error" };
+
+    const body = (await response.json().catch(() => null)) as { claims?: StorefrontReward[] } | null;
+
+    return { kind: "ok", rewards: Array.isArray(body?.claims) ? body.claims : [] };
   } catch {
     return { kind: "error" };
   }
