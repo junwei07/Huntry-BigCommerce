@@ -66,3 +66,23 @@ export interface EggFlags {
 // through HuntryMapApi.flags, so the claim dialogs change what the map's
 // proximity checks see instead of editing a private copy.
 export type MutableEggFlags = { [K in keyof EggFlags]: Set<string> };
+
+// Client-side view of GET .../cta-data (BC-HUN-038), mirroring PublicCtaData in
+// src/lib/huntry/public-api/cta-data.ts (dates arrive as ISO strings).
+export interface StorefrontCtaEvent {
+  name: string;
+  slug: string;
+  startsAt: string | null;
+  endsAt: string | null;
+  headerBannerUrl: string | null;
+  primaryColor: string;
+}
+
+export interface StorefrontCtaData {
+  events: StorefrontCtaEvent[];
+  allProducts: boolean;
+  productIds: number[];
+  // Blank text means "use the default copy"; a null image URL means "none".
+  banner: { description: string; logoUrl: string | null; imageUrl: string | null };
+  productCta: { title: string; description: string };
+}

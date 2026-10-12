@@ -1,6 +1,7 @@
 import { fetchMapData, fetchMyRewards, isLoggedIn, submitClaim } from "./api";
 import { listingUrl, renderListing, renderNotFound } from "./cards-view";
 import { startClaimUi } from "./claim-ui";
+import { startCtas } from "./cta";
 import { showJoinPrompt } from "./claim-ui/dom-ui";
 import { loadEggFlags } from "./local-state";
 import { enterFullscreen } from "./map/chrome";
@@ -54,11 +55,14 @@ declare global {
   }
 }
 
-function readConfig(): StorefrontConfig | null {
+// `warn` is off for the pages without a Huntry container, which would
+// otherwise log the same warning on every storefront page of an unconfigured
+// store.
+function readConfig(warn = true): StorefrontConfig | null {
   const raw = window.__HUNTRY_STOREFRONT__;
 
   if (!raw?.appOrigin || !raw.storeHash || !raw.clientId) {
-    console.warn("[Huntry] Storefront script is not configured; skipping.");
+    if (warn) console.warn("[Huntry] Storefront script is not configured; skipping.");
 
     return null;
   }
@@ -68,12 +72,18 @@ function readConfig(): StorefrontConfig | null {
 
 async function start(): Promise<void> {
   const container = document.querySelector<HTMLElement>(CONTAINER_SELECTOR);
-
-  if (!container) return;
-
-  const config = readConfig();
+  const config = readConfig(Boolean(container));
 
   if (!config) return;
+
+  // Pages without a Huntry container get the header banner and product CTA
+  // (BC-HUN-038). The Huntry page gets the banner too, except on a hunt map
+  // (see the end of this function), like the plugin.
+  if (!container) {
+    await startCtas(config);
+
+    return;
+  }
 
   const params = new URLSearchParams(window.location.search);
   const slug = params.get("event")?.trim() || undefined;
@@ -135,6 +145,13 @@ async function start(): Promise<void> {
       renderNotFound(container);
       break;
   }
+
+  // The hunts list, My Rewards and the not-found message are ordinary theme
+  // pages and keep the banner; only the hunt map, a fullscreen takeover that
+  // covers the theme header, goes without (huntry/includes/frontend/cta.php:80-85,
+  // map.php:80-86). After the page has rendered so the extra request never
+  // delays it.
+  if (mode.kind !== "map") await startCtas(config);
 }
 
 function showLoadError(): void {

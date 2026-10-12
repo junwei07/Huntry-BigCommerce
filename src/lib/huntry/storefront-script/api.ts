@@ -1,5 +1,5 @@
 import { ClaimOutcome, toClaimOutcome } from "./claim-outcome";
-import { StorefrontConfig, StorefrontMapData, StorefrontReward } from "./types";
+import { StorefrontConfig, StorefrontCtaData, StorefrontMapData, StorefrontReward } from "./types";
 
 const publicUrl = (config: StorefrontConfig, path: string) =>
   `${config.appOrigin}/api/public/huntry/${encodeURIComponent(config.storeHash)}/${path}`;
@@ -15,6 +15,35 @@ export async function fetchMapData(config: StorefrontConfig, eventSlug?: string)
   const body = (await response.json()) as Partial<StorefrontMapData>;
 
   return { events: Array.isArray(body.events) ? body.events : [] };
+}
+
+// The small, cached payload behind the header banner and product CTA. Returns
+// null on any failure: the CTAs are decoration and must never break a page.
+export async function fetchCtaData(config: StorefrontConfig): Promise<StorefrontCtaData | null> {
+  try {
+    const response = await fetch(publicUrl(config, "cta-data"));
+
+    if (!response.ok) return null;
+
+    const body = (await response.json()) as Partial<StorefrontCtaData>;
+
+    return {
+      events: Array.isArray(body.events) ? body.events : [],
+      allProducts: body.allProducts === true,
+      productIds: Array.isArray(body.productIds) ? body.productIds.filter((id) => Number.isInteger(id)) : [],
+      banner: {
+        description: typeof body.banner?.description === "string" ? body.banner.description : "",
+        logoUrl: body.banner?.logoUrl ?? null,
+        imageUrl: body.banner?.imageUrl ?? null,
+      },
+      productCta: {
+        title: typeof body.productCta?.title === "string" ? body.productCta.title : "",
+        description: typeof body.productCta?.description === "string" ? body.productCta.description : "",
+      },
+    };
+  } catch {
+    return null;
+  }
 }
 
 // Same-origin request to the storefront's own BigCommerce endpoint. Returns

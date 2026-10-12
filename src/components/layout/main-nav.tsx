@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { id: "events", title: "Events", isIndex: false },
   { id: "rewards", title: "Rewards", isIndex: false },
   { id: "sponsors", title: "Sponsors", isIndex: false },
+  { id: "featured", title: "Featured", isIndex: false },
   { id: "help", title: "Help", isIndex: false },
 ];
 

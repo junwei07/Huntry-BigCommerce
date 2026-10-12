@@ -187,7 +187,8 @@ describe("storefront loader", () => {
     setUp("", [EVENT]);
     await runLoader();
 
-    expect(fetchedUrls).toEqual(["https://app.example.com/api/public/huntry/abc123/map-data"]);
+    // map-data first; the header banner's cta-data request follows the render.
+    expect(fetchedUrls[0]).toBe("https://app.example.com/api/public/huntry/abc123/map-data");
     expect(headChildren.some((node) => node.src?.endsWith("/storefront-map.js"))).toBe(false);
     expect(container.children.some((child) => child.className === "huntry-cards")).toBe(true);
   });

@@ -7,6 +7,9 @@ import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 
 const BOX_SIZE = "96px";
 
+const DEFAULT_CAPTION =
+  "Preview only — image uploads aren't stored yet. New sponsors use the default logo until uploads are fully wired up.";
+
 // A tap-to-upload box, the interaction huntry/EVMS's own image pickers use
 // (add_event_dialog.dart / add_company_dialog.dart — tap a bordered box,
 // pick a file, the preview swaps in) rather than a plain URL text input.
@@ -20,7 +23,24 @@ const BOX_SIZE = "96px";
 // DEFAULT_SPONSOR_LOGO_URL (or its existing logo, when editing) regardless
 // of what's previewed here. No onChange prop: there's nothing downstream
 // for a selection to flow into yet.
-export function LogoUploadField({ previewUrl }: { previewUrl: string }) {
+//
+// The optional props let the Featured tab reuse this for its banner images
+// (BC-HUN-038); every default reproduces the sponsor field exactly.
+export function LogoUploadField({
+  previewUrl,
+  label = "Logo",
+  ariaLabel = "Change sponsor logo",
+  altText = "Sponsor logo preview",
+  width = BOX_SIZE,
+  caption = DEFAULT_CAPTION,
+}: {
+  previewUrl: string;
+  label?: string;
+  ariaLabel?: string;
+  altText?: string;
+  width?: string;
+  caption?: string;
+}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
 
@@ -48,10 +68,10 @@ export function LogoUploadField({ previewUrl }: { previewUrl: string }) {
 
   return (
     <Box marginBottom="medium">
-      <Small marginBottom="xSmall">Logo</Small>
+      <Small marginBottom="xSmall">{label}</Small>
 
       <button
-        aria-label="Change sponsor logo"
+        aria-label={ariaLabel}
         onClick={() => inputRef.current?.click()}
         style={{
           border: "1px solid rgba(0,0,0,0.15)",
@@ -61,17 +81,17 @@ export function LogoUploadField({ previewUrl }: { previewUrl: string }) {
           overflow: "hidden",
           padding: 0,
           position: "relative",
-          width: BOX_SIZE,
+          width,
         }}
         type="button"
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- local preview (object URL) or a public/ static asset, neither benefits from next/image */}
         <img
-          alt="Sponsor logo preview"
+          alt={altText}
           height={BOX_SIZE}
           src={objectUrl ?? previewUrl}
           style={{ objectFit: "cover" }}
-          width={BOX_SIZE}
+          width={width}
         />
 
         <Box
@@ -95,8 +115,7 @@ export function LogoUploadField({ previewUrl }: { previewUrl: string }) {
       <input accept="image/*" onChange={handleFileChange} ref={inputRef} style={{ display: "none" }} type="file" />
 
       <Small marginTop="xSmall" style={{ color: HUNTRY_COLORS.textMuted, maxWidth: "280px" }}>
-        Preview only — image uploads aren&apos;t stored yet. New sponsors use the default logo until uploads are
-        fully wired up.
+        {caption}
       </Small>
     </Box>
   );
