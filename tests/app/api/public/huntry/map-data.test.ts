@@ -104,6 +104,8 @@ describe("GET map-data (MOCK mode)", () => {
         claimedAt: new Date(),
         isForced: customer === 0,
         forcedByUserId: null,
+        orderId: null,
+        redemptionStatus: "unredeemed",
       });
     }
 

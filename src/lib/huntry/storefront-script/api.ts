@@ -72,6 +72,28 @@ export async function isLoggedIn(config: StorefrontConfig): Promise<boolean> {
   }
 }
 
+// BC-HUN-050: which of these cart coupon codes are reward codes claimed by
+// someone else. Fails open — [] on any error — because the cart guard is
+// advisory (the cart webhook is the enforcing layer). A guest sends no JWT.
+export async function fetchForeignCouponCodes(config: StorefrontConfig, codes: string[]): Promise<string[]> {
+  try {
+    const jwt = await fetchCustomerJwt(config);
+    const response = await fetch(publicUrl(config, "validate-coupon"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...(jwt ? { jwt } : {}), codes }),
+    });
+
+    if (!response.ok) return [];
+
+    const body = (await response.json().catch(() => null)) as { foreign?: unknown } | null;
+
+    return Array.isArray(body?.foreign) ? body.foreign.filter((code): code is string => typeof code === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 // One claim attempt: fresh JWT, then POST. Never throws — network failures
 // come back as { kind: "error" } so the dialog layer has a single path.
 export async function submitClaim(

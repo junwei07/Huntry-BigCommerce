@@ -43,6 +43,15 @@ On the **Scopes** tab, enable at minimum:
   `store/order/created` and the order re-fetch it triggers — there is no
   separate "Webhooks" scope)
 * **App Extensions**: manage
+* **Checkout Content**: modify (`store_content_checkout`; BC-HUN-051 — lets
+  the storefront script load on `/checkout`, where it shows "Invalid coupon
+  usage"). Needed **in addition to** Checkout below, not instead of it.
+* **Checkout**: modify (`store_checkout` — **not** "Checkout Content", a
+  different scope that does not unlock `/v3/checkouts`; BC-HUN-049: removes a reward code from a cart that
+  isn't its claimer's, and re-reads the checkout; also confirm whether
+  **Carts**: read-only is needed for the `store/cart/couponApplied` webhook —
+  see the scope table under "Required OAuth Scopes" in `docs/MIGRATION.md`). Stores installed before this scope
+  was added must reauthorize.
 
 Scope changes only take effect for a store on the next install, so if you
 change them later, uninstall and reinstall the app.

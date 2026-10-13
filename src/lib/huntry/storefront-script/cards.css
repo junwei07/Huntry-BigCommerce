@@ -170,8 +170,8 @@ scoped under .huntry-cards* so nothing leaks into the merchant's theme.
 .huntry-page-nav__item:hover,
 .huntry-page-nav__item:focus {
   text-decoration: none;
-  border-bottom-color: #b9e3be;
+  border-bottom-color: #f7a163;
 }
 .huntry-page-nav__item--active {
-  border-bottom-color: #4caf50;
+  border-bottom-color: #eb711b;
 }

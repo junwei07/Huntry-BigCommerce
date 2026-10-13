@@ -1,4 +1,6 @@
 import { fetchMapData, fetchMyRewards, isLoggedIn, submitClaim } from "./api";
+import { isCartPage, startCartGuard } from "./cart-guard";
+import { isCheckoutArea, isCheckoutPage, startCheckoutGuard } from "./checkout-guard";
 import { listingUrl, renderListing, renderNotFound } from "./cards-view";
 import { startClaimUi } from "./claim-ui";
 import { startCtas } from "./cta";
@@ -71,6 +73,17 @@ function readConfig(warn = true): StorefrontConfig | null {
 }
 
 async function start(): Promise<void> {
+  // The script is registered for all pages (BC-HUN-051), so it also loads on the
+  // checkout and the order confirmation. There it only runs the coupon guard on
+  // the checkout itself — never the map, banner or CTAs.
+  if (isCheckoutArea(window.location.pathname)) {
+    const checkoutConfig = isCheckoutPage(window.location.pathname) ? readConfig(false) : null;
+
+    if (checkoutConfig) startCheckoutGuard(checkoutConfig);
+
+    return;
+  }
+
   const container = document.querySelector<HTMLElement>(CONTAINER_SELECTOR);
   const config = readConfig(Boolean(container));
 
@@ -80,6 +93,9 @@ async function start(): Promise<void> {
   // (BC-HUN-038). The Huntry page gets the banner too, except on a hunt map
   // (see the end of this function), like the plugin.
   if (!container) {
+    // The cart page also gets the coupon-ownership guard (BC-HUN-050).
+    if (isCartPage(window.location.pathname)) startCartGuard(config);
+
     await startCtas(config);
 
     return;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { RedemptionStatus } from "@/lib/huntry/claims/types";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 
 // Layout and flow mirror the WP plugin's huntry_render_overview_game_activity()
@@ -17,6 +18,8 @@ export interface ActivityItem {
   claimedAt: string;
   isForced: boolean;
   forcedByLabel: string | null;
+  // Set by the order webhook (BC-HUN-041); "unredeemed" renders no pill.
+  redemptionStatus: RedemptionStatus;
 }
 
 const BORDER = "#E5E5EA";
@@ -224,6 +227,17 @@ export function GameActivityPanel({ items, limit }: { items: ActivityItem[]; lim
                           title={item.forcedByLabel ? `Force-claimed by ${item.forcedByLabel}` : "Force-claimed"}
                         >
                           Force Claimed
+                        </span>
+                      )}
+                      {item.redemptionStatus === "redeemed" && (
+                        <span style={pill("rgba(93, 197, 100, 0.15)", "#2E9E37")}>Redeemed</span>
+                      )}
+                      {item.redemptionStatus === "flagged_unauthorized_use" && (
+                        <span
+                          style={pill("rgba(220, 53, 69, 0.15)", "#B02A37")}
+                          title="This claim's code was used on an order by a different customer"
+                        >
+                          Flagged: unauthorized use
                         </span>
                       )}
                     </div>

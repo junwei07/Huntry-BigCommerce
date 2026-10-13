@@ -2,7 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { getDataMode, resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
 import { toDate } from "@/lib/huntry/claims/dates";
 import { MOCK_CLAIMS } from "@/lib/huntry/claims/mock/mock-claims";
-import { HuntryClaim } from "@/lib/huntry/claims/types";
+import { HuntryClaim, RedemptionStatus } from "@/lib/huntry/claims/types";
 import { getHuntryDb } from "@/lib/huntry/db/get-db";
 
 export const GAME_ACTIVITY_LIMIT = 200;
@@ -19,6 +19,8 @@ interface ActivityDbRow {
   claimed_at: Date | string;
   is_forced: boolean | number;
   forced_by_user_id: number | null;
+  order_id: number | null;
+  redemption_status: RedemptionStatus;
 }
 
 // BC-HUN-039: the newest claims for one event, forced ones included (they are
@@ -70,5 +72,7 @@ export async function fetchGameActivity(
     claimedAt: toDate(row.claimed_at) ?? new Date(),
     isForced: Boolean(row.is_forced),
     forcedByUserId: row.forced_by_user_id,
+    orderId: row.order_id,
+    redemptionStatus: row.redemption_status,
   }));
 }

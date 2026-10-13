@@ -1,3 +1,9 @@
+// Mirrors the huntry_claims.redemption_status CHECK constraint. Written only by
+// the order webhook (BC-HUN-041, claims/redemption.ts).
+export const REDEMPTION_STATUSES = ["unredeemed", "redeemed", "flagged_unauthorized_use"] as const;
+
+export type RedemptionStatus = (typeof REDEMPTION_STATUSES)[number];
+
 // A claim is deliberately denormalized (no FKs to egg/reward/event — see
 // 0001_huntry_schema.sql), so reward name/coupon are snapshots.
 export interface HuntryClaim {
@@ -12,6 +18,9 @@ export interface HuntryClaim {
   claimedAt: Date;
   isForced: boolean;
   forcedByUserId: number | null;
+  // The BigCommerce order the code was used on; null until the webhook sees it.
+  orderId: number | null;
+  redemptionStatus: RedemptionStatus;
 }
 
 export interface CreateForcedClaimInput {

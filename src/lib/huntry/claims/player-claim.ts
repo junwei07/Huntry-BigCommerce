@@ -315,6 +315,8 @@ async function runClaim(
     claimedAt: toDate(row.claimed_at) ?? new Date(),
     isForced: false,
     forcedByUserId: null,
+    orderId: null,
+    redemptionStatus: "unredeemed",
   };
 
   return { result: { status: "created", claim }, commit: true };

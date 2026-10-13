@@ -23,6 +23,18 @@ vi.mock("@/lib/huntry/register-storefront-page", () => ({
   removeStorefrontPage: (storeHash: string) => removeMock(storeHash),
 }));
 
+const ensureScriptMock = vi.fn(async (_storeHash: string) => {});
+
+vi.mock("@/lib/huntry/register-storefront-script", () => ({
+  ensureStorefrontScript: (storeHash: string) => ensureScriptMock(storeHash),
+}));
+
+const ensureWebhooksMock = vi.fn(async (_storeHash: string) => {});
+
+vi.mock("@/lib/huntry/register-webhooks", () => ({
+  ensureWebhooks: (storeHash: string) => ensureWebhooksMock(storeHash),
+}));
+
 const order: string[] = [];
 const deleteStoreMock = vi.fn(async () => {
   order.push("deleteStore");
@@ -57,6 +69,8 @@ describe("GET /api/app/load", () => {
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toContain("/store/abc123");
     expect(provisionMock).toHaveBeenCalledWith("abc123");
+    expect(ensureWebhooksMock).toHaveBeenCalledWith("abc123");
+    expect(ensureScriptMock).toHaveBeenCalledWith("abc123");
   });
 
   it("does not provision when the load itself fails", async () => {
@@ -68,6 +82,8 @@ describe("GET /api/app/load", () => {
 
     expect(response.status).toBe(307);
     expect(provisionMock).not.toHaveBeenCalled();
+    expect(ensureWebhooksMock).not.toHaveBeenCalled();
+    expect(ensureScriptMock).not.toHaveBeenCalled();
   });
 });
 

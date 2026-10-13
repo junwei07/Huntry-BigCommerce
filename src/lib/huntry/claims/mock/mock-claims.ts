@@ -21,6 +21,8 @@ export function addMockForcedClaim(input: CreateForcedClaimInput): CreateForcedC
     storeHash: "mock-store",
     claimedAt: new Date(),
     isForced: true,
+    orderId: null,
+    redemptionStatus: "unredeemed",
   };
 
   MOCK_CLAIMS = [...MOCK_CLAIMS, claim];
@@ -49,6 +51,8 @@ export function addMockPlayerClaim(input: CreatePlayerClaimInput): CreatePlayerC
     claimedAt: new Date(),
     isForced: false,
     forcedByUserId: null,
+    orderId: null,
+    redemptionStatus: "unredeemed",
   };
 
   MOCK_CLAIMS = [...MOCK_CLAIMS, claim];

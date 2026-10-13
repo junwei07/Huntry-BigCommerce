@@ -4,37 +4,48 @@ import { getCredentialsStore } from "@/lib/credentials-store/get-credentials-sto
 import { getAbsoluteAppUrl } from "@/lib/routing/app-url";
 import { logError } from "@/lib/errors/logger";
 
-// The one webhook scope Week 1 registers — order-created, per
-// docs/MIGRATION.md §4. store/cart/updated is deliberately deferred (fires
-// on every cart change store-wide, needs its own filtering work to be
-// worth its volume).
+// docs/MIGRATION.md §4. store/order/created feeds redemption tracking
+// (BC-HUN-041); store/cart/couponApplied feeds coupon-ownership enforcement
+// (BC-HUN-049) — it fires only when a code is applied, so unlike
+// store/cart/updated (still deliberately deferred: it fires on every cart
+// change store-wide) its volume is small.
 const ORDER_CREATED_SCOPE = "store/order/created";
+const CART_COUPON_APPLIED_SCOPE = "store/cart/couponApplied";
+
+interface HuntryWebhook {
+  scope: string;
+  path: string;
+}
+
+const HUNTRY_WEBHOOKS: HuntryWebhook[] = [
+  { scope: ORDER_CREATED_SCOPE, path: "/api/webhooks/huntry/order" },
+  { scope: CART_COUPON_APPLIED_SCOPE, path: "/api/webhooks/huntry/cart" },
+];
 
 interface BcWebhook {
   id: number;
   scope: string;
 }
 
-function getOrderWebhookDestination(): string {
-  return getAbsoluteAppUrl(undefined, "/api/webhooks/huntry/order");
-}
-
-// Finds this app's own order-created webhook among the store's existing
-// ones, matched on scope — one row per scope is this app's own idempotency
-// key (see store_webhooks' primary key), not name/destination.
-async function findExistingOrderWebhookId(restApiClient: BcRestApiClient): Promise<string | undefined> {
+// Finds this app's own webhook for a scope among the store's existing ones,
+// matched on scope — one row per scope is this app's own idempotency key (see
+// store_webhooks' primary key), not name/destination.
+async function findExistingWebhookId(restApiClient: BcRestApiClient, scope: string): Promise<string | undefined> {
   const result = await restApiClient.get<V3ListResponse<BcWebhook>>("/v3/hooks");
 
-  const existing = result.data.data.find((hook) => hook.scope === ORDER_CREATED_SCOPE);
+  const existing = result.data.data.find((hook) => hook.scope === scope);
 
   return existing ? String(existing.id) : undefined;
 }
 
-// Registers this app's order-created webhook, adopting an existing one
-// instead of creating a duplicate — safe to call more than once for the
-// same store.
-export async function findOrCreateOrderWebhook(restApiClient: BcRestApiClient): Promise<string> {
-  const existingHookId = await findExistingOrderWebhookId(restApiClient);
+// Registers a webhook for a scope, adopting an existing one instead of
+// creating a duplicate — safe to call more than once for the same store.
+export async function findOrCreateWebhook(
+  restApiClient: BcRestApiClient,
+  scope: string,
+  path: string,
+): Promise<string> {
+  const existingHookId = await findExistingWebhookId(restApiClient, scope);
 
   if (existingHookId) {
     return existingHookId;
@@ -42,8 +53,8 @@ export async function findOrCreateOrderWebhook(restApiClient: BcRestApiClient): 
 
   const result = await restApiClient.post<{ data: BcWebhook }>("/v3/hooks", {
     body: {
-      scope: ORDER_CREATED_SCOPE,
-      destination: getOrderWebhookDestination(),
+      scope,
+      destination: getAbsoluteAppUrl(undefined, path),
       is_active: true,
     },
   });
@@ -51,22 +62,64 @@ export async function findOrCreateOrderWebhook(restApiClient: BcRestApiClient): 
   return String(result.data.data.id);
 }
 
-// Registers Huntry's order-created webhook for a newly installed store.
+export async function findOrCreateOrderWebhook(restApiClient: BcRestApiClient): Promise<string> {
+  return findOrCreateWebhook(restApiClient, ORDER_CREATED_SCOPE, "/api/webhooks/huntry/order");
+}
+
+// Registers Huntry's webhooks for a newly installed store.
 // Takes apiToken directly (the one just returned from the OAuth handshake)
 // rather than looking it up, since the credentials store may not have it
 // written yet — same reasoning as register-app-extension.ts's
 // registerAppExtension.
 //
 // Deliberately never throws: a failed registration shouldn't block install.
-// Logged rather than silently swallowed. A user-triggered retry action is
-// Week 2 work (BC-HUN-011/012), once there's a Huntry admin page to host it.
+// Logged rather than silently swallowed. Each scope is attempted on its own,
+// so one failing (e.g. a token without the scope it needs) doesn't skip the
+// rest. ensureWebhooks retries/backfills on app Load.
 export async function registerWebhooks(storeHash: string, apiToken: string): Promise<void> {
-  try {
-    const restApiClient = await getRestApiClient(storeHash, apiToken);
-    const hookId = await findOrCreateOrderWebhook(restApiClient);
+  await registerMissingWebhooks(storeHash, apiToken, HUNTRY_WEBHOOKS);
+}
 
-    await getCredentialsStore().setStoreWebhook({ storeHash, scope: ORDER_CREATED_SCOPE, hookId });
+async function registerMissingWebhooks(storeHash: string, apiToken: string, webhooks: HuntryWebhook[]): Promise<void> {
+  for (const { scope, path } of webhooks) {
+    try {
+      const restApiClient = await getRestApiClient(storeHash, apiToken);
+      const hookId = await findOrCreateWebhook(restApiClient, scope, path);
+
+      await getCredentialsStore().setStoreWebhook({ storeHash, scope, hookId });
+    } catch (error) {
+      logError(`registerWebhooks: store "${storeHash}" scope "${scope}"`, error);
+    }
+  }
+}
+
+// Backfills stores installed before a webhook existed (and retries a failed
+// install-time attempt), run after the Load response like
+// provisionStorefrontPage. With every record already stored it makes no API
+// call at all. Never throws.
+export async function ensureWebhooks(storeHash: string): Promise<void> {
+  try {
+    const credentialsStore = getCredentialsStore();
+    const missing: HuntryWebhook[] = [];
+
+    for (const webhook of HUNTRY_WEBHOOKS) {
+      if (!(await credentialsStore.getStoreWebhook(storeHash, webhook.scope))) {
+        missing.push(webhook);
+      }
+    }
+
+    if (missing.length === 0) {
+      return;
+    }
+
+    const apiToken = await credentialsStore.getStoreToken(storeHash);
+
+    if (!apiToken) {
+      return;
+    }
+
+    await registerMissingWebhooks(storeHash, apiToken, missing);
   } catch (error) {
-    logError(`registerWebhooks: store "${storeHash}"`, error);
+    logError(`ensureWebhooks: store "${storeHash}"`, error);
   }
 }

@@ -1,6 +1,7 @@
 import { getRestApiClient } from "@/lib/bc-api-client/get-rest-api-client";
 import { BcRestApiClient, V3ListResponse } from "@/lib/bc-api-client/rest-client/types";
 import { getCredentialsStore } from "@/lib/credentials-store/get-credentials-store";
+import { AppError } from "@/lib/errors/app-error";
 import { getAbsoluteAppUrl } from "@/lib/routing/app-url";
 import { logError } from "@/lib/errors/logger";
 
@@ -9,7 +10,16 @@ interface BcScript {
   api_client_id?: string;
   consent_category?: string;
   src?: string;
+  visibility?: string;
 }
+
+// all_pages = storefront + checkout + order confirmation. The checkout guard
+// (BC-HUN-051) needs the script on /checkout, and BigCommerce only allows
+// checkout / all_pages visibility for an app with the Checkout Content scope
+// (store_content_checkout), so a token without it gets a 403 and falls back to
+// STOREFRONT_ONLY below — the Huntry page must keep working either way.
+const CHECKOUT_COVERAGE_VISIBILITY = "all_pages";
+const STOREFRONT_ONLY_VISIBILITY = "storefront";
 
 // essential, so the storefront script runs for every visitor. A functional
 // script is held back by BigCommerce's cookie-consent manager until the shopper
@@ -29,7 +39,7 @@ function getStorefrontScriptSrc(storeHash: string): string {
   return getAbsoluteAppUrl(undefined, `/api/public/huntry/${storeHash}/storefront-script.js`);
 }
 
-function buildScriptInput(storeHash: string) {
+function buildScriptInput(storeHash: string, visibility: string) {
   return {
     name: "Huntry",
     description: "Loads the Huntry treasure-hunt storefront experience.",
@@ -38,7 +48,7 @@ function buildScriptInput(storeHash: string) {
     auto_uninstall: true,
     load_method: "defer",
     location: "footer",
-    visibility: "storefront",
+    visibility,
     consent_category: STOREFRONT_SCRIPT_CONSENT_CATEGORY,
   };
 }
@@ -56,11 +66,13 @@ async function findExistingStorefrontScript(restApiClient: BcRestApiClient): Pro
 // A script registered earlier keeps whatever it was created with, so adopting
 // it also brings it up to date: the consent category (it changed to essential)
 // and the src, which embeds APP_ORIGIN and so goes stale whenever the app moves
-// (a new dev tunnel, a new deployment). Only the fields that differ are sent. A
-// failed update must not fail the adoption: the script still exists, it just
-// keeps its old settings.
+// (a new dev tunnel, a new deployment) — and the visibility, which widened from
+// storefront to all_pages for the checkout guard. Only the fields that differ
+// are sent. A failed update must not fail the adoption: the script still
+// exists, it just keeps its old settings (a missing Checkout Content scope
+// makes the visibility change 403 on its own, so it is retried without it).
 async function reconcileStorefrontScript(restApiClient: BcRestApiClient, script: BcScript, storeHash: string): Promise<void> {
-  const changes: { consent_category?: string; src?: string } = {};
+  const changes: { consent_category?: string; src?: string; visibility?: string } = {};
   const expectedSrc = getStorefrontScriptSrc(storeHash);
 
   if (script.consent_category !== STOREFRONT_SCRIPT_CONSENT_CATEGORY) {
@@ -71,6 +83,10 @@ async function reconcileStorefrontScript(restApiClient: BcRestApiClient, script:
     changes.src = expectedSrc;
   }
 
+  if (script.visibility !== undefined && script.visibility !== CHECKOUT_COVERAGE_VISIBILITY) {
+    changes.visibility = CHECKOUT_COVERAGE_VISIBILITY;
+  }
+
   if (Object.keys(changes).length === 0) {
     return;
   }
@@ -79,7 +95,27 @@ async function reconcileStorefrontScript(restApiClient: BcRestApiClient, script:
     await restApiClient.put(`/v3/content/scripts/${script.uuid}`, { body: changes });
   } catch (error) {
     logError(`reconcileStorefrontScript: script "${script.uuid}"`, error);
+
+    // Without the Checkout Content scope the visibility change is refused and
+    // takes the unrelated consent/src fixes down with it, so retry those alone.
+    if (changes.visibility && isForbidden(error)) {
+      const rest = { ...changes };
+
+      delete rest.visibility;
+
+      if (Object.keys(rest).length > 0) {
+        try {
+          await restApiClient.put(`/v3/content/scripts/${script.uuid}`, { body: rest });
+        } catch (retryError) {
+          logError(`reconcileStorefrontScript: script "${script.uuid}" (without visibility)`, retryError);
+        }
+      }
+    }
   }
+}
+
+function isForbidden(error: unknown): boolean {
+  return error instanceof AppError && error.status === 403;
 }
 
 // Registers this app's storefront script, adopting an existing one instead
@@ -93,11 +129,31 @@ export async function findOrCreateStorefrontScript(restApiClient: BcRestApiClien
     return existingScript.uuid;
   }
 
-  const result = await restApiClient.post<{ data: BcScript }>("/v3/content/scripts", {
-    body: buildScriptInput(storeHash),
-  });
+  try {
+    const result = await restApiClient.post<{ data: BcScript }>("/v3/content/scripts", {
+      body: buildScriptInput(storeHash, CHECKOUT_COVERAGE_VISIBILITY),
+    });
 
-  return result.data.data.uuid;
+    return result.data.data.uuid;
+  } catch (error) {
+    // Creating an all_pages script needs the Checkout Content scope. A token
+    // without it must still get the storefront script, or the Huntry page and
+    // the cart guard would be lost along with the checkout coverage.
+    if (!isForbidden(error)) {
+      throw error;
+    }
+
+    logError(
+      `findOrCreateStorefrontScript: store "${storeHash}" — Checkout Content scope missing, registering for the storefront only`,
+      error,
+    );
+
+    const result = await restApiClient.post<{ data: BcScript }>("/v3/content/scripts", {
+      body: buildScriptInput(storeHash, STOREFRONT_ONLY_VISIBILITY),
+    });
+
+    return result.data.data.uuid;
+  }
 }
 
 // Registers the Huntry storefront script for a newly installed store. Takes
@@ -108,6 +164,38 @@ export async function findOrCreateStorefrontScript(restApiClient: BcRestApiClien
 // Deliberately never throws: a failed registration shouldn't block install.
 // Logged rather than silently swallowed. A user-triggered retry action is
 // Week 2 work (BC-HUN-011/012), once there's a Huntry admin page to host it.
+// Brings an already-installed store's script up to date (visibility, src,
+// consent category) without a reinstall: reconcile only ever ran at install, so
+// a store installed before a change — or one whose install-time update failed —
+// kept its old settings. Run after the app Load response; the reconcile makes
+// one GET on /v3/content/scripts and writes only if something differs, so it is
+// throttled per store (in-memory, per server instance) to keep opening the
+// admin cheap. Never throws.
+const ENSURE_INTERVAL_MS = 10 * 60 * 1000;
+const lastEnsuredAt = new Map<string, number>();
+
+export async function ensureStorefrontScript(storeHash: string): Promise<void> {
+  const last = lastEnsuredAt.get(storeHash);
+
+  if (last !== undefined && Date.now() - last < ENSURE_INTERVAL_MS) {
+    return;
+  }
+
+  lastEnsuredAt.set(storeHash, Date.now());
+
+  try {
+    const apiToken = await getCredentialsStore().getStoreToken(storeHash);
+
+    if (!apiToken) {
+      return;
+    }
+
+    await registerStorefrontScript(storeHash, apiToken);
+  } catch (error) {
+    logError(`ensureStorefrontScript: store "${storeHash}"`, error);
+  }
+}
+
 export async function registerStorefrontScript(storeHash: string, apiToken: string): Promise<void> {
   try {
     const restApiClient = await getRestApiClient(storeHash, apiToken);

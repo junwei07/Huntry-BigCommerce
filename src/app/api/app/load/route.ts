@@ -3,6 +3,8 @@ import { isSignedPayloadVerificationError, StoreNotInstalledError } from "@/lib/
 import { getAppErrorUrl } from "@/lib/bc-auth/app-error-reason";
 import { loadStore } from "@/lib/bc-auth/load-store";
 import { provisionStorefrontPage } from "@/lib/huntry/register-storefront-page";
+import { ensureStorefrontScript } from "@/lib/huntry/register-storefront-script";
+import { ensureWebhooks } from "@/lib/huntry/register-webhooks";
 import { getAbsoluteAppUrl } from "@/lib/routing/app-url";
 import { logError } from "@/lib/errors/logger";
 
@@ -48,6 +50,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   // already stored it makes no API call at all. Only reached once loadStore
   // has verified the signed JWT.
   after(() => provisionStorefrontPage(storeHash));
+
+  // Same idea for webhooks added after install (store/cart/couponApplied,
+  // BC-HUN-049): registers only the scopes with no stored record.
+  after(() => ensureWebhooks(storeHash));
+
+  // And the storefront script's Script Manager settings (it must be registered
+  // for all pages to load on /checkout, BC-HUN-051); one throttled GET, a write
+  // only when something differs.
+  after(() => ensureStorefrontScript(storeHash));
 
   return NextResponse.redirect(getAbsoluteAppUrl(storeHash, url));
 }

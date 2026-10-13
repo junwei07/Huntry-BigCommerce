@@ -2,7 +2,13 @@ import { DatabaseSync } from "node:sqlite";
 import { getDataMode, resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
 import { toDate } from "@/lib/huntry/claims/dates";
 import { addMockForcedClaim, MOCK_CLAIMS } from "@/lib/huntry/claims/mock/mock-claims";
-import { CreateForcedClaimInput, CreateForcedClaimResult, EggClaimCount, HuntryClaim } from "@/lib/huntry/claims/types";
+import {
+  CreateForcedClaimInput,
+  CreateForcedClaimResult,
+  EggClaimCount,
+  HuntryClaim,
+  RedemptionStatus,
+} from "@/lib/huntry/claims/types";
 import { getHuntryDb } from "@/lib/huntry/db/get-db";
 
 // Raw row shape as node-postgres returns it: BOOLEAN is a real boolean,
@@ -19,6 +25,8 @@ interface PostgresClaimRow {
   claimed_at: Date;
   is_forced: boolean;
   forced_by_user_id: number | null;
+  order_id: number | null;
+  redemption_status: RedemptionStatus;
 }
 
 // Raw row shape as node:sqlite returns it: BOOLEAN is 0/1, timestamps TEXT.
@@ -40,6 +48,8 @@ function normalizeRow(row: PostgresClaimRow | SqliteClaimRow): HuntryClaim {
     claimedAt: toDate(row.claimed_at) ?? new Date(),
     isForced: Boolean(row.is_forced),
     forcedByUserId: row.forced_by_user_id,
+    orderId: row.order_id,
+    redemptionStatus: row.redemption_status,
   };
 }
 

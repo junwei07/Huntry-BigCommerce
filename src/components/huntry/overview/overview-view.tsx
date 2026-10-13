@@ -103,6 +103,7 @@ export async function OverviewView({
       claimedAt: row.claimedAt.toISOString(),
       isForced: row.isForced,
       forcedByLabel: row.forcedByUserId === null ? null : `admin #${row.forcedByUserId}`,
+      redemptionStatus: row.redemptionStatus,
     };
   });
   const mapEggs = eggs.map((egg) => ({ id: egg.id, rewardId: egg.rewardId, name: egg.name, lat: egg.lat, lng: egg.lng }));
