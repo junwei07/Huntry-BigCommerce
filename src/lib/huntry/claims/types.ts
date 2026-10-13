@@ -62,3 +62,28 @@ export interface EggClaimCount {
   count: number;
   forced: number;
 }
+
+// BC-HUN-039: one leaderboard row — a customer's non-forced claim count for an
+// event. Forced claims are excluded by the query, never filtered afterwards.
+export interface LeaderboardEntry {
+  bcCustomerId: number;
+  claimCount: number;
+  lastClaimedAt: Date;
+}
+
+// The BigCommerce-side identity shown next to a customer id. No local players
+// table, so this is fetched live; undefined when the customer no longer exists.
+export interface ClaimCustomer {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export interface LeaderboardRow extends LeaderboardEntry {
+  rank: number;
+  customer: ClaimCustomer | undefined;
+}
+
+export interface GameActivityRow extends HuntryClaim {
+  customer: ClaimCustomer | undefined;
+}
