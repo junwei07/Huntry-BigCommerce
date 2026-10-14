@@ -34,7 +34,11 @@ const allowedDevOrigins = process.env.APP_ORIGIN ? [new URL(process.env.APP_ORIG
 // require rather than bundled; a Workers build, which has to produce a
 // self-contained bundle, does.
 function buildCredentialsDriverAliases(): Record<string, string> {
-  const configuredDriver = process.env.CREDENTIALS_STORE_DRIVER;
+  // Same trim + uppercase normalization as the runtime resolver
+  // (src/lib/huntry/db/resolve-driver.ts), so a value like "postgres" can't
+  // stub `pg` at build time yet select Postgres at runtime. It does not throw
+  // on unrecognized values: the runtime resolver does that.
+  const configuredDriver = process.env.CREDENTIALS_STORE_DRIVER?.trim().toUpperCase();
   const aliases: Record<string, string> = {};
 
   if (configuredDriver !== "POSTGRES") {

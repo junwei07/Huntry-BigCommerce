@@ -91,7 +91,7 @@ async function loadModules() {
   const enforcement = await import("@/lib/huntry/claims/cart-coupon-enforcement");
   const { getHuntryDb } = await import("@/lib/huntry/db/get-db");
 
-  async function seed(storeHash: string, bcCustomerId: number, couponCode: string): Promise<number> {
+  async function seed(storeHash: string, bcCustomerId: number, couponCode: string): Promise<number | string> {
     const eggId = `00000000-0000-4000-8000-${String(nextEgg++).padStart(12, "0")}`;
     const result = await claims.createForcedClaim(
       { eggId, rewardId: 1, eventId: 1, rewardNameSnapshot: "Free Coffee", bcCustomerId, couponCode, forcedByUserId: null },
@@ -105,7 +105,7 @@ async function loadModules() {
     return result.claim.id;
   }
 
-  function statusOf(id: number) {
+  function statusOf(id: number | string) {
     return (
       (getHuntryDb() as DatabaseSync).prepare("SELECT redemption_status FROM huntry_claims WHERE id = ?").get(id) as {
         redemption_status: string;

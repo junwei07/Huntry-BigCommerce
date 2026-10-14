@@ -1,10 +1,9 @@
-import { DatabaseSync } from "node:sqlite";
-import { getHuntryDb } from "@/lib/huntry/db/get-db";
 import { getDataMode, resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
 import { eggTag, EGGS_LIST_TAG, eventEggsTag } from "@/lib/huntry/eggs/cache-tags";
 import { addMockEggs, deleteMockEgg, MOCK_EGGS, updateMockEgg } from "@/lib/huntry/eggs/mock/mock-eggs";
 import { CreateEggInput, HuntryEgg, PlacedEggClaimCapacity, UpdateEggInput } from "@/lib/huntry/eggs/types";
 import { MOCK_EVENTS } from "@/lib/huntry/events/mock/mock-events";
+import { getHuntryRepository } from "@/lib/huntry/repository/get-huntry-repository";
 
 // @cache-components-only:drop-specifier cacheProfile
 import { cacheProfile, CACHE_PROFILE_STANDARD } from "@/lib/cache/cache-profiles";
@@ -13,81 +12,6 @@ import { cacheProfile, CACHE_PROFILE_STANDARD } from "@/lib/cache/cache-profiles
 import { cacheLife, cacheTag } from "next/cache";
 // @cache-components-only:end
 
-// Raw row shape as node-postgres actually returns it: TIMESTAMPTZ columns
-// are Date instances, DOUBLE PRECISION comes back as a JS number.
-interface PostgresEggRow {
-  id: string;
-  store_hash: string;
-  reward_id: number;
-  event_id: number;
-  name: string;
-  lat: number;
-  lng: number;
-  created_at: Date;
-  updated_at: Date;
-}
-
-// Raw row shape as node:sqlite actually returns it: timestamps are the TEXT
-// strings SQLite's datetime('now') default wrote.
-interface SqliteEggRow {
-  id: string;
-  store_hash: string;
-  reward_id: number;
-  event_id: number;
-  name: string;
-  lat: number;
-  lng: number;
-  created_at: string;
-  updated_at: string;
-}
-
-function normalizePostgresRow(row: PostgresEggRow): HuntryEgg {
-  return {
-    id: row.id,
-    storeHash: row.store_hash,
-    rewardId: row.reward_id,
-    eventId: row.event_id,
-    name: row.name,
-    lat: row.lat,
-    lng: row.lng,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-function normalizeSqliteRow(row: SqliteEggRow): HuntryEgg {
-  return {
-    id: row.id,
-    storeHash: row.store_hash,
-    rewardId: row.reward_id,
-    eventId: row.event_id,
-    name: row.name,
-    lat: row.lat,
-    lng: row.lng,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-  };
-}
-
-async function selectEggs(eventId: number, storeHash: string): Promise<HuntryEgg[]> {
-  const db = getHuntryDb();
-
-  if (db instanceof DatabaseSync) {
-    const rows = db
-      .prepare("SELECT * FROM huntry_eggs WHERE store_hash = ? AND event_id = ? ORDER BY created_at, id")
-      .all(storeHash, eventId) as unknown as SqliteEggRow[];
-
-    return rows.map(normalizeSqliteRow);
-  }
-
-  const result = await db.query<PostgresEggRow>(
-    "SELECT * FROM huntry_eggs WHERE store_hash = $1 AND event_id = $2 ORDER BY created_at, id",
-    [storeHash, eventId],
-  );
-
-  return result.rows.map(normalizePostgresRow);
-}
-
 async function fetchEggsFromDb(eventId: number, storeHash: string): Promise<HuntryEgg[]> {
   // @cache-components-only:start
   "use cache: remote";
@@ -95,7 +19,7 @@ async function fetchEggsFromDb(eventId: number, storeHash: string): Promise<Hunt
   cacheTag(EGGS_LIST_TAG, eventEggsTag(eventId));
   // @cache-components-only:end
 
-  const eggs = await selectEggs(eventId, storeHash);
+  const eggs = await getHuntryRepository().eggs.listByEvent(storeHash, eventId);
 
   // @cache-components-only:start
   for (const egg of eggs) {
@@ -106,7 +30,7 @@ async function fetchEggsFromDb(eventId: number, storeHash: string): Promise<Hunt
   return eggs;
 }
 
-// MOCK mode never touches getHuntryDb() — deterministic fixtures instead,
+// MOCK mode never touches the repository — deterministic fixtures instead,
 // matching fetchRewards/fetchEvents's own MOCK behavior.
 export async function fetchEggs(eventId: number, storeHash: string | undefined): Promise<HuntryEgg[]> {
   if (getDataMode() === "MOCK") {
@@ -122,27 +46,6 @@ export async function fetchEggs(eventId: number, storeHash: string | undefined):
   return fetchEggsFromDb(eventId, resolvedStoreHash);
 }
 
-async function selectRewardEggCounts(storeHash: string): Promise<Map<number, number>> {
-  const db = getHuntryDb();
-  let rows: { reward_id: number; egg_count: number | string }[];
-
-  if (db instanceof DatabaseSync) {
-    rows = db
-      .prepare("SELECT reward_id, COUNT(*) AS egg_count FROM huntry_eggs WHERE store_hash = ? GROUP BY reward_id")
-      .all(storeHash) as unknown as typeof rows;
-  } else {
-    // COUNT(*) is a bigint, which node-postgres returns as a string.
-    rows = (
-      await db.query<(typeof rows)[number]>(
-        "SELECT reward_id, COUNT(*) AS egg_count FROM huntry_eggs WHERE store_hash = $1 GROUP BY reward_id",
-        [storeHash],
-      )
-    ).rows;
-  }
-
-  return new Map(rows.map((row) => [row.reward_id, Number(row.egg_count)]));
-}
-
 async function fetchRewardEggCountsFromDb(storeHash: string): Promise<Map<number, number>> {
   // @cache-components-only:start
   "use cache: remote";
@@ -150,7 +53,7 @@ async function fetchRewardEggCountsFromDb(storeHash: string): Promise<Map<number
   cacheTag(EGGS_LIST_TAG);
   // @cache-components-only:end
 
-  return selectRewardEggCounts(storeHash);
+  return getHuntryRepository().eggs.countsByReward(storeHash);
 }
 
 function mockRewardEggCounts(): Map<number, number> {
@@ -183,7 +86,7 @@ export async function fetchRewardEggCountsUncached(storeHash: string | undefined
 
   const resolvedStoreHash = resolveStoreHash(storeHash);
 
-  return resolvedStoreHash ? selectRewardEggCounts(resolvedStoreHash) : new Map();
+  return resolvedStoreHash ? getHuntryRepository().eggs.countsByReward(resolvedStoreHash) : new Map();
 }
 
 // Uncached counterpart to fetchEggs — the placement/edit Server Actions
@@ -199,7 +102,7 @@ export async function fetchEggsUncached(eventId: number, storeHash: string | und
     return [];
   }
 
-  return selectEggs(eventId, resolvedStoreHash);
+  return getHuntryRepository().eggs.listByEvent(resolvedStoreHash, eventId);
 }
 
 export async function fetchEggUncached(id: string, storeHash: string | undefined): Promise<HuntryEgg | undefined> {
@@ -213,22 +116,7 @@ export async function fetchEggUncached(id: string, storeHash: string | undefined
     return undefined;
   }
 
-  const db = getHuntryDb();
-
-  if (db instanceof DatabaseSync) {
-    const row = db.prepare("SELECT * FROM huntry_eggs WHERE id = ? AND store_hash = ?").get(id, resolvedStoreHash) as
-      | SqliteEggRow
-      | undefined;
-
-    return row ? normalizeSqliteRow(row) : undefined;
-  }
-
-  const result = await db.query<PostgresEggRow>("SELECT * FROM huntry_eggs WHERE id = $1 AND store_hash = $2", [
-    id,
-    resolvedStoreHash,
-  ]);
-
-  return result.rows[0] ? normalizePostgresRow(result.rows[0]) : undefined;
+  return getHuntryRepository().eggs.get(resolvedStoreHash, id);
 }
 
 // BC-HUN-028: every egg currently placed for a reward, as the claim capacity
@@ -250,29 +138,7 @@ export async function fetchPlacedEggCapacitiesUncached(
     return [];
   }
 
-  const db = getHuntryDb();
-  let rows: { egg_claim_capacity: number | null }[];
-
-  if (db instanceof DatabaseSync) {
-    rows = db
-      .prepare(
-        `SELECT e.egg_claim_capacity FROM huntry_eggs g
-         LEFT JOIN huntry_events e ON e.id = g.event_id AND e.store_hash = g.store_hash
-         WHERE g.reward_id = ? AND g.store_hash = ?`,
-      )
-      .all(rewardId, resolvedStoreHash) as unknown as typeof rows;
-  } else {
-    rows = (
-      await db.query<(typeof rows)[number]>(
-        `SELECT e.egg_claim_capacity FROM huntry_eggs g
-         LEFT JOIN huntry_events e ON e.id = g.event_id AND e.store_hash = g.store_hash
-         WHERE g.reward_id = $1 AND g.store_hash = $2`,
-        [rewardId, resolvedStoreHash],
-      )
-    ).rows;
-  }
-
-  return rows.map((row) => ({ eventClaimCapacity: row.egg_claim_capacity }));
+  return getHuntryRepository().eggs.listPlacedCapacities(resolvedStoreHash, rewardId);
 }
 
 // BC-HUN-028: the distinct rewards with at least one egg in an event — the
@@ -291,22 +157,7 @@ export async function fetchRewardIdsForEventUncached(
     return [];
   }
 
-  const db = getHuntryDb();
-
-  if (db instanceof DatabaseSync) {
-    const rows = db
-      .prepare("SELECT DISTINCT reward_id FROM huntry_eggs WHERE event_id = ? AND store_hash = ?")
-      .all(eventId, resolvedStoreHash) as unknown as { reward_id: number }[];
-
-    return rows.map((row) => row.reward_id);
-  }
-
-  const result = await db.query<{ reward_id: number }>(
-    "SELECT DISTINCT reward_id FROM huntry_eggs WHERE event_id = $1 AND store_hash = $2",
-    [eventId, resolvedStoreHash],
-  );
-
-  return result.rows.map((row) => row.reward_id);
+  return getHuntryRepository().eggs.listRewardIdsForEvent(resolvedStoreHash, eventId);
 }
 
 // Inserts every egg in one transaction (the Stop Placing batch commits or
@@ -326,59 +177,7 @@ export async function createEggs(inputs: CreateEggInput[], storeHash: string | u
     throw new Error("A store hash is required to create eggs.");
   }
 
-  const db = getHuntryDb();
-  const ids = inputs.map(() => crypto.randomUUID());
-
-  if (db instanceof DatabaseSync) {
-    db.exec("BEGIN");
-
-    try {
-      const insert = db.prepare(
-        "INSERT INTO huntry_eggs (id, store_hash, reward_id, event_id, name, lat, lng) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      );
-
-      inputs.forEach((input, index) => {
-        insert.run(ids[index], resolvedStoreHash, input.rewardId, input.eventId, input.name, input.lat, input.lng);
-      });
-      db.exec("COMMIT");
-    } catch (error) {
-      db.exec("ROLLBACK");
-      throw error;
-    }
-
-    const rows = db
-      .prepare(`SELECT * FROM huntry_eggs WHERE id IN (${ids.map(() => "?").join(", ")})`)
-      .all(...ids) as unknown as SqliteEggRow[];
-
-    return rows.map(normalizeSqliteRow);
-  }
-
-  const client = await db.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const created: HuntryEgg[] = [];
-
-    for (const [index, input] of inputs.entries()) {
-      const result = await client.query<PostgresEggRow>(
-        `INSERT INTO huntry_eggs (id, store_hash, reward_id, event_id, name, lat, lng)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-        [ids[index], resolvedStoreHash, input.rewardId, input.eventId, input.name, input.lat, input.lng],
-      );
-
-      created.push(normalizePostgresRow(result.rows[0]));
-    }
-
-    await client.query("COMMIT");
-
-    return created;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  return getHuntryRepository().eggs.createMany(resolvedStoreHash, inputs);
 }
 
 // Updates only reward_id/name/lat/lng + updated_at — id, event_id and
@@ -398,30 +197,7 @@ export async function updateEgg(
     return undefined;
   }
 
-  const db = getHuntryDb();
-
-  if (db instanceof DatabaseSync) {
-    const result = db
-      .prepare(
-        `UPDATE huntry_eggs SET reward_id = ?, name = ?, lat = ?, lng = ?, updated_at = datetime('now')
-         WHERE id = ? AND store_hash = ?`,
-      )
-      .run(input.rewardId, input.name, input.lat, input.lng, id, resolvedStoreHash);
-
-    if (result.changes === 0) {
-      return undefined;
-    }
-
-    return normalizeSqliteRow(db.prepare("SELECT * FROM huntry_eggs WHERE id = ?").get(id) as unknown as SqliteEggRow);
-  }
-
-  const result = await db.query<PostgresEggRow>(
-    `UPDATE huntry_eggs SET reward_id = $1, name = $2, lat = $3, lng = $4, updated_at = now()
-     WHERE id = $5 AND store_hash = $6 RETURNING *`,
-    [input.rewardId, input.name, input.lat, input.lng, id, resolvedStoreHash],
-  );
-
-  return result.rows[0] ? normalizePostgresRow(result.rows[0]) : undefined;
+  return getHuntryRepository().eggs.update(resolvedStoreHash, id, input);
 }
 
 // A hard delete — eggs, unlike rewards, have no archive state. Never touches
@@ -437,13 +213,5 @@ export async function deleteEgg(id: string, storeHash: string | undefined): Prom
     return false;
   }
 
-  const db = getHuntryDb();
-
-  if (db instanceof DatabaseSync) {
-    return db.prepare("DELETE FROM huntry_eggs WHERE id = ? AND store_hash = ?").run(id, resolvedStoreHash).changes > 0;
-  }
-
-  const result = await db.query("DELETE FROM huntry_eggs WHERE id = $1 AND store_hash = $2", [id, resolvedStoreHash]);
-
-  return (result.rowCount ?? 0) > 0;
+  return getHuntryRepository().eggs.delete(resolvedStoreHash, id);
 }

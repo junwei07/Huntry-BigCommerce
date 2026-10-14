@@ -4,6 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import type { Pool } from "pg";
 import { CREATE_HUNTRY_SCHEMA } from "@/lib/huntry/db/sqlite-schema";
 import { getPool } from "@/lib/huntry/db/postgres-pool-loader";
+import { resolveCredentialsStoreDriver } from "@/lib/huntry/db/resolve-driver";
 
 // Huntry's own data (events/sponsors/rewards/eggs/claims) isn't shaped like
 // credentials-store's key-value store lookups, so it doesn't go through the
@@ -47,13 +48,12 @@ function getSqliteDb(): DatabaseSync {
 }
 
 // D1 isn't a supported Huntry driver yet (Cloudflare support is a later
-// phase — see docs/MIGRATION.md's phased rollout, Phase 8). Unlike
-// get-credentials-store.ts's fallback-to-SQLITE behavior for any
-// unrecognized value, an explicit "D1" here throws rather than silently
-// running Huntry's production data against a local SQLite file on a
-// Cloudflare deployment.
+// phase — see docs/MIGRATION.md's phased rollout, Phase 8). An explicit "D1"
+// throws rather than silently running Huntry's production data against a
+// local SQLite file on a Cloudflare deployment. Unrecognized values throw in
+// the shared resolver.
 function getHuntryDbDriver(): "SQLITE" | "POSTGRES" {
-  const configuredDriver = process.env.CREDENTIALS_STORE_DRIVER?.toUpperCase();
+  const configuredDriver = resolveCredentialsStoreDriver();
 
   if (configuredDriver === "POSTGRES") {
     return "POSTGRES";

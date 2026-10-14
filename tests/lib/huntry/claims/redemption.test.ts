@@ -90,7 +90,7 @@ async function loadModules() {
   const redemption = await import("@/lib/huntry/claims/redemption");
   const { getHuntryDb } = await import("@/lib/huntry/db/get-db");
 
-  async function seed(storeHash: string, bcCustomerId: number, couponCode: string): Promise<number> {
+  async function seed(storeHash: string, bcCustomerId: number, couponCode: string): Promise<number | string> {
     const eggId = `00000000-0000-4000-8000-${String(nextEgg++).padStart(12, "0")}`;
     const result = await claims.createForcedClaim(
       { eggId, rewardId: 1, eventId: 1, rewardNameSnapshot: "Free Coffee", bcCustomerId, couponCode, forcedByUserId: null },
@@ -104,7 +104,7 @@ async function loadModules() {
     return result.claim.id;
   }
 
-  function row(id: number) {
+  function row(id: number | string) {
     return (getHuntryDb() as DatabaseSync).prepare("SELECT * FROM huntry_claims WHERE id = ?").get(id) as Record<
       string,
       unknown

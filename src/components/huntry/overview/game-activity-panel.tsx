@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { RedemptionStatus } from "@/lib/huntry/claims/types";
+import type { ClaimId, RedemptionStatus } from "@/lib/huntry/claims/types";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 
 // Layout and flow mirror the WP plugin's huntry_render_overview_game_activity()
@@ -10,7 +10,7 @@ import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 // loaded, expandable rows, no pagination.
 
 export interface ActivityItem {
-  id: number;
+  id: ClaimId;
   playerName: string;
   rewardName: string;
   couponCode: string;
@@ -51,7 +51,7 @@ export function GameActivityPanel({ items, limit }: { items: ActivityItem[]; lim
   const [to, setTo] = useState("");
   const [applied, setApplied] = useState({ from: "", to: "" });
   const [popoverOpen, setPopoverOpen] = useState(false);
-  const [openIds, setOpenIds] = useState<ReadonlySet<number>>(new Set());
+  const [openIds, setOpenIds] = useState<ReadonlySet<ClaimId>>(new Set());
 
   const needle = search.trim().toLowerCase();
   const dateActive = applied.from !== "" || applied.to !== "";
@@ -74,7 +74,7 @@ export function GameActivityPanel({ items, limit }: { items: ActivityItem[]; lim
     setPopoverOpen(false);
   }
 
-  function toggle(id: number) {
+  function toggle(id: ClaimId) {
     setOpenIds((current) => {
       const next = new Set(current);
 

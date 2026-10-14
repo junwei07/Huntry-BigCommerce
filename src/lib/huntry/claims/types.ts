@@ -4,10 +4,15 @@ export const REDEMPTION_STATUSES = ["unredeemed", "redeemed", "flagged_unauthori
 
 export type RedemptionStatus = (typeof REDEMPTION_STATUSES)[number];
 
+// Opaque claim identifier: a number from the SQL implementations, a string
+// doc id from Firestore. Consumers may only compare it or pass it back, never
+// do arithmetic on it. Tighten to `string` once the SQL path is retired.
+export type ClaimId = number | string;
+
 // A claim is deliberately denormalized (no FKs to egg/reward/event — see
 // 0001_huntry_schema.sql), so reward name/coupon are snapshots.
 export interface HuntryClaim {
-  id: number;
+  id: ClaimId;
   storeHash: string;
   eggId: string;
   rewardId: number;

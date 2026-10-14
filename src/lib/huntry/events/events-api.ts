@@ -1,5 +1,3 @@
-import { DatabaseSync } from "node:sqlite";
-import { getHuntryDb } from "@/lib/huntry/db/get-db";
 import { getDataMode, resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
 import { eventTag, EVENTS_LIST_TAG } from "@/lib/huntry/events/cache-tags";
 import { addMockEvent, deleteMockEvent, MOCK_EVENTS, updateMockEvent } from "@/lib/huntry/events/mock/mock-events";
@@ -10,10 +8,10 @@ import {
   EventSort,
   EventsQuery,
   EventStatus,
-  EventTheme,
   HuntryEvent,
   UpdateEventInput,
 } from "@/lib/huntry/events/types";
+import { getHuntryRepository } from "@/lib/huntry/repository/get-huntry-repository";
 
 // @cache-components-only:drop-specifier cacheProfile
 import { cacheProfile, CACHE_PROFILE_STANDARD } from "@/lib/cache/cache-profiles";
@@ -21,51 +19,6 @@ import { cacheProfile, CACHE_PROFILE_STANDARD } from "@/lib/cache/cache-profiles
 // @cache-components-only:start
 import { cacheLife, cacheTag } from "next/cache";
 // @cache-components-only:end
-
-// Raw row shape as node-postgres actually returns it: JSONB is already a
-// parsed object, BOOLEAN is a real boolean, TIMESTAMPTZ columns are Date
-// instances.
-interface PostgresEventRow {
-  id: number;
-  store_hash: string;
-  name: string;
-  slug: string;
-  description: string;
-  starts_at: Date | null;
-  ends_at: Date | null;
-  header_banner_url: string | null;
-  marker_radius_meters: number;
-  max_grab_count: number;
-  egg_claim_capacity: number;
-  theme: EventTheme;
-  is_featured: boolean;
-  featured_order: number | null;
-  created_at: Date;
-  updated_at: Date;
-}
-
-// Raw row shape as node:sqlite actually returns it: no native
-// boolean/timestamp/json type, so is_featured is 0/1, the timestamp columns
-// are the TEXT strings datetime('now')/the app itself wrote, and theme is a
-// JSON-encoded string.
-interface SqliteEventRow {
-  id: number;
-  store_hash: string;
-  name: string;
-  slug: string;
-  description: string;
-  starts_at: string | null;
-  ends_at: string | null;
-  header_banner_url: string | null;
-  marker_radius_meters: number;
-  max_grab_count: number;
-  egg_claim_capacity: number;
-  theme: string;
-  is_featured: number;
-  featured_order: number | null;
-  created_at: string;
-  updated_at: string;
-}
 
 // Derived from starts_at/ends_at at read time — huntry_events has no status
 // column, exactly like the plugin's huntry_compute_event_status(). now is an
@@ -91,57 +44,6 @@ function buildHuntryEvent(fields: EventFields, now?: Date): HuntryEvent {
   return { ...fields, status: computeEventStatus(fields.startsAt, fields.endsAt, now) };
 }
 
-function normalizePostgresRow(row: PostgresEventRow): EventFields {
-  return {
-    id: row.id,
-    storeHash: row.store_hash,
-    name: row.name,
-    slug: row.slug,
-    description: row.description,
-    startsAt: row.starts_at,
-    endsAt: row.ends_at,
-    headerBannerUrl: row.header_banner_url,
-    markerRadiusMeters: row.marker_radius_meters,
-    maxGrabCount: row.max_grab_count,
-    eggClaimCapacity: row.egg_claim_capacity,
-    theme: row.theme,
-    isFeatured: row.is_featured,
-    featuredOrder: row.featured_order,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  };
-}
-
-function normalizeSqliteRow(row: SqliteEventRow): EventFields {
-  return {
-    id: row.id,
-    storeHash: row.store_hash,
-    name: row.name,
-    slug: row.slug,
-    description: row.description,
-    startsAt: row.starts_at ? new Date(row.starts_at) : null,
-    endsAt: row.ends_at ? new Date(row.ends_at) : null,
-    headerBannerUrl: row.header_banner_url,
-    markerRadiusMeters: row.marker_radius_meters,
-    maxGrabCount: row.max_grab_count,
-    eggClaimCapacity: row.egg_claim_capacity,
-    theme: JSON.parse(row.theme) as EventTheme,
-    isFeatured: row.is_featured === 1,
-    featuredOrder: row.featured_order,
-    createdAt: new Date(row.created_at),
-    updatedAt: new Date(row.updated_at),
-  };
-}
-
-// Maps the query's sort field to a fixed ORDER BY fragment rather than
-// interpolating it directly, even though EventsQuery's type already
-// restricts it to "name" | "time" — defense in depth against ever
-// interpolating an unvalidated value into the ORDER BY clause below (the
-// only place in this file that can't use a parameterized placeholder).
-function orderBySql(sort: EventSort): string {
-  return sort === "name" ? "name ASC" : "starts_at IS NULL, starts_at ASC, name ASC";
-}
-
 async function fetchEventsFromDb(query: EventsQuery, storeHash: string): Promise<HuntryEvent[]> {
   // @cache-components-only:start
   "use cache: remote";
@@ -149,24 +51,7 @@ async function fetchEventsFromDb(query: EventsQuery, storeHash: string): Promise
   cacheTag(EVENTS_LIST_TAG);
   // @cache-components-only:end
 
-  const db = getHuntryDb();
-  const orderBy = orderBySql(query.sort);
-  let eventFields: EventFields[];
-
-  if (db instanceof DatabaseSync) {
-    const rows = db
-      .prepare(`SELECT * FROM huntry_events WHERE store_hash = ? ORDER BY ${orderBy}`)
-      .all(storeHash) as unknown as SqliteEventRow[];
-
-    eventFields = rows.map(normalizeSqliteRow);
-  } else {
-    const result = await db.query<PostgresEventRow>(
-      `SELECT * FROM huntry_events WHERE store_hash = $1 ORDER BY ${orderBy}`,
-      [storeHash],
-    );
-
-    eventFields = result.rows.map(normalizePostgresRow);
-  }
+  const eventFields = await getHuntryRepository().events.list(storeHash, query.sort);
 
   const events = eventFields.map((fields) => buildHuntryEvent(fields));
 
@@ -179,24 +64,10 @@ async function fetchEventsFromDb(query: EventsQuery, storeHash: string): Promise
   return events;
 }
 
-async function selectEventRow(id: number, storeHash: string): Promise<HuntryEvent | undefined> {
-  const db = getHuntryDb();
+async function getEventFromRepository(storeHash: string, id: number): Promise<HuntryEvent | undefined> {
+  const fields = await getHuntryRepository().events.get(storeHash, id);
 
-  if (db instanceof DatabaseSync) {
-    const row = db.prepare("SELECT * FROM huntry_events WHERE id = ? AND store_hash = ?").get(id, storeHash) as
-      | SqliteEventRow
-      | undefined;
-
-    return row ? buildHuntryEvent(normalizeSqliteRow(row)) : undefined;
-  }
-
-  const result = await db.query<PostgresEventRow>("SELECT * FROM huntry_events WHERE id = $1 AND store_hash = $2", [
-    id,
-    storeHash,
-  ]);
-  const row = result.rows[0];
-
-  return row ? buildHuntryEvent(normalizePostgresRow(row)) : undefined;
+  return fields ? buildHuntryEvent(fields) : undefined;
 }
 
 async function fetchEventFromDb(id: number, storeHash: string): Promise<HuntryEvent | undefined> {
@@ -206,7 +77,7 @@ async function fetchEventFromDb(id: number, storeHash: string): Promise<HuntryEv
   cacheTag(eventTag(id));
   // @cache-components-only:end
 
-  return selectEventRow(id, storeHash);
+  return getEventFromRepository(storeHash, id);
 }
 
 // Matches orderBySql's two orderings. "time" is nulls-last — an unscheduled
@@ -233,7 +104,7 @@ function sortMockEvents(events: HuntryEvent[], sort: EventSort): HuntryEvent[] {
   });
 }
 
-// MOCK mode never touches getHuntryDb() — it returns deterministic fixture
+// MOCK mode never touches the repository — it returns deterministic fixture
 // data instead, matching gift-certificates-api.ts's own MOCK behavior and
 // the app's DATA_MODE philosophy ("no real API calls; in-memory mock
 // data"), rather than letting a contributor's local SQLite file silently
@@ -289,7 +160,7 @@ export async function fetchEventUncached(id: number, storeHash: string | undefin
     return undefined;
   }
 
-  return selectEventRow(id, resolvedStoreHash);
+  return getEventFromRepository(resolvedStoreHash, id);
 }
 
 // Uncached on purpose — used by createHuntryEvent to enforce MAX_EVENTS
@@ -305,21 +176,7 @@ export async function countEvents(storeHash: string | undefined): Promise<number
     return 0;
   }
 
-  const db = getHuntryDb();
-
-  if (db instanceof DatabaseSync) {
-    const row = db.prepare("SELECT COUNT(*) AS count FROM huntry_events WHERE store_hash = ?").get(resolvedStoreHash) as unknown as {
-      count: number;
-    };
-
-    return Number(row.count);
-  }
-
-  const result = await db.query<{ count: string }>("SELECT COUNT(*) AS count FROM huntry_events WHERE store_hash = $1", [
-    resolvedStoreHash,
-  ]);
-
-  return Number(result.rows[0]?.count ?? 0);
+  return getHuntryRepository().events.count(resolvedStoreHash);
 }
 
 // True when an error means "the (store_hash, slug) UNIQUE constraint was
@@ -343,71 +200,14 @@ export function isUniqueSlugConstraintError(error: unknown): boolean {
 // giving up, so a pathological run of collisions can't loop forever.
 const MAX_SLUG_ATTEMPTS = 20;
 
-async function insertEventRow(input: CreateEventInput, slug: string, storeHash: string): Promise<HuntryEvent> {
-  const db = getHuntryDb();
-  const themeJson = JSON.stringify(input.theme);
-
-  if (db instanceof DatabaseSync) {
-    const result = db
-      .prepare(
-        `INSERT INTO huntry_events
-          (store_hash, name, slug, description, starts_at, ends_at, header_banner_url,
-           marker_radius_meters, max_grab_count, egg_claim_capacity, theme, is_featured, featured_order)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
-        storeHash,
-        input.name,
-        slug,
-        input.description,
-        input.startsAt ? input.startsAt.toISOString() : null,
-        input.endsAt ? input.endsAt.toISOString() : null,
-        input.headerBannerUrl,
-        input.markerRadiusMeters,
-        input.maxGrabCount,
-        input.eggClaimCapacity,
-        themeJson,
-        input.isFeatured ? 1 : 0,
-        input.featuredOrder,
-      );
-
-    const row = db.prepare("SELECT * FROM huntry_events WHERE id = ?").get(result.lastInsertRowid) as unknown as SqliteEventRow;
-
-    return buildHuntryEvent(normalizeSqliteRow(row));
-  }
-
-  const result = await db.query<PostgresEventRow>(
-    `INSERT INTO huntry_events
-      (store_hash, name, slug, description, starts_at, ends_at, header_banner_url,
-       marker_radius_meters, max_grab_count, egg_claim_capacity, theme, is_featured, featured_order)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-     RETURNING *`,
-    [
-      storeHash,
-      input.name,
-      slug,
-      input.description,
-      input.startsAt,
-      input.endsAt,
-      input.headerBannerUrl,
-      input.markerRadiusMeters,
-      input.maxGrabCount,
-      input.eggClaimCapacity,
-      themeJson,
-      input.isFeatured,
-      input.featuredOrder,
-    ],
-  );
-
-  return buildHuntryEvent(normalizePostgresRow(result.rows[0]));
-}
-
 async function createEventInDb(input: CreateEventInput, storeHash: string): Promise<HuntryEvent> {
   const baseSlug = slugify(input.name);
 
   for (let attempt = 1; attempt <= MAX_SLUG_ATTEMPTS; attempt++) {
     try {
-      return await insertEventRow(input, buildCandidateSlug(baseSlug, attempt), storeHash);
+      return buildHuntryEvent(
+        await getHuntryRepository().events.create(storeHash, input, buildCandidateSlug(baseSlug, attempt)),
+      );
     } catch (error) {
       if (!isUniqueSlugConstraintError(error) || attempt === MAX_SLUG_ATTEMPTS) {
         throw error;
@@ -457,78 +257,6 @@ export async function createEvent(input: CreateEventInput, storeHash: string | u
   return createEventInDb(input, resolvedStoreHash);
 }
 
-// slug is deliberately excluded from UpdateEventInput's writable set (it's
-// an alias of CreateEventInput, which already omits slug) — it never
-// changes on edit, since it's an internal identifier, not user-facing
-// either way (see docs/HUNTRY-UI-REFERENCE.md).
-async function updateEventRow(id: number, input: UpdateEventInput, storeHash: string): Promise<HuntryEvent | undefined> {
-  const db = getHuntryDb();
-  const themeJson = JSON.stringify(input.theme);
-
-  if (db instanceof DatabaseSync) {
-    const result = db
-      .prepare(
-        `UPDATE huntry_events SET
-          name = ?, description = ?, starts_at = ?, ends_at = ?, header_banner_url = ?,
-          marker_radius_meters = ?, max_grab_count = ?, egg_claim_capacity = ?, theme = ?,
-          is_featured = ?, featured_order = ?, updated_at = ?
-         WHERE id = ? AND store_hash = ?`,
-      )
-      .run(
-        input.name,
-        input.description,
-        input.startsAt ? input.startsAt.toISOString() : null,
-        input.endsAt ? input.endsAt.toISOString() : null,
-        input.headerBannerUrl,
-        input.markerRadiusMeters,
-        input.maxGrabCount,
-        input.eggClaimCapacity,
-        themeJson,
-        input.isFeatured ? 1 : 0,
-        input.featuredOrder,
-        new Date().toISOString(),
-        id,
-        storeHash,
-      );
-
-    if (result.changes === 0) {
-      return undefined;
-    }
-
-    const row = db.prepare("SELECT * FROM huntry_events WHERE id = ?").get(id) as unknown as SqliteEventRow;
-
-    return buildHuntryEvent(normalizeSqliteRow(row));
-  }
-
-  const result = await db.query<PostgresEventRow>(
-    `UPDATE huntry_events SET
-      name = $1, description = $2, starts_at = $3, ends_at = $4, header_banner_url = $5,
-      marker_radius_meters = $6, max_grab_count = $7, egg_claim_capacity = $8, theme = $9,
-      is_featured = $10, featured_order = $11, updated_at = now()
-     WHERE id = $12 AND store_hash = $13
-     RETURNING *`,
-    [
-      input.name,
-      input.description,
-      input.startsAt,
-      input.endsAt,
-      input.headerBannerUrl,
-      input.markerRadiusMeters,
-      input.maxGrabCount,
-      input.eggClaimCapacity,
-      themeJson,
-      input.isFeatured,
-      input.featuredOrder,
-      id,
-      storeHash,
-    ],
-  );
-
-  const row = result.rows[0];
-
-  return row ? buildHuntryEvent(normalizePostgresRow(row)) : undefined;
-}
-
 // Returns undefined if no row matched (already deleted, or belongs to a
 // different store) — the Server Action reports that as "no longer exists"
 // rather than treating it as an unexpected error.
@@ -549,21 +277,9 @@ export async function updateEvent(
     return undefined;
   }
 
-  return updateEventRow(id, input, resolvedStoreHash);
-}
+  const updated = await getHuntryRepository().events.update(resolvedStoreHash, id, input);
 
-async function deleteEventRow(id: number, storeHash: string): Promise<boolean> {
-  const db = getHuntryDb();
-
-  if (db instanceof DatabaseSync) {
-    const result = db.prepare("DELETE FROM huntry_events WHERE id = ? AND store_hash = ?").run(id, storeHash);
-
-    return result.changes > 0;
-  }
-
-  const result = await db.query("DELETE FROM huntry_events WHERE id = $1 AND store_hash = $2", [id, storeHash]);
-
-  return (result.rowCount ?? 0) > 0;
+  return updated ? buildHuntryEvent(updated) : undefined;
 }
 
 // A genuine hard delete — huntry_events has no soft-delete/archive column
@@ -583,5 +299,5 @@ export async function deleteEvent(id: number, storeHash: string | undefined): Pr
     return false;
   }
 
-  return deleteEventRow(id, resolvedStoreHash);
+  return getHuntryRepository().events.delete(resolvedStoreHash, id);
 }
