@@ -36,6 +36,7 @@ const STATUS_BY_RESULT: Record<Exclude<CreatePlayerClaimResult["status"], "creat
   too_fast: 429,
   code_issue_failed: 502,
   lock_timeout: 503,
+  claim_in_progress: 503,
 };
 
 // Public, unauthenticated-by-cookie route (docs/MIGRATION.md §4): never reads

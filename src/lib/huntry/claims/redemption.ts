@@ -1,5 +1,6 @@
 import { getDataMode } from "@/lib/bc-api-client/resolve-store-credentials";
 import { BcRestApiClient } from "@/lib/bc-api-client/rest-client/types";
+import { normalizeCouponCode } from "@/lib/huntry/claims/coupon-code";
 import { ClaimId, RedemptionStatus } from "@/lib/huntry/claims/types";
 import { getHuntryRepository } from "@/lib/huntry/repository/get-huntry-repository";
 
@@ -23,12 +24,7 @@ export interface RedemptionUpdate {
   status: Exclude<RedemptionStatus, "unredeemed">;
 }
 
-// BigCommerce echoes the code as the shopper typed it, while issued codes are
-// generated uppercase (rewards/claim-codes.ts), so both sides are compared
-// trimmed + uppercased.
-export function normalizeCouponCode(code: string): string {
-  return code.trim().toUpperCase();
-}
+export { normalizeCouponCode };
 
 // Pure decision: given the claims whose code appeared on an order, which get
 // marked and how. A per-claim code maps to exactly one claim, but

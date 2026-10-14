@@ -51,7 +51,7 @@ export interface ClaimContext {
   lastClaim: { lat: number | null; lng: number | null; elapsedSeconds: number } | null;
 }
 
-export type ClaimEvaluation = { ok: true } | Exclude<CreatePlayerClaimResult, { status: "created" | "code_issue_failed" | "lock_timeout" }>;
+export type ClaimEvaluation = { ok: true } | Exclude<CreatePlayerClaimResult, { status: "created" | "code_issue_failed" | "lock_timeout" | "claim_in_progress" }>;
 
 // Pure: no I/O, so each rule is unit-testable. Order matches the ticket.
 export function evaluateClaim(

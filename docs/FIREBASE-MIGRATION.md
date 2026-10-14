@@ -241,7 +241,56 @@ it: `gcloud projects get-iam-policy evms-demo-d1477` and remove that one. Your
 own (Owner) account is unscoped and should only be used for `firebase deploy` and
 console work.
 
-### Phase 3: Firestore Huntry repository  [ ]
+### Phase 3: Firestore Huntry repository  [x]
+
+Implemented on branch `firebase-phase2-credentials-store` (not committed). Where it
+differs from or settles the design below:
+
+- Code: `src/lib/huntry/repository/firestore/*` (one file per concern, factories
+  take `getDb` like the credentials driver; `index.ts` assembles it). Selected by
+  `getHuntryRepository()` for `FIRESTORE` through
+  `firestore-repository-loader.ts` / `.unavailable.ts`, aliased in `next.config.ts`
+  like the credentials driver. `getHuntryDb()` still throws for `FIRESTORE`.
+- **Layout** (all under `stores/{hash}/`): `events`, `sponsors`, `rewards`
+  (`productIds` array), `eggs`, `claims` (id `${eggId}_${customerId}`),
+  `customers/{id}`, `counters/{ids | egg_{id} | reward_{id}}`, `settings/storefront`,
+  `slugs/{sha256}`, `couponCodes/{sha256 of normalized code}`.
+- **Unique errors** are `UniqueConstraintError` (message contains `UNIQUE constraint
+  failed`), which `isUniqueSlugConstraintError` / `isUniqueCouponCodeConstraintError`
+  already recognise: no caller changed.
+- **Deletes never touch claims** (SQL claims are denormalized with no FK). Event and
+  reward delete cascade to eggs and their `egg_*` counters, as the SQL FKs do.
+- **`status: "issued" | "pending"`** on every claim; readers filter by equality, never
+  `!=`. `claim_in_progress` (503) is a new `CreatePlayerClaimResult`, handled in the
+  claims route and, like `lock_timeout`, shown by the storefront as "retry later".
+- **Player claim**: reserve (pending doc, both counters, customer doc) -> `issueCode`
+  outside any transaction -> finalize; release restores the customer's last
+  position/time, so a failed issue leaves no cooldown. `PENDING_TTL_MS` is 60s.
+  An expired reservation is released lazily (same customer: taken over; capacity
+  full: one sweep then retry). No BigCommerce "delete code" call exists, so an
+  expired reservation that had already issued a code is released and the code is
+  left unused (single-use, never shown).
+- **Clock**: Firestore uses the app clock for `claimedAt` and rate-limit ages (the
+  SQL implementations use the DB clock; `ClaimRateLimitRepository` comment updated).
+- **Coupon codes are case-insensitive on Firestore** (reservation on the trimmed,
+  uppercased code), stricter than SQL; pinned by a Firestore-only test.
+- `createMany` is one batch (<=500); the 30-egg caps keep it far below that, and a
+  larger request is rejected rather than split.
+- Indexes: `firestore.indexes.json` holds the two composite indexes the claim
+  readers need (rate limiter; activity feed), deployed to `huntry-bc` 2026-10-14.
+  Everything else uses equality filters and in-memory sorting.
+- `scripts/reconcile-huntry-counters.mjs <storeHash | --all> [--fix]` compares the
+  counters with the claims (drift exits 1; `--fix` rewrites). Run it after any import.
+- Tests: `tests/lib/huntry/repository/{catalog,claims,featured}.contract.test.ts`
+  run each suite on SQL and Firestore (`pnpm test:firestore` now includes them; live
+  with `FIRESTORE_TEST_LIVE=1`). They include N-claims-on-capacity-K and the
+  one-customer-two-eggs cooldown race. Verified: emulator, live `huntry-bc`,
+  `pnpm test` (560 pass), `pnpm build` (default driver and `FIRESTORE`).
+- **Not done**: rules were released to `huntry-bc` as a side effect of the index
+  deploy (see note in the Phase 2 section); no end-to-end `next dev` run with
+  `FIRESTORE`; Phase 4 CI and Phase 5 cutover.
+
+Original design notes:
 
 Layout, scoped per store: `stores/{hash}/events/{id}`, `/sponsors/{id}`,
 `/rewards/{id}` (`productIds` array replaces `huntry_reward_products`),
@@ -399,9 +448,27 @@ issuing (needs the BC secret) and webhook handling must run server-side
 anyway. EVMS already uses this same Admin SDK + IAM pattern in
 `functions/index.js` (`autoFlipEventStatus`).
 
-Browser-direct Firestore (e.g. live map updates) would need client config plus
-Firebase Auth tokens minted from the BC session and security rules. It is not
-in this plan.
+Browser-direct Firestore (e.g. live map updates) is not in this plan and nothing
+in `src/` needs it: the storefront script only calls this app's own routes. The
+consequence is that map freshness is bounded by HTTP caching, not Firestore:
+`map-data` and `cta-data` send `s-maxage=30, stale-while-revalidate=60`
+(`src/app/api/public/huntry/[storeHash]/`), so a filled egg can look available for
+up to about 90s; tapping it ends in `capacity_full`, which `claim-outcome.ts`
+shows as "full". `revalidateTag` in the claim route is per-instance on Cloud Run
+(see Phase 0 and `docs/CACHE-IMPLEMENTATION-SWAP.md`).
+
+If fresher data is wanted, in order of preference:
+
+1. Leave it as is (a stale egg fails gracefully).
+2. Shorten `s-maxage` or add an `ETag`, and re-fetch `map-data` on
+   `visibilitychange` or a timer while the map is open. Server-only; no new auth.
+3. Only for sub-second push: the Firebase client SDK in the storefront script.
+   That needs client config, Firebase Auth tokens minted from the verified
+   BigCommerce customer JWT (`storefront-auth/verify-customer-jwt.ts`), real
+   security rules (the deny-all `firestore.rules` would block it) over a separate
+   public mirror collection (egg positions and full/not-full only, since the
+   current docs also hold admin fields), and SDK weight on merchant storefronts.
+   Not recommended.
 
 | Item | Where |
 |---|---|

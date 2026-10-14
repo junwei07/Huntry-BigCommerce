@@ -108,7 +108,8 @@ export interface ClaimRateLimitRepository {
   hasClaimedEgg(storeHash: string, eggId: string, customerId: number): Promise<boolean>;
   // Seconds since each of the customer's non-forced claims inside the window,
   // newest first, at most `maxClaims` of them. Ages are measured by the
-  // database clock, never the app clock.
+  // database clock in the SQL implementations; Firestore has no server-side
+  // clock arithmetic, so it uses the app clock, which also stamps claimedAt.
   listRecentClaimAges(storeHash: string, customerId: number, windowSeconds: number, maxClaims: number): Promise<number[]>;
 }
 

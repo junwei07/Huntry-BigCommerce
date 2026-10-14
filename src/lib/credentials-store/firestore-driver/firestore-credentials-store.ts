@@ -13,6 +13,7 @@ import {
 import { AppError } from "@/lib/errors/app-error";
 import { logError } from "@/lib/errors/logger";
 import { getFirestoreDb } from "@/lib/firebase/admin";
+import { assertValidStoreHash, isValidStoreHash } from "@/lib/firebase/store-hash";
 
 // Layout (all in the database named by FIRESTORE_DATABASE_ID):
 //   stores/{storeHash}                 accessToken (encrypted), scope, adminUserId,
@@ -28,25 +29,8 @@ const STORES = "stores";
 const STORE_USERS = "storeUsers";
 const USERS = "users";
 
-// BigCommerce store hashes are short alphanumeric strings. Public routes pass a
-// URL segment straight into the credentials store, and Firestore document ids
-// are far less forgiving than a SQL bind parameter (a "/" becomes a path, "." and
-// "__x__" are reserved, an empty id throws), so anything else is "no such store"
-// rather than an error.
-const STORE_HASH_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
-
-function isValidStoreHash(storeHash: string): boolean {
-  return STORE_HASH_PATTERN.test(storeHash);
-}
-
 function isValidUserId(userId: number): boolean {
   return Number.isSafeInteger(userId) && userId > 0;
-}
-
-function assertValidStoreHash(storeHash: string): void {
-  if (!isValidStoreHash(storeHash)) {
-    throw new Error("Invalid store hash.");
-  }
 }
 
 function assertValidUserId(userId: number): void {

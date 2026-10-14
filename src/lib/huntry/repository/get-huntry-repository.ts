@@ -1,3 +1,4 @@
+import { createFirestoreHuntryRepository } from "@/lib/huntry/repository/firestore-repository-loader";
 import { resolveCredentialsStoreDriver } from "@/lib/huntry/db/resolve-driver";
 import { sqlClaimsRepository } from "@/lib/huntry/repository/sql/claims";
 import { sqlEggsRepository } from "@/lib/huntry/repository/sql/eggs";
@@ -16,6 +17,8 @@ const sqlRepository: HuntryRepository = {
   claims: sqlClaimsRepository,
 };
 
+let firestoreRepository: HuntryRepository | undefined;
+
 // Selects the Huntry storage implementation from the same
 // CREDENTIALS_STORE_DRIVER that governs credentials (shared resolver, so the two
 // can't diverge). The SQL implementation serves SQLITE and POSTGRES; it picks
@@ -28,10 +31,9 @@ export function getHuntryRepository(): HuntryRepository {
     case "POSTGRES":
       return sqlRepository;
     case "FIRESTORE":
-      throw new Error(
-        "getHuntryRepository: Huntry's own data is not on Firestore yet (CREDENTIALS_STORE_DRIVER=FIRESTORE " +
-          "is only valid for credentials-store until Phase 3 of docs/FIREBASE-MIGRATION.md).",
-      );
+      firestoreRepository ??= createFirestoreHuntryRepository();
+
+      return firestoreRepository;
     case "D1":
       throw new Error(
         "getHuntryRepository: the D1 driver is not yet supported for Huntry's own database " +

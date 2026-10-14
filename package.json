@@ -13,7 +13,7 @@
     "lint": "eslint",
     "pretest": "node scripts/build-storefront-script.mjs",
     "test": "vitest run",
-    "test:firestore": "firebase emulators:exec --only firestore --project demo-huntry \"vitest run tests/lib/credentials-store\"",
+    "test:firestore": "firebase emulators:exec --only firestore --project demo-huntry \"vitest run tests/lib/credentials-store tests/lib/huntry/repository\"",
     "scaffold": "node scripts/scaffold.mjs"
   },
   "dependencies": {

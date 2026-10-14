@@ -69,7 +69,11 @@ export type CreatePlayerClaimResult =
   | { status: "duplicate"; couponCode: string }
   | { status: PlayerClaimRejection }
   | { status: "code_issue_failed" }
-  | { status: "lock_timeout" };
+  | { status: "lock_timeout" }
+  // Firestore only: this customer's earlier request for the same egg is still
+  // between reserving the claim and getting its code. The storefront treats it
+  // like a lock timeout (503, retry shortly).
+  | { status: "claim_in_progress" };
 
 export interface EggClaimCount {
   // Every claim on the egg, forced ones included (they count toward capacity).

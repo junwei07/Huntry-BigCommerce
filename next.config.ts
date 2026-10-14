@@ -55,6 +55,8 @@ function buildCredentialsDriverAliases(): Record<string, string> {
   if (configuredDriver !== "FIRESTORE") {
     aliases["@/lib/credentials-store/firestore-driver-loader"] =
       "@/lib/credentials-store/firestore-driver-loader.unavailable";
+    aliases["@/lib/huntry/repository/firestore-repository-loader"] =
+      "@/lib/huntry/repository/firestore-repository-loader.unavailable";
   }
 
   return aliases;

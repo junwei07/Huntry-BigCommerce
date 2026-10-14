@@ -66,13 +66,13 @@ function getHuntryDbDriver(): "SQLITE" | "POSTGRES" {
     );
   }
 
-  // Credentials may already be on Firestore, but Huntry's own data is not (Phase 3
-  // of docs/FIREBASE-MIGRATION.md). Falling back to SQLite here would split the
-  // app across two backends, so fail instead.
+  // Huntry's own data on Firestore goes through getHuntryRepository(), never a raw
+  // SQL handle. Falling back to SQLite here would split the app across two
+  // backends, so fail instead.
   if (configuredDriver === "FIRESTORE") {
     throw new Error(
-      "getHuntryDb: Huntry's own data is not on Firestore yet (CREDENTIALS_STORE_DRIVER=FIRESTORE " +
-        "is only valid for credentials-store until Phase 3 of docs/FIREBASE-MIGRATION.md).",
+      "getHuntryDb: CREDENTIALS_STORE_DRIVER=FIRESTORE keeps Huntry's data in Firestore, which has no " +
+        "SQL handle: go through getHuntryRepository() (docs/FIREBASE-MIGRATION.md, Phase 3).",
     );
   }
 
