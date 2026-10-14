@@ -13,12 +13,14 @@
     "lint": "eslint",
     "pretest": "node scripts/build-storefront-script.mjs",
     "test": "vitest run",
+    "test:firestore": "firebase emulators:exec --only firestore --project demo-huntry \"vitest run tests/lib/credentials-store\"",
     "scaffold": "node scripts/scaffold.mjs"
   },
   "dependencies": {
     "@bigcommerce/big-design": "5.0.0",
     "@bigcommerce/big-design-icons": "3.0.0",
     "@bigcommerce/big-design-theme": "3.0.0",
+    "firebase-admin": "^14.5.0",
     "jose": "6.2.3",
     "maplibre-gl": "^6.11.2",
     "next": "16.2.9",

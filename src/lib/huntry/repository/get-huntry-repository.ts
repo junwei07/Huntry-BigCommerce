@@ -27,6 +27,11 @@ export function getHuntryRepository(): HuntryRepository {
     case "SQLITE":
     case "POSTGRES":
       return sqlRepository;
+    case "FIRESTORE":
+      throw new Error(
+        "getHuntryRepository: Huntry's own data is not on Firestore yet (CREDENTIALS_STORE_DRIVER=FIRESTORE " +
+          "is only valid for credentials-store until Phase 3 of docs/FIREBASE-MIGRATION.md).",
+      );
     case "D1":
       throw new Error(
         "getHuntryRepository: the D1 driver is not yet supported for Huntry's own database " +

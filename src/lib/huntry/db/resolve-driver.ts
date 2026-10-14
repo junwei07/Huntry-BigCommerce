@@ -9,7 +9,7 @@ import type { CredentialsStoreDriver } from "@/lib/credentials-store/types";
 // Reads process.env on every call (no caching) so tests and per-request
 // callers always see the current value. next.config.ts repeats the trim +
 // uppercase normalization for its build-time alias; keep the two in step.
-const VALID_DRIVERS: CredentialsStoreDriver[] = ["SQLITE", "POSTGRES", "D1"];
+const VALID_DRIVERS: CredentialsStoreDriver[] = ["SQLITE", "POSTGRES", "D1", "FIRESTORE"];
 
 export function resolveCredentialsStoreDriver(): CredentialsStoreDriver {
   const raw = process.env.CREDENTIALS_STORE_DRIVER?.trim().toUpperCase();

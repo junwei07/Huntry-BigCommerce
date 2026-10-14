@@ -9,8 +9,12 @@ phases ship, and record new decisions in the Decision log.
 - **Host**: Firebase App Hosting (Next.js on Cloud Run). Not classic Hosting +
   Cloud Functions.
 - **Database**: Firestore (as in the EVMS app), not Cloud SQL / Postgres.
-- **Project**: a new dedicated Firebase project, separate from EVMS prod
-  (`nytt-hunt-prod`) and dev (`evms-dev-246f5`).
+- **Project**: the existing `evms-demo-d1477` project, database **`huntry-bc`**
+  (supersedes the earlier "new dedicated project" decision). The project also
+  holds EVMS's `(default)` database and a `huntry` database, so every client
+  names `huntry-bc` explicitly (`FIRESTORE_DATABASE_ID` is required and never
+  defaulted), and access is scoped to that one database (see "Phase 2 setup:
+  scoped IAM" below). Billing and quotas are shared with EVMS.
 - **Local dev**: SQLite stays the default. The Firestore emulator is the
   Firestore dev/test target.
 - **Coupon uniqueness** is case-insensitive on Firestore (normalized uppercase),
@@ -146,32 +150,96 @@ actually shipped, where it differs from the bullets below:
 - Existing tests pass unchanged. `getHuntryDb()` must have no callers outside
   `sql/` (grep).
 
-### Phase 2: Firestore credentials store  [ ]
+### Phase 2: Firestore credentials store  [~]
+
+Implemented on branch `firebase-phase2-credentials-store` (off Phase 1). The
+contract suite passes against SQLite and against the **Firestore emulator**
+(`pnpm test:firestore`, 43 tests). **Not yet verified against the hosted
+`huntry-bc` database**: that needs the scoped IAM setup below.
+
+`pnpm test:firestore` needs JDK 21+ (firebase-tools 15 refuses older Java). If
+your default `JAVA_HOME` is older, point it at a newer JDK for that command
+only, for example in bash: `JAVA_HOME="/c/Program Files/Java/jdk-25.0.2"
+PATH="$JAVA_HOME/bin:$PATH" pnpm test:firestore`. CI needs JDK 21+ too.
 
 - `src/lib/credentials-store/firestore-driver/firestore-credentials-store.ts`
-  implementing all 15 methods; add `FIRESTORE` to the `CredentialsStoreDriver`
-  union and the factory; add a loader + `.unavailable.ts` stub wired in
-  `next.config.ts` (same pattern as the Postgres/D1 loaders). Reuse
-  `encryption.ts` for `access_token`.
-- Layout: `stores/{storeHash}` (token, scope, admin user; extension, script,
-  page, webhook fields as nested maps or subdocs), `users/{userId}`, a
-  `store_users` subcollection or array for the link table.
-- `deleteStore` = `recursiveDelete`; `deleteUser` = transaction (replace SQL
-  `ON DELETE CASCADE` and the conditional user delete).
-- **SDK init** (`src/lib/firebase/admin.ts`):
-  - `ignoreUndefinedProperties: true`: Firestore writes throw on `undefined`,
-    which the row mappers and optional BC fields produce.
-  - Guard init with `getApps().length ? getApp() : initializeApp()`, and apply
-    `settings()` exactly once (it can only be called before first use, and Next
-    hot reload re-evaluates modules).
-  - Keep the client in a `globalThis` singleton, not the per-request `cache()`
-    used for the store instance in `get-credentials-store.ts`.
-- **Lazy-load SQLite** (option, not a guarantee): `get-credentials-store.ts`
-  imports `SqliteCredentialsStore`, and so `node:sqlite`, eagerly. Load the
-  SQLite pieces through loaders (same pattern as Postgres/D1; the Phase 1 `sql/`
-  implementation uses dynamic `import()`), so a Firestore deployment does not
-  need `node:sqlite`. This might let App Hosting run an older Node, but
-  `engines` stays `>=24` until a test rollout proves otherwise.
+  implements all 15 methods. `FIRESTORE` is in `CredentialsStoreDriver`, the
+  shared resolver and `get-credentials-store.ts`; `firestore-driver-loader.ts` +
+  `.unavailable.ts` are aliased in `next.config.ts` unless the driver is
+  `FIRESTORE`, same as Postgres. The token still goes through `encryption.ts`.
+- Layout (credentials only):
+  - `stores/{storeHash}`: `accessToken` (encrypted), `scope`, `adminUserId`,
+    `extensionId`, `scriptId`, `storefrontPage {pageId, createdByApp}`,
+    `webhooks {scope: hookId}`.
+  - `stores/{storeHash}/storeUsers/{userId}`: the link; `isStoreUserLinked` (hot,
+    every authorization) is one get-by-id, no index.
+  - `users/{userId}`: `email`, `storeHashes[]`, which answers "does this user
+    have any store left" with no collection-group query.
+- **`deleteStore` is not `recursiveDelete`** (this corrects the earlier text).
+  The SQL drivers delete credentials rows only, and Huntry data outlives an
+  uninstall. Phase 3 puts Huntry data in subcollections of the same
+  `stores/{hash}` document, so the driver deletes the store document and its
+  `storeUsers` docs explicitly: deleting a document never deletes its other
+  subcollections. A contract test pins this.
+- Setters merge and touch only their own fields (a re-install keeps the
+  extension, script, page and webhook ids). `deleteUser` removes the user when no
+  store links them any more, whether or not the link existed, as the SQL drivers
+  do.
+- **Malformed store hashes are "no such store".** Public routes pass URL
+  segments to `getStoreToken`/`isStoreUserLinked`; a Firestore document id is far
+  stricter than a SQL bind parameter, so the driver validates
+  `/^[A-Za-z0-9_-]{1,64}$/` (getters return `undefined`/`false`, deletes no-op,
+  setters throw) instead of turning a 404 into a 500 or reading a nested path.
+- **SDK init** (`src/lib/firebase/admin.ts`): `FIRESTORE_DATABASE_ID` required;
+  optional `FIREBASE_PROJECT_ID`; `ignoreUndefinedProperties: true`; guarded
+  `initializeApp`; one `globalThis` client with `settings()` applied once; throws
+  if `FIRESTORE_EMULATOR_HOST` is set on Cloud Run (`K_SERVICE`).
+- **Fail closed for Huntry data**: with `CREDENTIALS_STORE_DRIVER=FIRESTORE`,
+  `getHuntryDb()` and `getHuntryRepository()` throw until Phase 3 rather than
+  falling back to SQLite.
+- Config: `.firebaserc`, `firebase.json` (database `huntry-bc`), deny-all
+  `firestore.rules` (the Admin SDK bypasses rules; no client reads this
+  database), empty `firestore.indexes.json` (no composite index needed yet).
+  Deploy rules only with an explicit target:
+  `firebase deploy --only firestore:huntry-bc --project evms-demo-d1477`.
+- Tests: `tests/lib/credentials-store/credentials-store.contract.test.ts` runs
+  one suite against SQLite always, and against Firestore under the emulator
+  (`pnpm test:firestore`) or with `FIRESTORE_TEST_LIVE=1` (hosted database,
+  unique ids, cleaned up). It is skipped otherwise because `pnpm build` runs
+  `vitest run`.
+- **Lazy-load SQLite** is not done (option): `get-credentials-store.ts` still
+  imports `SqliteCredentialsStore`, and so `node:sqlite`, eagerly. Revisit with
+  the Node version question in Phase 0.
+
+#### Phase 2 setup: scoped IAM (you run these)
+
+The project is shared, so the app must not get project-wide Firestore access.
+Grant a dedicated service account `roles/datastore.user` with an IAM condition
+that limits it to `huntry-bc`, and have dev and the deployed backend run as it:
+
+```shell
+gcloud iam service-accounts create huntry-bc-app --project evms-demo-d1477
+
+gcloud projects add-iam-policy-binding evms-demo-d1477   --member="serviceAccount:huntry-bc-app@evms-demo-d1477.iam.gserviceaccount.com"   --role="roles/datastore.user"   --condition='expression=resource.name == "projects/evms-demo-d1477/databases/huntry-bc",title=huntry-bc-only'
+
+# Dev: run the app as that account without a key file.
+gcloud auth application-default login   --impersonate-service-account=huntry-bc-app@evms-demo-d1477.iam.gserviceaccount.com
+```
+
+The impersonating user also needs `roles/iam.serviceAccountTokenCreator` on that
+account (Owner does not include it; allow a minute or two to propagate):
+`gcloud iam service-accounts add-iam-policy-binding huntry-bc-app@evms-demo-d1477.iam.gserviceaccount.com --member="user:<you>" --role="roles/iam.serviceAccountTokenCreator"`
+
+Verified 2026-10-14: live contract suite (`FIRESTORE_TEST_LIVE=1`,
+`FIRESTORE_DATABASE_ID=huntry-bc`, `FIREBASE_PROJECT_ID=evms-demo-d1477`,
+`npx vitest run tests/lib/credentials-store`) passed 43/43 as the impersonated
+account; it read `huntry-bc` and got `PERMISSION_DENIED` on `(default)` and `huntry`.
+
+Verify: the account reads and writes `huntry-bc` and gets `PERMISSION_DENIED` on
+`(default)` and `huntry`. If it does not, another broader binding is overriding
+it: `gcloud projects get-iam-policy evms-demo-d1477` and remove that one. Your
+own (Owner) account is unscoped and should only be used for `firebase deploy` and
+console work.
 
 ### Phase 3: Firestore Huntry repository  [ ]
 

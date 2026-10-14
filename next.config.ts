@@ -50,6 +50,13 @@ function buildCredentialsDriverAliases(): Record<string, string> {
     aliases["@/lib/huntry/db/postgres-pool-loader"] = "@/lib/huntry/db/postgres-pool-loader.unavailable";
   }
 
+  // Same idea for Firestore: firebase-admin and its gRPC stack stay out of every
+  // build that won't select it.
+  if (configuredDriver !== "FIRESTORE") {
+    aliases["@/lib/credentials-store/firestore-driver-loader"] =
+      "@/lib/credentials-store/firestore-driver-loader.unavailable";
+  }
+
   return aliases;
 }
 

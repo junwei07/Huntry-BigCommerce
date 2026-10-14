@@ -35,13 +35,14 @@ describe("resolveCredentialsStoreDriver", () => {
     ["sqlite", "SQLITE"],
     [" Postgres ", "POSTGRES"],
     ["D1", "D1"],
+    [" firestore ", "FIRESTORE"],
   ])("normalizes %j to %s", (value, expected) => {
     process.env.CREDENTIALS_STORE_DRIVER = value;
 
     expect(resolveCredentialsStoreDriver()).toBe(expected);
   });
 
-  it.each(["bogus", "FIRESTORE", "postgresql"])("throws on unrecognized value %j", (value) => {
+  it.each(["bogus", "firebase", "postgresql"])("throws on unrecognized value %j", (value) => {
     process.env.CREDENTIALS_STORE_DRIVER = value;
 
     expect(() => resolveCredentialsStoreDriver()).toThrow(/Unrecognized CREDENTIALS_STORE_DRIVER/);
@@ -68,10 +69,10 @@ describe("resolveCredentialsStoreDriver", () => {
     expect(() => resolveCredentialsStoreDriver()).toThrow(/Cloud Run/);
   });
 
-  it("leaves hosted drivers alone on Cloud Run", () => {
+  it.each(["POSTGRES", "FIRESTORE"])("leaves the hosted driver %s alone on Cloud Run", (driver) => {
     process.env.K_SERVICE = "huntry";
-    process.env.CREDENTIALS_STORE_DRIVER = "POSTGRES";
+    process.env.CREDENTIALS_STORE_DRIVER = driver;
 
-    expect(resolveCredentialsStoreDriver()).toBe("POSTGRES");
+    expect(resolveCredentialsStoreDriver()).toBe(driver);
   });
 });
