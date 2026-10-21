@@ -34,7 +34,7 @@ let tempDir: string;
 const USER_ID = 1;
 const STORE_HASH = "store-a";
 
-const INPUT = { bannerDescription: "Hello", productCtaTitle: "Title", productCtaDescription: "Desc" };
+const INPUT = { bannerDescription: "Hello", productCtaTitle: "Title", productCtaDescription: "Desc", bannerLogoUrl: "", bannerImageUrl: "" };
 
 beforeEach(() => {
   cookieJar.clear();
@@ -97,6 +97,38 @@ describe("saveHuntryFeaturedSettings", () => {
 
     expect((await saveHuntryFeaturedSettings(INPUT, STORE_HASH)).success).toBe(true);
     expect(await fetchStorefrontSettings(STORE_HASH)).toEqual(INPUT);
+  });
+
+  it("accepts this store's uploaded image URL, rejects another store's, and deletes the replaced object", async () => {
+    await authorize(STORE_HASH);
+    process.env.FIREBASE_STORAGE_BUCKET = "test-bucket";
+
+    const removed: string[] = [];
+    const { setImageObjectStoreForTesting } = await import("@/lib/huntry/storage/image-storage");
+    setImageObjectStoreForTesting({
+      bucketName: () => "test-bucket",
+      save: async () => {},
+      remove: async (objectPath) => {
+        removed.push(objectPath);
+      },
+    });
+
+    const urlFor = (storeHash: string, name: string) =>
+      `https://firebasestorage.googleapis.com/v0/b/test-bucket/o/${encodeURIComponent(`${storeHash}/featured-banner/${name}.png`)}?alt=media&token=t`;
+    const { saveHuntryFeaturedSettings } = await import("@/app/store/[storeHash]/huntry/featured/actions");
+    const { fetchStorefrontSettingsUncached: fetchStorefrontSettings } = await import("@/lib/huntry/featured/featured-api");
+
+    const foreign = await saveHuntryFeaturedSettings({ ...INPUT, bannerImageUrl: urlFor("store-b", "x") }, STORE_HASH);
+    expect(foreign.success).toBe(false);
+
+    expect((await saveHuntryFeaturedSettings({ ...INPUT, bannerImageUrl: urlFor(STORE_HASH, "one") }, STORE_HASH)).success).toBe(true);
+    expect((await fetchStorefrontSettings(STORE_HASH)).bannerImageUrl).toBe(urlFor(STORE_HASH, "one"));
+
+    expect((await saveHuntryFeaturedSettings({ ...INPUT, bannerImageUrl: urlFor(STORE_HASH, "two") }, STORE_HASH)).success).toBe(true);
+    expect(removed).toEqual([`${STORE_HASH}/featured-banner/one.png`]);
+
+    setImageObjectStoreForTesting(null);
+    delete process.env.FIREBASE_STORAGE_BUCKET;
   });
 
   it("rejects invalid input with the validation message and writes nothing", async () => {

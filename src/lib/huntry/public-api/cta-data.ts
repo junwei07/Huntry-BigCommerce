@@ -65,8 +65,8 @@ export async function buildPublicCtaData(storeHash: string): Promise<PublicCtaDa
     productIds,
     banner: {
       description: settings.bannerDescription,
-      logoUrl: toPublicAssetUrl(DEFAULT_BANNER_LOGO_URL),
-      imageUrl: toPublicAssetUrl(DEFAULT_BANNER_IMAGE_URL),
+      logoUrl: toPublicAssetUrl(settings.bannerLogoUrl || DEFAULT_BANNER_LOGO_URL),
+      imageUrl: toPublicAssetUrl(settings.bannerImageUrl || DEFAULT_BANNER_IMAGE_URL),
     },
     productCta: { title: settings.productCtaTitle, description: settings.productCtaDescription },
   };

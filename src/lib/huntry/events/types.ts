@@ -150,3 +150,7 @@ export type CreateEventInput = Omit<EventFields, "id" | "storeHash" | "slug" | "
 // identical today and would only need to diverge if an edit-only field
 // ever appears.
 export type UpdateEventInput = CreateEventInput;
+
+// Header banner for an event with no uploaded image (BC-HUN-044): a bundled
+// public/ asset, the same placeholder sponsors use for their logo.
+export const DEFAULT_EVENT_BANNER_URL = "/huntry/cookies-banner.png";

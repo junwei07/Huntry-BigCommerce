@@ -63,6 +63,8 @@ describe.each(implementations)("FeaturedRepository ($name)", ({ create }) => {
       bannerDescription: "",
       productCtaTitle: "",
       productCtaDescription: "",
+      bannerLogoUrl: "",
+      bannerImageUrl: "",
     });
   });
 
@@ -70,13 +72,15 @@ describe.each(implementations)("FeaturedRepository ($name)", ({ create }) => {
     const repository = await create();
     const storeHash = newStoreHash();
 
-    await repository.saveStorefrontSettings(storeHash, { bannerDescription: "A", productCtaTitle: "B", productCtaDescription: "C" });
-    await repository.saveStorefrontSettings(storeHash, { bannerDescription: "A2", productCtaTitle: "", productCtaDescription: "C2" });
+    await repository.saveStorefrontSettings(storeHash, { bannerDescription: "A", productCtaTitle: "B", productCtaDescription: "C", bannerLogoUrl: "", bannerImageUrl: "" });
+    await repository.saveStorefrontSettings(storeHash, { bannerDescription: "A2", productCtaTitle: "", productCtaDescription: "C2", bannerLogoUrl: "https://img.example/l.png", bannerImageUrl: "https://img.example/b.png" });
 
     expect(await repository.getStorefrontSettings(storeHash)).toEqual({
       bannerDescription: "A2",
       productCtaTitle: "",
       productCtaDescription: "C2",
+      bannerLogoUrl: "https://img.example/l.png",
+      bannerImageUrl: "https://img.example/b.png",
     });
   });
 
@@ -84,7 +88,7 @@ describe.each(implementations)("FeaturedRepository ($name)", ({ create }) => {
     const repository = await create();
     const mine = newStoreHash();
 
-    await repository.saveStorefrontSettings(mine, { bannerDescription: "mine", productCtaTitle: "", productCtaDescription: "" });
+    await repository.saveStorefrontSettings(mine, { bannerDescription: "mine", productCtaTitle: "", productCtaDescription: "", bannerLogoUrl: "", bannerImageUrl: "" });
 
     expect((await repository.getStorefrontSettings(newStoreHash())).bannerDescription).toBe("");
   });

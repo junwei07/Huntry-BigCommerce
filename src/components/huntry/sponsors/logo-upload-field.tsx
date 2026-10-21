@@ -3,36 +3,34 @@
 import { useEffect, useRef, useState } from "react";
 import { Box, Small } from "@bigcommerce/big-design";
 import { CloudUploadIcon } from "@bigcommerce/big-design-icons";
+import { useStoreHash } from "@/components/ui/store-hash-context";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
+import { ImageKind, MAX_IMAGE_BYTES } from "@/lib/huntry/storage/image-validation";
 
 const BOX_SIZE = "96px";
 
-const DEFAULT_CAPTION =
-  "Preview only — image uploads aren't stored yet. New sponsors use the default logo until uploads are fully wired up.";
+const PREVIEW_ONLY_CAPTION = "Preview only — image uploads aren't configured for this environment.";
+const UPLOAD_CAPTION = "JPEG, PNG or WebP, up to 5 MB.";
 
 // A tap-to-upload box, the interaction huntry/EVMS's own image pickers use
 // (add_event_dialog.dart / add_company_dialog.dart — tap a bordered box,
 // pick a file, the preview swaps in) rather than a plain URL text input.
 //
-// Unlike ItemMarkerPicker/LocationMarkerPicker's "custom URL, labeled
-// honestly, not a fake upload button" (docs/HUNTRY-UI-REFERENCE.md), this
-// *is* a real file-picker interaction — the honesty is in the caption
-// below: no object storage exists in this starter yet (BC-HUN-044), so a
-// picked file only ever swaps the local preview via
-// URL.createObjectURL — it's never sent anywhere, and the sponsor keeps
-// DEFAULT_SPONSOR_LOGO_URL (or its existing logo, when editing) regardless
-// of what's previewed here. No onChange prop: there's nothing downstream
-// for a selection to flow into yet.
-//
-// The optional props let the Featured tab reuse this for its banner images
-// (BC-HUN-038); every default reproduces the sponsor field exactly.
+// With `kind` + `onUploaded`, a picked file is POSTed to
+// /api/internal/huntry/upload-image (BC-HUN-044) and the returned Firebase
+// Storage URL is handed to the parent form, which submits it with the rest of
+// the fields; the Server Action re-validates it. Without them the field stays
+// a local preview only. The optional props let the Featured tab and the event
+// banner reuse it; every default reproduces the sponsor logo field.
 export function LogoUploadField({
   previewUrl,
   label = "Logo",
   ariaLabel = "Change sponsor logo",
   altText = "Sponsor logo preview",
   width = BOX_SIZE,
-  caption = DEFAULT_CAPTION,
+  caption,
+  kind,
+  onUploaded,
 }: {
   previewUrl: string;
   label?: string;
@@ -40,9 +38,15 @@ export function LogoUploadField({
   altText?: string;
   width?: string;
   caption?: string;
+  kind?: ImageKind;
+  onUploaded?: (url: string) => void;
 }) {
+  const storeHash = useStoreHash();
   const inputRef = useRef<HTMLInputElement>(null);
   const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canUpload = Boolean(kind && onUploaded && storeHash);
 
   useEffect(() => {
     return () => {
@@ -52,18 +56,57 @@ export function LogoUploadField({
     };
   }, [objectUrl]);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const input = event.target;
+    const file = input.files?.[0];
+
+    // Lets the same file be picked again after a failed upload.
+    input.value = "";
 
     if (!file) {
       return;
     }
 
-    if (objectUrl) {
-      URL.revokeObjectURL(objectUrl);
+    setError(null);
+
+    if (canUpload && file.size > MAX_IMAGE_BYTES) {
+      setError("Images must be 5 MB or smaller.");
+
+      return;
     }
 
-    setObjectUrl(URL.createObjectURL(file));
+    if (!canUpload) {
+      setObjectUrl(URL.createObjectURL(file));
+
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      const body = new FormData();
+      body.set("kind", kind as string);
+      body.set("file", file);
+
+      const response = await fetch(`/api/internal/huntry/upload-image?storeHash=${encodeURIComponent(storeHash as string)}`, {
+        method: "POST",
+        body,
+      });
+      const result = (await response.json().catch(() => ({}))) as { url?: string; error?: string };
+
+      if (!response.ok || !result.url) {
+        setError(result.error ?? "Failed to upload the image.");
+
+        return;
+      }
+
+      setObjectUrl(URL.createObjectURL(file));
+      onUploaded?.(result.url);
+    } catch {
+      setError("Failed to upload the image.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -72,6 +115,7 @@ export function LogoUploadField({
 
       <button
         aria-label={ariaLabel}
+        disabled={isUploading}
         onClick={() => inputRef.current?.click()}
         style={{
           border: "1px solid rgba(0,0,0,0.15)",
@@ -114,8 +158,8 @@ export function LogoUploadField({
 
       <input accept="image/*" onChange={handleFileChange} ref={inputRef} style={{ display: "none" }} type="file" />
 
-      <Small marginTop="xSmall" style={{ color: HUNTRY_COLORS.textMuted, maxWidth: "280px" }}>
-        {caption}
+      <Small marginTop="xSmall" style={{ color: error ? "#C0392B" : HUNTRY_COLORS.textMuted, maxWidth: "280px" }}>
+        {error ?? (isUploading ? "Uploading…" : (caption ?? (canUpload ? UPLOAD_CAPTION : PREVIEW_ONLY_CAPTION)))}
       </Small>
     </Box>
   );

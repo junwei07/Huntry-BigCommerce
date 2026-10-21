@@ -1,0 +1,14 @@
+rules_version = '2';
+
+// Deny everything to client SDKs. Huntry uploads and deletes images only through
+// the Admin SDK (IAM-authenticated, bypasses these rules); browsers read the
+// objects through their download-token URLs, which also bypass rules. Deploy
+// ONLY to the dedicated Huntry bucket (the "huntry" target in firebase.json),
+// never to the project's default bucket, which belongs to another app.
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

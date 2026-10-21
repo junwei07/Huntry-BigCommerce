@@ -67,7 +67,7 @@ export function EditEventForm({ event }: { event: HuntryEvent }) {
 
   return (
     <Panel header={`Edit Event: ${event.name}`} style={{ backgroundColor: "#FFFFFF", borderRadius: "16px" }}>
-      <EventFormFields onChange={handleChange} state={state} />
+      <EventFormFields bannerPreviewUrl={event.headerBannerUrl ?? undefined} onChange={handleChange} state={state} />
 
       <Flex flexGap="0.5rem" justifyContent="flex-end">
         <Button

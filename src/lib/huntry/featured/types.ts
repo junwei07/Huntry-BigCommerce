@@ -7,12 +7,17 @@ export interface StorefrontSettings {
   bannerDescription: string;
   productCtaTitle: string;
   productCtaDescription: string;
+  // Uploaded image URLs (BC-HUN-044); "" means the bundled default image below.
+  bannerLogoUrl: string;
+  bannerImageUrl: string;
 }
 
 export const DEFAULT_STOREFRONT_SETTINGS: StorefrontSettings = {
   bannerDescription: "",
   productCtaTitle: "",
   productCtaDescription: "",
+  bannerLogoUrl: "",
+  bannerImageUrl: "",
 };
 
 // Placeholders shown in the admin form and used by the storefront when a
@@ -21,7 +26,7 @@ export const BANNER_DESCRIPTION_PLACEHOLDER = "Unlock exclusive discounts with H
 export const PRODUCT_CTA_TITLE_PLACEHOLDER = "Hunt rewards with Huntry.";
 export const PRODUCT_CTA_DESCRIPTION_PLACEHOLDER = "Play Huntry and unlock exclusive discounts for this product.";
 
-// Not stored: image storage doesn't exist yet (BC-HUN-044), so both banner
-// images are fixed defaults served from this app's public/ folder.
+// Fallbacks for a blank bannerLogoUrl/bannerImageUrl, served from this app's
+// public/ folder.
 export const DEFAULT_BANNER_IMAGE_URL = "/huntry/cookies-banner.png";
 export const DEFAULT_BANNER_LOGO_URL = "/huntry-logo.png";

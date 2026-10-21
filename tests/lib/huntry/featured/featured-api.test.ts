@@ -32,26 +32,30 @@ describe("storefront settings (SQLite)", () => {
       bannerDescription: "",
       productCtaTitle: "",
       productCtaDescription: "",
+      bannerLogoUrl: "",
+      bannerImageUrl: "",
     });
   });
 
   it("upserts, and a second save replaces the first", async () => {
     const { fetchStorefrontSettingsUncached: fetchStorefrontSettings, saveStorefrontSettings } = await import("@/lib/huntry/featured/featured-api");
 
-    await saveStorefrontSettings({ bannerDescription: "A", productCtaTitle: "B", productCtaDescription: "C" }, "store-a");
-    await saveStorefrontSettings({ bannerDescription: "A2", productCtaTitle: "", productCtaDescription: "C2" }, "store-a");
+    await saveStorefrontSettings({ bannerDescription: "A", productCtaTitle: "B", productCtaDescription: "C", bannerLogoUrl: "", bannerImageUrl: "" }, "store-a");
+    await saveStorefrontSettings({ bannerDescription: "A2", productCtaTitle: "", productCtaDescription: "C2", bannerLogoUrl: "https://img.example/l.png", bannerImageUrl: "https://img.example/b.png" }, "store-a");
 
     expect(await fetchStorefrontSettings("store-a")).toEqual({
       bannerDescription: "A2",
       productCtaTitle: "",
       productCtaDescription: "C2",
+      bannerLogoUrl: "https://img.example/l.png",
+      bannerImageUrl: "https://img.example/b.png",
     });
   });
 
   it("keeps stores isolated", async () => {
     const { fetchStorefrontSettingsUncached: fetchStorefrontSettings, saveStorefrontSettings } = await import("@/lib/huntry/featured/featured-api");
 
-    await saveStorefrontSettings({ bannerDescription: "mine", productCtaTitle: "", productCtaDescription: "" }, "store-c");
+    await saveStorefrontSettings({ bannerDescription: "mine", productCtaTitle: "", productCtaDescription: "", bannerLogoUrl: "", bannerImageUrl: "" }, "store-c");
 
     expect((await fetchStorefrontSettings("store-d")).bannerDescription).toBe("");
   });
@@ -67,7 +71,7 @@ describe("storefront settings (SQLite)", () => {
 
     const { fetchStorefrontSettingsOrDefaults: safeFetch } = await import("@/lib/huntry/featured/featured-api");
 
-    expect(await safeFetch("store-e")).toEqual({ bannerDescription: "", productCtaTitle: "", productCtaDescription: "" });
+    expect(await safeFetch("store-e")).toEqual({ bannerDescription: "", productCtaTitle: "", productCtaDescription: "", bannerLogoUrl: "", bannerImageUrl: "" });
 
     vi.doUnmock("@/lib/huntry/db/get-db");
     vi.restoreAllMocks();
@@ -77,12 +81,12 @@ describe("storefront settings (SQLite)", () => {
 describe("featuredFormSchema", () => {
   it("trims and allows blanks", () => {
     expect(
-      featuredFormSchema.parse({ bannerDescription: "  hi  ", productCtaTitle: "", productCtaDescription: " " }),
-    ).toEqual({ bannerDescription: "hi", productCtaTitle: "", productCtaDescription: "" });
+      featuredFormSchema.parse({ bannerDescription: "  hi  ", productCtaTitle: "", productCtaDescription: " ", bannerLogoUrl: "", bannerImageUrl: "" }),
+    ).toEqual({ bannerDescription: "hi", productCtaTitle: "", productCtaDescription: "", bannerLogoUrl: "", bannerImageUrl: "" });
   });
 
   it("rejects over-long text", () => {
-    const base = { bannerDescription: "", productCtaTitle: "", productCtaDescription: "" };
+    const base = { bannerDescription: "", productCtaTitle: "", productCtaDescription: "", bannerLogoUrl: "", bannerImageUrl: "" };
 
     expect(featuredFormSchema.safeParse({ ...base, bannerDescription: "x".repeat(121) }).success).toBe(false);
     expect(featuredFormSchema.safeParse({ ...base, productCtaTitle: "x".repeat(121) }).success).toBe(false);

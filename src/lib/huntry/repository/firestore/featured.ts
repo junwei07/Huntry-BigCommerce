@@ -24,6 +24,8 @@ export function createFirestoreFeaturedRepository(getDb: () => Firestore = getFi
         bannerDescription: readString(snapshot.get("bannerDescription")),
         productCtaTitle: readString(snapshot.get("productCtaTitle")),
         productCtaDescription: readString(snapshot.get("productCtaDescription")),
+        bannerLogoUrl: readString(snapshot.get("bannerLogoUrl")),
+        bannerImageUrl: readString(snapshot.get("bannerImageUrl")),
       };
     },
 
@@ -32,6 +34,8 @@ export function createFirestoreFeaturedRepository(getDb: () => Firestore = getFi
         bannerDescription: settings.bannerDescription,
         productCtaTitle: settings.productCtaTitle,
         productCtaDescription: settings.productCtaDescription,
+        bannerLogoUrl: settings.bannerLogoUrl,
+        bannerImageUrl: settings.bannerImageUrl,
         updatedAt: new Date(),
       });
     },

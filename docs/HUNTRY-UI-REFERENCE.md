@@ -213,44 +213,22 @@ and `events-api.ts`'s `createEvent` retries with `-2`, `-3`, ... suffixes
 **Never add a user-facing slug field** — that was BC-HUN-014's original
 mistake, corrected same-day once checked against the WP plugin source.
 
-## Image fields: placeholder defaults until real upload storage exists
+## Image fields: uploaded to Firebase Storage, bundled defaults as fallback
 
-No object storage exists in this starter outside the Cloudflare profile's
-R2 bucket (reserved for cache, not app assets — `docs/MIGRATION.md` §8).
-Two Huntry image fields are affected, and they currently take **different**
-approaches to that gap:
+Shipped in BC-HUN-044 (`HBC-CHANGELOG.md`; architecture in the *Huntry Firestore Flow* artifact). One shared
+control, `LogoUploadField` (`src/components/huntry/sponsors/logo-upload-field.tsx`, a tap-to-pick box styled
+after EVMS's `add_event_dialog.dart`/`add_company_dialog.dart`), uploads on select to
+`POST /api/internal/huntry/upload-image` and hands the returned URL to the form:
 
-- **`headerBannerUrl` (events)**: every event created today gets a fixed
-  placeholder — `createHuntryEvent`
-  (`src/app/store/[storeHash]/huntry/events/actions.ts`) always writes
-  `headerBannerUrl: "/huntry/cookies-banner.png"`
-  (`public/huntry/cookies-banner.png`, copied from the repo-root
-  `assets/cookies-banner.png`) — **the creation form has no banner field
-  at all.**
-- **`logoUrl` (sponsors, BC-HUN-017 follow-up)**: same default asset
-  (`createHuntrySponsor` writes `DEFAULT_SPONSOR_LOGO_URL`,
-  `src/lib/huntry/sponsors/types.ts`), but the creation/edit forms **do**
-  show a real upload control — `LogoUploadField`
-  (`src/components/huntry/sponsors/logo-upload-field.tsx`), a tap-to-pick
-  box styled after EVMS's own image pickers
-  (`add_event_dialog.dart`/`add_company_dialog.dart`: tap a bordered box,
-  pick a file, the preview swaps in). Picking a file only swaps a local
-  preview (`URL.createObjectURL`) — there is nowhere to send it yet, so the
-  sponsor still gets the fixed default on create, or keeps its existing
-  logo on edit (`updateHuntrySponsor` re-fetches uncached and preserves
-  `existing.logoUrl`, the same reasoning as events'
-  `headerBannerUrl`/`isFeatured`/`featuredOrder` preserve-on-edit pattern
-  below). The control is honest about this in its own caption text, rather
-  than silently discarding a selection with no explanation.
+| Field | Form state | Default when blank |
+| --- | --- | --- |
+| Event `headerBannerUrl` | `EventFormInput.headerBannerUrl` | `DEFAULT_EVENT_BANNER_URL` (`events/types.ts`) |
+| Sponsor `logoUrl` | `SponsorFormInput.logoUrl` | `DEFAULT_SPONSOR_LOGO_URL` (`sponsors/types.ts`) |
+| Featured button logo / banner image | `FeaturedFormInput.bannerLogoUrl` / `bannerImageUrl` | `DEFAULT_BANNER_LOGO_URL` / `DEFAULT_BANNER_IMAGE_URL` (`featured/types.ts`) |
 
-Sponsors deliberately got the real upload *control* first, ahead of the
-*storage* behind it, per explicit user direction — this is a front-end
-affordance built intentionally ahead of its backend, not an oversight.
-**BC-HUN-044** (`tickets.md`) tracks wiring both fields (and any future
-Huntry image field) to actual persisted storage; when it lands, replace
-`LogoUploadField`'s local-preview-only behavior with a real upload call,
-and give events' `headerBannerUrl` the same control instead of no field at
-all.
+On edit a blank or unchanged URL keeps the current image (the update actions already re-fetch uncached, as for
+`isFeatured`/`featuredOrder`). Rewards have no image field. The marker "custom URL" fields are still plain
+URLs by design, not uploads. Without `FIREBASE_STORAGE_BUCKET` the control is preview-only and says so.
 
 ## Editing and deleting: kebab menu, per-record actions
 

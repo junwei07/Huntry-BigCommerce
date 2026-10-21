@@ -7,6 +7,10 @@ import { fetchRewardIdsForEventUncached } from "@/lib/huntry/eggs/eggs-api";
 import { deleteEvent, fetchEventUncached, updateEvent } from "@/lib/huntry/events/events-api";
 import { recomputeRewardsUsageLimits, withUsageLimitWarning } from "@/lib/huntry/rewards/coupon-sync";
 import { eventFormSchema, EventFormInput } from "@/lib/huntry/events/event-form-schema";
+import { resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
+import { DEFAULT_EVENT_BANNER_URL } from "@/lib/huntry/events/types";
+import { deleteImageByUrl } from "@/lib/huntry/storage/image-storage";
+import { INVALID_IMAGE_MESSAGE, resolveImageField } from "@/lib/huntry/storage/resolve-image-field";
 import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
 import { toSafeMessage } from "@/lib/errors/app-error";
 import { logError } from "@/lib/errors/logger";
@@ -14,10 +18,10 @@ import { logError } from "@/lib/errors/logger";
 const EVENT_NOT_FOUND_MESSAGE =
   "That event no longer exists. It may have been deleted — reload the page to see the current list.";
 
-// headerBannerUrl/isFeatured/featuredOrder aren't edit-form fields (no
-// upload UI yet; featuring is a separate ticket's territory) — re-fetching
-// fresh (not fetchEvent's cached read) before writing preserves them
-// instead of resetting them to defaults, the same reasoning
+// isFeatured/featuredOrder aren't edit-form fields (featuring is a separate
+// ticket's territory), and a blank/unchanged headerBannerUrl keeps the
+// current banner — re-fetching fresh (not fetchEvent's cached read) before
+// writing preserves them instead of resetting them to defaults, the same reasoning
 // gift-certs/[id]/actions.ts's own re-fetch-before-mutate pattern
 // documents.
 export async function updateHuntryEvent(id: number, input: EventFormInput, storeHash: string | undefined): Promise<ActionResult> {
@@ -51,6 +55,17 @@ export async function updateHuntryEvent(id: number, input: EventFormInput, store
       return { success: false, message: EVENT_NOT_FOUND_MESSAGE };
     }
 
+    const banner = resolveImageField({
+      submitted: parsed.data.headerBannerUrl,
+      current: existing.headerBannerUrl,
+      fallback: DEFAULT_EVENT_BANNER_URL,
+      storeHash,
+    });
+
+    if (!banner.ok) {
+      return { success: false, message: INVALID_IMAGE_MESSAGE };
+    }
+
     const updated = await updateEvent(
       id,
       {
@@ -58,7 +73,7 @@ export async function updateHuntryEvent(id: number, input: EventFormInput, store
         description,
         startsAt: new Date(startsAt),
         endsAt: new Date(endsAt),
-        headerBannerUrl: existing.headerBannerUrl,
+        headerBannerUrl: banner.url,
         markerRadiusMeters,
         maxGrabCount,
         eggClaimCapacity,
@@ -71,6 +86,10 @@ export async function updateHuntryEvent(id: number, input: EventFormInput, store
 
     if (!updated) {
       return { success: false, message: EVENT_NOT_FOUND_MESSAGE };
+    }
+
+    if (existing.headerBannerUrl !== banner.url) {
+      await deleteImageByUrl(existing.headerBannerUrl, resolveStoreHash(storeHash));
     }
 
     updateTag(EVENTS_LIST_TAG);
@@ -109,11 +128,14 @@ export async function deleteHuntryEvent(id: number, storeHash: string | undefine
     // egg capacity.
     rewardIds = await fetchRewardIdsForEventUncached(id, storeHash);
 
+    const existing = await fetchEventUncached(id, storeHash);
     const deleted = await deleteEvent(id, storeHash);
 
     if (!deleted) {
       return { success: false, message: EVENT_NOT_FOUND_MESSAGE };
     }
+
+    await deleteImageByUrl(existing?.headerBannerUrl, resolveStoreHash(storeHash));
   } catch (error) {
     logError(`deleteHuntryEvent: event ${id}`, error);
 

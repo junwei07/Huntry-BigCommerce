@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "evms-demo-d1477"
+  },
+  "targets": {
+    "evms-demo-d1477": {
+      "storage": {
+        "huntry": [
+          "huntry-bc-images"
+        ]
+      }
+    }
   }
 }

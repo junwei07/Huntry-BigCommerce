@@ -82,6 +82,9 @@ export const eventFormSchema = z
     itemMarker: eventItemMarkerSchema,
     locationMarker: eventLocationMarkerSchema,
     themeColors: eventThemeColorsSchema,
+    // Uploaded banner URL (BC-HUN-044); the Server Actions validate it against
+    // the store's own storage prefix, blank keeps the current/default banner.
+    headerBannerUrl: z.string().trim().max(2048).optional(),
   })
   .refine((data) => new Date(data.endsAt) > new Date(data.startsAt), {
     message: "End date must be after the start date.",
@@ -102,4 +105,5 @@ export interface EventFormInput {
   itemMarker: EventItemMarker;
   locationMarker: EventLocationMarker;
   themeColors: EventThemeColors;
+  headerBannerUrl?: string;
 }

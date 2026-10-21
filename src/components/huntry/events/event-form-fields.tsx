@@ -1,10 +1,12 @@
 "use client";
 
 import { Box, Flex, FlexItem, Input, Textarea } from "@bigcommerce/big-design";
+import { LogoUploadField } from "@/components/huntry/sponsors/logo-upload-field";
 import { ItemMarkerPicker } from "@/components/huntry/events/item-marker-picker";
 import { LocationMarkerPicker } from "@/components/huntry/events/location-marker-picker";
 import { ThemePicker } from "@/components/huntry/events/theme-picker";
 import { EventFormInput } from "@/lib/huntry/events/event-form-schema";
+import { DEFAULT_EVENT_BANNER_URL } from "@/lib/huntry/events/types";
 
 // Shared by new-event-form.tsx (create) and edit-event-form.tsx (edit) —
 // extracted so the ~150 lines of field JSX aren't duplicated near-verbatim
@@ -20,12 +22,24 @@ import { EventFormInput } from "@/lib/huntry/events/event-form-schema";
 export function EventFormFields({
   state,
   onChange,
+  bannerPreviewUrl = DEFAULT_EVENT_BANNER_URL,
 }: {
   state: EventFormInput;
   onChange: (patch: Partial<EventFormInput>) => void;
+  bannerPreviewUrl?: string;
 }) {
   return (
     <>
+      <LogoUploadField
+        altText="Event banner preview"
+        ariaLabel="Change event banner"
+        kind="event-banner"
+        label="Header banner"
+        onUploaded={(url) => onChange({ headerBannerUrl: url })}
+        previewUrl={bannerPreviewUrl}
+        width="240px"
+      />
+
       <Box marginBottom="medium">
         <Input label="Name" onChange={(event) => onChange({ name: event.target.value })} required value={state.name} />
       </Box>

@@ -55,8 +55,13 @@ export const CREATE_HUNTRY_SCHEMA = `
     banner_description TEXT NOT NULL DEFAULT '',
     product_cta_title TEXT NOT NULL DEFAULT '',
     product_cta_description TEXT NOT NULL DEFAULT '',
+    banner_logo_url TEXT NOT NULL DEFAULT '',
+    banner_image_url TEXT NOT NULL DEFAULT '',
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
+  -- BC-HUN-044 added the two banner_*_url columns to an already-existing
+  -- table: delete a local data/huntry.sqlite once to pick them up, same as
+  -- the BC-HUN-020 note below.
 
   -- BC-HUN-020 added the UNIQUE (store_hash, coupon_code) constraint below
   -- to an already-existing table — CREATE TABLE IF NOT EXISTS won't

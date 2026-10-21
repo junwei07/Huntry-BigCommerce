@@ -19,7 +19,7 @@ import {
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 
 const PANEL_STYLE = { backgroundColor: "#FFFFFF", borderRadius: "16px", marginBottom: "1rem" };
-const IMAGE_CAPTION = "Preview only — image uploads aren't stored yet. The default image is used on the storefront.";
+const IMAGE_CAPTION = "JPEG, PNG or WebP, up to 5 MB. The default image is used until you upload one.";
 
 // Port of the plugin's Featured page (huntry/includes/featured/index.php),
 // minus the featured-event picker: every live event gets a banner slide, since
@@ -65,15 +65,19 @@ export function FeaturedForm({ initial }: { initial: StorefrontSettings }) {
             altText="Banner button logo preview"
             ariaLabel="Change banner button logo"
             caption={IMAGE_CAPTION}
+            kind="featured-logo"
             label="Button logo"
-            previewUrl={DEFAULT_BANNER_LOGO_URL}
+            onUploaded={(url) => handleChange({ bannerLogoUrl: url })}
+            previewUrl={state.bannerLogoUrl || DEFAULT_BANNER_LOGO_URL}
           />
           <LogoUploadField
             altText="Banner image preview"
             ariaLabel="Change banner image"
             caption={IMAGE_CAPTION}
+            kind="featured-banner"
             label="Banner image"
-            previewUrl={DEFAULT_BANNER_IMAGE_URL}
+            onUploaded={(url) => handleChange({ bannerImageUrl: url })}
+            previewUrl={state.bannerImageUrl || DEFAULT_BANNER_IMAGE_URL}
             width="240px"
           />
         </Flex>

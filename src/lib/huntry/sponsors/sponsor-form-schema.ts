@@ -14,13 +14,12 @@ import { z } from "zod";
 // link) sanitized with `sanitize_text_field`, so no format validation beyond
 // a length cap.
 //
-// logoUrl is deliberately NOT a field here — LogoUploadField
-// (components/huntry/sponsors/logo-upload-field.tsx) is a preview-only
-// upload control with nowhere to send a picked file yet (BC-HUN-044), so
-// there is nothing for it to submit. The Server Actions set logoUrl
-// themselves (DEFAULT_SPONSOR_LOGO_URL on create, the existing value
-// preserved on update), the same way headerBannerUrl has no field in the
-// events form at all.
+// logoUrl is optional (BC-HUN-044): LogoUploadField uploads the picked file
+// to Firebase Storage straight away and the form submits the returned URL.
+// It is not validated here — the Server Actions check it against the store's
+// own storage prefix (resolveImageField) and fall back to
+// DEFAULT_SPONSOR_LOGO_URL on create / the existing logo on update when it
+// is blank.
 function urlField(label: string) {
   return z.string().trim().refine((value) => value === "" || z.string().url().safeParse(value).success, {
     message: `${label} must be a valid URL.`,
@@ -33,6 +32,7 @@ export const sponsorFormSchema = z.object({
   facebookUrl: urlField("Facebook URL"),
   websiteUrl: urlField("Website URL"),
   location: z.string().trim().max(500, "Location must be 500 characters or fewer."),
+  logoUrl: z.string().trim().max(2048).optional(),
 });
 
 // The raw shape both new-sponsor-form.tsx and edit-sponsor-form.tsx submit —
@@ -45,4 +45,5 @@ export interface SponsorFormInput {
   facebookUrl: string;
   websiteUrl: string;
   location: string;
+  logoUrl?: string;
 }

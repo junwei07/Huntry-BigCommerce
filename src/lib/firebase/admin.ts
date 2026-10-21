@@ -1,4 +1,4 @@
-import { getApp, getApps, initializeApp } from "firebase-admin/app";
+import { App, getApp, getApps, initializeApp } from "firebase-admin/app";
 import { Firestore, getFirestore } from "firebase-admin/firestore";
 
 // The one Firestore client for the process. Server-only: the Admin SDK
@@ -24,6 +24,12 @@ export function getFirestoreDatabaseId(): string {
   return databaseId;
 }
 
+// Shared by Firestore and Cloud Storage so both hang off one Firebase app.
+// Guarded so a hot reload (which re-evaluates this module) reuses the app.
+export function getFirebaseApp(): App {
+  return getApps().length > 0 ? getApp() : initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID || undefined });
+}
+
 export function getFirestoreDb(): Firestore {
   if (globalForFirestore.huntryFirestore) {
     return globalForFirestore.huntryFirestore;
@@ -43,9 +49,7 @@ export function getFirestoreDb(): Firestore {
     console.warn(`[firebase] Firestore calls go to the emulator at ${emulatorHost}, not a hosted database.`);
   }
 
-  // Guarded so a hot reload (which re-evaluates this module) reuses the app.
-  const app = getApps().length > 0 ? getApp() : initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID || undefined });
-  const db = getFirestore(app, databaseId);
+  const db = getFirestore(getFirebaseApp(), databaseId);
 
   // settings() can only be applied once, before the first request. Optional BC
   // fields can be undefined, which Firestore otherwise rejects on write.

@@ -56,7 +56,7 @@ describe("GET cta-data (MOCK mode)", () => {
     const { saveStorefrontSettings } = await import("@/lib/huntry/featured/featured-api");
 
     await saveStorefrontSettings(
-      { bannerDescription: "Hunt with us", productCtaTitle: "Rewards", productCtaDescription: "Find the egg" },
+      { bannerDescription: "Hunt with us", productCtaTitle: "Rewards", productCtaDescription: "Find the egg", bannerLogoUrl: "", bannerImageUrl: "" },
       "abc123",
     );
 
@@ -66,7 +66,7 @@ describe("GET cta-data (MOCK mode)", () => {
       expect(body.banner.description).toBe("Hunt with us");
       expect(body.productCta).toEqual({ title: "Rewards", description: "Find the egg" });
     } finally {
-      await saveStorefrontSettings({ bannerDescription: "", productCtaTitle: "", productCtaDescription: "" }, "abc123");
+      await saveStorefrontSettings({ bannerDescription: "", productCtaTitle: "", productCtaDescription: "", bannerLogoUrl: "", bannerImageUrl: "" }, "abc123");
     }
   });
 

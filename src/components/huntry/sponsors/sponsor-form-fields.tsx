@@ -10,8 +10,7 @@ import { SponsorFormInput } from "@/lib/huntry/sponsors/sponsor-form-schema";
 // (the post title) is required, every other field is a plain optional
 // input — Instagram/Facebook/Website as URLs, Location as free text (not
 // lat/lng, not a map link). Logo leads (image first, matching EVMS's
-// company-dialog layout) but isn't part of `state` — see
-// LogoUploadField/sponsor-form-schema.ts for why.
+// company-dialog layout); its uploaded URL rides in `state.logoUrl`.
 //
 // Takes one state object + one patch-merging onChange, mirroring
 // EventFormFields, rather than ~6 individual value/onChange props.
@@ -26,7 +25,7 @@ export function SponsorFormFields({
 }) {
   return (
     <>
-      <LogoUploadField previewUrl={logoPreviewUrl} />
+      <LogoUploadField kind="sponsor-logo" onUploaded={(url) => onChange({ logoUrl: url })} previewUrl={logoPreviewUrl} />
 
       <Box marginBottom="medium">
         <Input label="Name" onChange={(event) => onChange({ name: event.target.value })} required value={state.name} />

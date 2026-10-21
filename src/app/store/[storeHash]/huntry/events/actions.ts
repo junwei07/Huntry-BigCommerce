@@ -6,15 +6,11 @@ import { eventTag, EVENTS_LIST_TAG } from "@/lib/huntry/events/cache-tags";
 import { countEvents, createEvent, isUniqueSlugConstraintError } from "@/lib/huntry/events/events-api";
 import { EVENT_LIMIT_MESSAGE, MAX_EVENTS } from "@/lib/huntry/events/limits";
 import { eventFormSchema, EventFormInput } from "@/lib/huntry/events/event-form-schema";
+import { DEFAULT_EVENT_BANNER_URL } from "@/lib/huntry/events/types";
+import { INVALID_IMAGE_MESSAGE, resolveImageField } from "@/lib/huntry/storage/resolve-image-field";
 import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
 import { toSafeMessage } from "@/lib/errors/app-error";
 import { logError } from "@/lib/errors/logger";
-
-// No image upload exists in this starter yet (same gap BC-HUN-017 already
-// flagged for sponsor logos) — every event created here gets this fixed
-// placeholder instead of exposing a banner field in the form. See
-// docs/HUNTRY-UI-REFERENCE.md.
-const DEFAULT_EVENT_BANNER_URL = "/huntry/cookies-banner.png";
 
 export async function createHuntryEvent(input: EventFormInput, storeHash: string | undefined): Promise<ActionResult> {
   // A page/layout-level auth check does not extend to Server Actions, since
@@ -43,6 +39,17 @@ export async function createHuntryEvent(input: EventFormInput, storeHash: string
     themeColors,
   } = parsed.data;
 
+  const banner = resolveImageField({
+    submitted: parsed.data.headerBannerUrl,
+    current: null,
+    fallback: DEFAULT_EVENT_BANNER_URL,
+    storeHash,
+  });
+
+  if (!banner.ok) {
+    return { success: false, message: INVALID_IMAGE_MESSAGE };
+  }
+
   try {
     // The real gate (mirrors huntry_block_extra_event_creation in the WP
     // plugin) — the UI's disabled button/notice is only UX.
@@ -56,7 +63,7 @@ export async function createHuntryEvent(input: EventFormInput, storeHash: string
         description,
         startsAt: new Date(startsAt),
         endsAt: new Date(endsAt),
-        headerBannerUrl: DEFAULT_EVENT_BANNER_URL,
+        headerBannerUrl: banner.url,
         markerRadiusMeters,
         maxGrabCount,
         eggClaimCapacity,

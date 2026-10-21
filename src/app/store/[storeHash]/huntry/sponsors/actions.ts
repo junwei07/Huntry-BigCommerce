@@ -6,6 +6,7 @@ import { sponsorTag, SPONSORS_LIST_TAG } from "@/lib/huntry/sponsors/cache-tags"
 import { createSponsor } from "@/lib/huntry/sponsors/sponsors-api";
 import { sponsorFormSchema, SponsorFormInput } from "@/lib/huntry/sponsors/sponsor-form-schema";
 import { DEFAULT_SPONSOR_LOGO_URL } from "@/lib/huntry/sponsors/types";
+import { INVALID_IMAGE_MESSAGE, resolveImageField } from "@/lib/huntry/storage/resolve-image-field";
 import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
 import { toSafeMessage } from "@/lib/errors/app-error";
 import { logError } from "@/lib/errors/logger";
@@ -25,18 +26,22 @@ export async function createHuntrySponsor(input: SponsorFormInput, storeHash: st
   }
 
   const { name, instagramUrl, facebookUrl, websiteUrl, location } = parsed.data;
+  const logo = resolveImageField({
+    submitted: parsed.data.logoUrl,
+    current: null,
+    fallback: DEFAULT_SPONSOR_LOGO_URL,
+    storeHash,
+  });
+
+  if (!logo.ok) {
+    return { success: false, message: INVALID_IMAGE_MESSAGE };
+  }
 
   try {
-    // No image upload storage exists yet (BC-HUN-044) — every sponsor
-    // created here gets this fixed placeholder, matching
-    // DEFAULT_EVENT_BANNER_URL's precedent in events/actions.ts. Unlike
-    // that field, the create form does show a real upload control
-    // (LogoUploadField) for the logo, but it has nowhere to send a picked
-    // file yet — see docs/HUNTRY-UI-REFERENCE.md.
     const sponsor = await createSponsor(
       {
         name,
-        logoUrl: DEFAULT_SPONSOR_LOGO_URL,
+        logoUrl: logo.url,
         instagramUrl: instagramUrl === "" ? null : instagramUrl,
         facebookUrl: facebookUrl === "" ? null : facebookUrl,
         websiteUrl: websiteUrl === "" ? null : websiteUrl,
