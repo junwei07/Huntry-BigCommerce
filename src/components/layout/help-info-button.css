@@ -1,0 +1,127 @@
+/*
+ * Styles for the "?" help button and dialog (help-info-button.tsx), ported
+ * from the plugin's .huntry-admin-info-* / .huntry-info-modal__* rules
+ * (huntry/assets/css/huntry-admin.css). Color values mirror HUNTRY_COLORS in
+ * src/lib/huntry/theme.ts, which CSS can't import.
+ */
+.huntry-help-button,
+.huntry-help-modal {
+  --huntry-help-primary: #e88b59;
+  --huntry-help-primary-hover: #d9783f;
+  --huntry-help-text: #0f1322;
+  --huntry-help-text-muted: #717182;
+  --huntry-help-link: #10154a;
+}
+
+/* Right-aligned slot in the nav row; never shrinks so it isn't clipped. */
+.huntry-help-slot {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.huntry-help-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background-color: var(--huntry-help-primary);
+  color: #fff;
+  cursor: pointer;
+}
+
+.huntry-help-button:hover {
+  background-color: var(--huntry-help-primary-hover);
+}
+
+.huntry-help-button:focus-visible {
+  outline: 2px solid var(--huntry-help-link);
+  outline-offset: 2px;
+}
+
+.huntry-help-icon {
+  font-weight: 700;
+  line-height: 1;
+}
+
+.huntry-help-icon--button {
+  font-size: 15px;
+}
+
+.huntry-help-icon--modal {
+  font-size: 17px;
+}
+
+.huntry-help-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(15, 19, 34, 0.5);
+}
+
+.huntry-help-modal__dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  padding: 24px 20px 20px;
+  border-radius: 12px;
+  background-color: #fff;
+  box-shadow: 0 8px 30px rgba(15, 19, 34, 0.25);
+  text-align: left;
+}
+
+.huntry-help-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.huntry-help-modal__icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: rgba(16, 21, 74, 0.1);
+  color: var(--huntry-help-link);
+}
+
+.huntry-help-modal__headline {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--huntry-help-text);
+}
+
+.huntry-help-modal__message {
+  margin: 0;
+  font-size: 13px;
+  color: var(--huntry-help-text-muted);
+}
+
+.huntry-help-modal__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--huntry-help-text);
+}
+
+.huntry-help-modal__actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}

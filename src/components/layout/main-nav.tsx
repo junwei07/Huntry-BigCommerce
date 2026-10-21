@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useTheme } from "styled-components";
 import { Box, Flex, Text } from "@bigcommerce/big-design";
+import { HelpInfoButton } from "@/components/layout/help-info-button";
 import { AppLink } from "@/components/ui/app-link";
 import { useStoreHash } from "@/components/ui/store-hash-context";
 import { getAppUrl } from "@/lib/routing/app-url";
@@ -61,7 +62,11 @@ export function MainNav() {
   const theme = useTheme();
 
   return (
-    <Flex alignItems="stretch" flexGap="0.5rem" role="navigation" aria-label="Main">
+    // The "?" help button sits at the right edge of the row like the
+    // plugin's tab bar; the row wraps and the button doesn't shrink so a
+    // narrowed control-panel iframe never clips it.
+    <Flex alignItems="center" flexGap="0.5rem" flexWrap="wrap">
+      <Flex alignItems="stretch" flexGap="0.5rem" flexWrap="wrap" role="navigation" aria-label="Main">
       {NAV_ITEMS.map((item) => {
         const isActive = item.id === activeSection;
 
@@ -109,6 +114,10 @@ export function MainNav() {
           </Box>
         );
       })}
+      </Flex>
+      <div className="huntry-help-slot">
+        <HelpInfoButton sectionId={activeSection} />
+      </div>
     </Flex>
   );
 }

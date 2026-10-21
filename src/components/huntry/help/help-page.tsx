@@ -3,10 +3,9 @@ import { Box, Flex, H1, H4, Link, Panel, Small, Text } from "@bigcommerce/big-de
 import { BaselineHelpIcon } from "@bigcommerce/big-design-icons";
 
 const DEVELOPER_LOGO_FILENAME = process.env.DEVELOPER_LOGO_FILENAME || "developer-logo.svg";
-const DEVELOPER_NAME = process.env.DEVELOPER_NAME || "Developer Name";
-const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "support@developer.dev";
-const SUPPORT_URL = process.env.SUPPORT_URL || "https://developer.dev/support";
-const SUPPORT_PHONE = process.env.SUPPORT_PHONE || "+1 (555) 010-0142";
+const DEVELOPER_NAME = process.env.DEVELOPER_NAME || "Huntry";
+const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "info@nytt-tech.com";
+const SUPPORT_URL = process.env.SUPPORT_URL || "https://huntry.io";
 
 export function HelpPage() {
   return (
@@ -32,17 +31,20 @@ export function HelpPage() {
             Support
           </Small>
         </Flex>
-        <Text marginBottom="none">
+        <Flex alignItems="center">
+          <Text marginBottom="none" marginRight="xxSmall">
+            Email:
+          </Text>
           <Link href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</Link>
-        </Text>
-        <Text marginBottom="none">
-          <Link href={`tel:${SUPPORT_PHONE.replace(/[^+\d]/g, "")}`}>{SUPPORT_PHONE}</Link>
-        </Text>
-        <Text marginBottom="none">
+        </Flex>
+        <Flex alignItems="center">
+          <Text marginBottom="none" marginRight="xxSmall">
+            Website:
+          </Text>
           <Link href={SUPPORT_URL} target="_blank" rel="noopener noreferrer">
-            Help Center
+            {SUPPORT_URL}
           </Link>
-        </Text>
+        </Flex>
       </Box>
       </Panel>
     </Box>
