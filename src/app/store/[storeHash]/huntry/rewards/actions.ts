@@ -4,7 +4,9 @@ import { updateTag } from "next/cache";
 import { ActionResult } from "@/lib/actions/action-result";
 import { rewardTag, REWARDS_LIST_TAG } from "@/lib/huntry/rewards/cache-tags";
 import { syncRewardCoupon } from "@/lib/huntry/rewards/coupon-sync";
+import { MAX_REWARDS, REWARD_LIMIT_MESSAGE } from "@/lib/huntry/rewards/limits";
 import {
+  countRewards,
   createReward,
   fetchBcProductsForPicker,
   isRewardCouponCodeTaken,
@@ -43,6 +45,12 @@ export async function createHuntryReward(input: RewardFormInput, storeHash: stri
     discountScope,
     productIds,
   } = parsed.data;
+
+  // The real gate for the reward cap — the UI's disabled button/redirect is
+  // only UX.
+  if ((await countRewards(storeHash)) >= MAX_REWARDS) {
+    return { success: false, message: REWARD_LIMIT_MESSAGE };
+  }
 
   // Primary uniqueness check (BC-HUN-020) — a fast, specific form error
   // instead of a confusing write failure after the reward row is already

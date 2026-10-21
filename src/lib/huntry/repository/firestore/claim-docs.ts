@@ -40,6 +40,13 @@ export function rewardCounterRef(db: Firestore, storeHash: string, rewardId: num
   return storeDoc(db, storeHash, "counters", `reward_${rewardId}`);
 }
 
+// Distinct players (customers with a claim, forced or not) in one event —
+// maintained on each customer's 0 -> 1 per-event transition (and its reverse on
+// release), since a distinct count cannot be read inside a transaction.
+export function eventPlayersCounterRef(db: Firestore, storeHash: string, eventId: number): DocumentReference {
+  return storeDoc(db, storeHash, "counters", `event_players_${eventId}`);
+}
+
 export function customerRef(db: Firestore, storeHash: string, customerId: number): DocumentReference {
   return storeDoc(db, storeHash, "customers", customerId);
 }

@@ -188,6 +188,22 @@ export async function createReward(input: CreateRewardInput, storeHash: string |
   return getHuntryRepository().rewards.create(resolvedStoreHash, input);
 }
 
+// Uncached on purpose — used by createHuntryReward to enforce MAX_REWARDS
+// right before an insert, which must never trust a cached read.
+export async function countRewards(storeHash: string | undefined): Promise<number> {
+  if (getDataMode() === "MOCK") {
+    return MOCK_REWARDS.length;
+  }
+
+  const resolvedStoreHash = resolveStoreHash(storeHash);
+
+  if (!resolvedStoreHash) {
+    return 0;
+  }
+
+  return getHuntryRepository().rewards.count(resolvedStoreHash);
+}
+
 // Returns undefined if no row matched (already deleted, or belongs to a
 // different store) — the caller reports that as "no longer exists" rather
 // than treating it as an unexpected error, mirroring updateEvent/

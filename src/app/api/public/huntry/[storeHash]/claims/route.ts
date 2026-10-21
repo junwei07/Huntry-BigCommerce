@@ -29,6 +29,7 @@ const STATUS_BY_RESULT: Record<Exclude<CreatePlayerClaimResult["status"], "creat
   too_far: 403,
   duplicate: 409,
   capacity_full: 409,
+  player_limit_reached: 409,
   limit_reached: 409,
   event_not_live: 409,
   reward_unavailable: 409,

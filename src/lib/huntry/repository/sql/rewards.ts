@@ -493,9 +493,28 @@ async function deleteRewardRow(storeHash: string, id: number): Promise<boolean> 
   return (result.rowCount ?? 0) > 0;
 }
 
+async function selectRewardCount(storeHash: string): Promise<number> {
+  const db = getHuntryDb();
+
+  if (db instanceof DatabaseSync) {
+    const row = db.prepare("SELECT COUNT(*) AS count FROM huntry_rewards WHERE store_hash = ?").get(storeHash) as unknown as {
+      count: number;
+    };
+
+    return Number(row.count);
+  }
+
+  const result = await db.query<{ count: string }>("SELECT COUNT(*) AS count FROM huntry_rewards WHERE store_hash = $1", [
+    storeHash,
+  ]);
+
+  return Number(result.rows[0]?.count ?? 0);
+}
+
 export const sqlRewardsRepository: RewardsRepository = {
   list: selectRewards,
   get: selectRewardRow,
+  count: selectRewardCount,
   isCouponCodeTaken: selectCouponCodeTaken,
   create: insertRewardRow,
   update: updateRewardRow,

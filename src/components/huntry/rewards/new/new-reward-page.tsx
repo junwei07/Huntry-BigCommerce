@@ -1,5 +1,9 @@
+import { redirect } from "next/navigation";
 import { Box } from "@bigcommerce/big-design";
 import { NewRewardForm } from "@/components/huntry/rewards/new/new-reward-form";
+import { MAX_REWARDS } from "@/lib/huntry/rewards/limits";
+import { countRewards } from "@/lib/huntry/rewards/rewards-api";
+import { getAppUrl } from "@/lib/routing/app-url";
 import { fetchSponsors } from "@/lib/huntry/sponsors/sponsors-api";
 
 // Fetches the sponsor dropdown's options server-side, unlike
@@ -15,6 +19,11 @@ export async function NewRewardPage({
   const resolvedParams = await params;
   const storeHash = resolvedParams.storeHash;
   const storeHashString = Array.isArray(storeHash) ? storeHash[0] : storeHash;
+
+  // Direct-URL guard for the reward cap (createHuntryReward is the real gate).
+  if ((await countRewards(storeHashString)) >= MAX_REWARDS) {
+    redirect(getAppUrl(storeHashString, "/huntry/rewards"));
+  }
 
   const sponsors = await fetchSponsors({ direction: "ASC" }, storeHashString);
 

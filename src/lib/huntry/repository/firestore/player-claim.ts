@@ -10,6 +10,7 @@ import {
   customerRef,
   CustomerState,
   eggCounterRef,
+  eventPlayersCounterRef,
   readCount,
   readCustomer,
   rewardCounterRef,
@@ -50,6 +51,7 @@ type ReserveOutcome =
 interface Counts {
   egg: number;
   reward: number;
+  players: number;
 }
 
 // Undoes one reservation against the state read in the same transaction: both
@@ -61,10 +63,16 @@ function undoReservation(pending: DocumentData, customer: CustomerState, counts:
   const reservedAt = readDate(pending.reservedAt);
   const untouched = reservedAt !== null && customer.lastClaimAt?.getTime() === reservedAt.getTime();
   const eventKey = String(pending.eventId);
-  const eventCounts = { ...customer.eventCounts, [eventKey]: Math.max((customer.eventCounts[eventKey] ?? 0) - 1, 0) };
+  const eventCount = customer.eventCounts[eventKey] ?? 0;
+  const eventCounts = { ...customer.eventCounts, [eventKey]: Math.max(eventCount - 1, 0) };
 
   return {
-    counts: { egg: Math.max(counts.egg - 1, 0), reward: Math.max(counts.reward - 1, 0) },
+    counts: {
+      egg: Math.max(counts.egg - 1, 0),
+      reward: Math.max(counts.reward - 1, 0),
+      // The customer's last claim in the event is gone, so they are no longer a player.
+      players: eventCount <= 1 ? Math.max(counts.players - 1, 0) : counts.players,
+    },
     customer: {
       lastClaimAt: untouched ? readDate(previous.lastClaimAt) : customer.lastClaimAt,
       lastLat: untouched ? (previous.lastLat ?? null) : customer.lastLat,
@@ -100,15 +108,24 @@ export function createFirestorePlayerClaimRepository(getDb: () => Firestore = ge
       const customerDoc = customerRef(db, storeHash, input.bcCustomerId);
       const eggCounter = eggCounterRef(db, storeHash, input.eggId);
       const rewardCounter = rewardCounterRef(db, storeHash, egg.rewardId);
-      const [eventSnapshot, rewardSnapshot, customerSnapshot, claimSnapshot, eggCounterSnapshot, rewardCounterSnapshot] =
-        await tx.getAll(
-          storeDoc(db, storeHash, "events", egg.eventId),
-          storeDoc(db, storeHash, "rewards", egg.rewardId),
-          customerDoc,
-          claim,
-          eggCounter,
-          rewardCounter,
-        );
+      const playersCounter = eventPlayersCounterRef(db, storeHash, egg.eventId);
+      const [
+        eventSnapshot,
+        rewardSnapshot,
+        customerSnapshot,
+        claimSnapshot,
+        eggCounterSnapshot,
+        rewardCounterSnapshot,
+        playersCounterSnapshot,
+      ] = await tx.getAll(
+        storeDoc(db, storeHash, "events", egg.eventId),
+        storeDoc(db, storeHash, "rewards", egg.rewardId),
+        customerDoc,
+        claim,
+        eggCounter,
+        rewardCounter,
+        playersCounter,
+      );
       const placed = await tx.get(storeCollection(db, storeHash, "eggs").where("rewardId", "==", egg.rewardId));
       const placedEventIds = [...new Set(placed.docs.map((doc) => doc.get("eventId") as number))];
       const placedEvents = placedEventIds.length
@@ -121,7 +138,11 @@ export function createFirestorePlayerClaimRepository(getDb: () => Firestore = ge
       }
 
       let customer = readCustomer(customerSnapshot.data());
-      let counts: Counts = { egg: readCount(eggCounterSnapshot.data()), reward: readCount(rewardCounterSnapshot.data()) };
+      let counts: Counts = {
+        egg: readCount(eggCounterSnapshot.data()),
+        reward: readCount(rewardCounterSnapshot.data()),
+        players: readCount(playersCounterSnapshot.data()),
+      };
       const existing = claimSnapshot.exists ? (claimSnapshot.data() as DocumentData) : undefined;
       let takeover = false;
 
@@ -166,7 +187,12 @@ export function createFirestorePlayerClaimRepository(getDb: () => Firestore = ge
             return parent?.exists ? (parent.get("eggClaimCapacity") as number) : null;
           }),
         },
-        counts: { egg: counts.egg, reward: counts.reward, customerInEvent: customer.eventCounts[eventKey] ?? 0 },
+        counts: {
+          egg: counts.egg,
+          reward: counts.reward,
+          customerInEvent: customer.eventCounts[eventKey] ?? 0,
+          playersInEvent: counts.players,
+        },
         existingCouponCode: existing?.status === "issued" ? (existing.couponCode ?? null) : null,
         lastClaim: customer.lastClaimAt
           ? {
@@ -210,6 +236,11 @@ export function createFirestorePlayerClaimRepository(getDb: () => Firestore = ge
 
       tx.set(eggCounter, { eventId: egg.eventId, count: counts.egg + 1 }, { merge: true });
       tx.set(rewardCounter, { count: counts.reward + 1 }, { merge: true });
+
+      if (context.counts.customerInEvent === 0) {
+        tx.set(playersCounter, { count: counts.players + 1 }, { merge: true });
+      }
+
       tx.set(customerDoc, {
         lastClaimAt: now,
         lastLat: input.lat,
@@ -236,15 +267,23 @@ export function createFirestorePlayerClaimRepository(getDb: () => Firestore = ge
       const eggCounter = eggCounterRef(db, storeHash, eggId);
       const rewardCounter = rewardCounterRef(db, storeHash, pending.rewardId);
       const customerDoc = customerRef(db, storeHash, customerId);
-      const [eggCounterSnapshot, rewardCounterSnapshot, customerSnapshot] = await tx.getAll(eggCounter, rewardCounter, customerDoc);
+      const playersCounter = eventPlayersCounterRef(db, storeHash, pending.eventId);
+      const [eggCounterSnapshot, rewardCounterSnapshot, customerSnapshot, playersCounterSnapshot] = await tx.getAll(
+        eggCounter,
+        rewardCounter,
+        customerDoc,
+        playersCounter,
+      );
       const undone = undoReservation(pending, readCustomer(customerSnapshot.data()), {
         egg: readCount(eggCounterSnapshot.data()),
         reward: readCount(rewardCounterSnapshot.data()),
+        players: readCount(playersCounterSnapshot.data()),
       });
 
       tx.delete(claim);
       tx.set(eggCounter, { count: undone.counts.egg }, { merge: true });
       tx.set(rewardCounter, { count: undone.counts.reward }, { merge: true });
+      tx.set(playersCounter, { count: undone.counts.players }, { merge: true });
       tx.set(customerDoc, undone.customer);
     });
   }

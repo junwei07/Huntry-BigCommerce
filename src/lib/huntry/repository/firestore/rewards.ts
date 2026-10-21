@@ -100,6 +100,12 @@ export function createFirestoreRewardsRepository(getDb: () => Firestore = getFir
       return snapshot.exists ? toReward(snapshot.data() as DocumentData) : undefined;
     },
 
+    async count(storeHash) {
+      const aggregate = await storeCollection(getDb(), storeHash, "rewards").count().get();
+
+      return aggregate.data().count;
+    },
+
     async isCouponCodeTaken(storeHash, couponCode, excludeId) {
       const snapshot = await couponRef(getDb(), storeHash, couponCode).get();
 

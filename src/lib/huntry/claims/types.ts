@@ -59,6 +59,7 @@ export type PlayerClaimRejection =
   | "reward_unavailable"
   | "too_far"
   | "capacity_full"
+  | "player_limit_reached"
   | "limit_reached"
   | "cooldown"
   | "too_fast";

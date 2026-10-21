@@ -80,6 +80,7 @@ export interface RewardsRepository {
   // "specific").
   list(storeHash: string, sort: RewardSort): Promise<HuntryReward[]>;
   get(storeHash: string, id: number): Promise<HuntryReward | undefined>;
+  count(storeHash: string): Promise<number>;
   // Whether another reward in the store already uses the code.
   isCouponCodeTaken(storeHash: string, couponCode: string, excludeId?: number): Promise<boolean>;
   // Atomic with the reward's product ids. Throws the backend's raw

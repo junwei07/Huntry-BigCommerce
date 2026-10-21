@@ -7,6 +7,7 @@ import {
   customerRef,
   EGG_COUNTER_PREFIX,
   eggCounterRef,
+  eventPlayersCounterRef,
   readCount,
   readCustomer,
   rewardCounterRef,
@@ -37,14 +38,16 @@ export function createFirestoreClaimRecordsRepository(getDb: () => Firestore = g
       const eggCounter = eggCounterRef(db, storeHash, input.eggId);
       const rewardCounter = rewardCounterRef(db, storeHash, input.rewardId);
       const customer = customerRef(db, storeHash, input.bcCustomerId);
+      const playersCounter = eventPlayersCounterRef(db, storeHash, input.eventId);
 
       try {
         return await db.runTransaction(async (tx) => {
-          const [claimSnapshot, eggSnapshot, rewardSnapshot, customerSnapshot] = await tx.getAll(
+          const [claimSnapshot, eggSnapshot, rewardSnapshot, customerSnapshot, playersSnapshot] = await tx.getAll(
             ref,
             eggCounter,
             rewardCounter,
             customer,
+            playersCounter,
           );
 
           // A pending reservation on the same egg and customer also blocks it.
@@ -80,6 +83,12 @@ export function createFirestoreClaimRecordsRepository(getDb: () => Firestore = g
             { merge: true },
           );
           tx.set(rewardCounter, { count: readCount(rewardSnapshot.data()) + 1 }, { merge: true });
+
+          // A forced claim makes the customer a player too (never refused by the cap).
+          if ((state.eventCounts[eventKey] ?? 0) === 0) {
+            tx.set(playersCounter, { count: readCount(playersSnapshot.data()) + 1 }, { merge: true });
+          }
+
           tx.set(customer, {
             lastClaimAt: now,
             lastLat: null,

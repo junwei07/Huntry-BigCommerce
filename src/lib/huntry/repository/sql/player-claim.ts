@@ -65,7 +65,8 @@ async function loadContext(
     `SELECT
        (SELECT COUNT(*) FROM huntry_claims WHERE store_hash = $1 AND egg_id = $2) AS egg,
        (SELECT COUNT(*) FROM huntry_claims WHERE store_hash = $1 AND reward_id = $3) AS reward,
-       (SELECT COUNT(*) FROM huntry_claims WHERE store_hash = $1 AND event_id = $4 AND bc_customer_id = $5) AS customer_in_event`,
+       (SELECT COUNT(*) FROM huntry_claims WHERE store_hash = $1 AND event_id = $4 AND bc_customer_id = $5) AS customer_in_event,
+       (SELECT COUNT(DISTINCT bc_customer_id) FROM huntry_claims WHERE store_hash = $1 AND event_id = $4) AS players_in_event`,
     [storeHash, eggId, egg.reward_id, egg.event_id, customerId],
   );
   const [existing] = await tx.query<{ coupon_code: string }>(
@@ -102,6 +103,7 @@ async function loadContext(
       egg: Number(counts.egg),
       reward: Number(counts.reward),
       customerInEvent: Number(counts.customer_in_event),
+      playersInEvent: Number(counts.players_in_event),
     },
     existingCouponCode: existing?.coupon_code ?? null,
     lastClaim: last
@@ -118,7 +120,7 @@ async function runClaim(
   input: CreatePlayerClaimInput,
   hooks: PlayerClaimHooks,
 ): Promise<{ result: CreatePlayerClaimResult; commit: boolean }> {
-  // Lock order (all callers): customer, reward, egg — see the ticket plan.
+  // Lock order (all callers): customer, event, reward, egg — see the ticket plan.
   const [egg] = await tx.query<EggRow & { reward_id: number }>(
     // The reward row is locked next, so first read the egg unlocked just to
     // learn its reward; the egg itself is re-locked below.
@@ -132,6 +134,8 @@ async function runClaim(
 
   if (tx.dialect === "pg") {
     await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`${storeHash}:${input.bcCustomerId}`]);
+    // Serialises different new customers racing for the last player slots.
+    await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`${storeHash}:event:${egg.event_id}`]);
     await tx.query("SELECT id FROM huntry_rewards WHERE id = $1 AND store_hash = $2 FOR UPDATE", [egg.reward_id, storeHash]);
   }
 

@@ -1,6 +1,7 @@
 import { getDataMode, resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
 import { logError } from "@/lib/errors/logger";
 import { addMockPlayerClaim } from "@/lib/huntry/claims/mock/mock-claims";
+import { MAX_PLAYERS_PER_EVENT } from "@/lib/huntry/claims/limits";
 import { CreatePlayerClaimInput, CreatePlayerClaimResult } from "@/lib/huntry/claims/types";
 import { getHuntryRepository } from "@/lib/huntry/repository/get-huntry-repository";
 import { computeRewardUsageLimit } from "@/lib/huntry/rewards/coupon-sync";
@@ -46,7 +47,7 @@ export interface ClaimContext {
     // computeRewardUsageLimit).
     placedEggClaimCapacities: (number | null)[];
   };
-  counts: { egg: number; reward: number; customerInEvent: number };
+  counts: { egg: number; reward: number; customerInEvent: number; playersInEvent: number };
   existingCouponCode: string | null;
   lastClaim: { lat: number | null; lng: number | null; elapsedSeconds: number } | null;
 }
@@ -86,6 +87,10 @@ export function evaluateClaim(
 
   if (context.counts.egg >= event.eggClaimCapacity || context.counts.reward >= rewardBudget) {
     return { status: "capacity_full" };
+  }
+
+  if (context.counts.customerInEvent === 0 && context.counts.playersInEvent >= MAX_PLAYERS_PER_EVENT) {
+    return { status: "player_limit_reached" };
   }
 
   if (event.maxGrabCount > 0 && context.counts.customerInEvent >= event.maxGrabCount) {

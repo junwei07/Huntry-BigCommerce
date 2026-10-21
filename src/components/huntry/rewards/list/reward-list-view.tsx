@@ -1,9 +1,10 @@
-import { Box, Flex, Panel, Text } from "@bigcommerce/big-design";
+import { Box, Flex, InlineMessage, Panel, Text } from "@bigcommerce/big-design";
 import { RewardCard } from "@/components/huntry/rewards/list/reward-card";
 import { RewardListHeader } from "@/components/huntry/rewards/list/reward-list-header";
 import { NewRewardButton } from "@/components/huntry/rewards/list/new-reward-button";
 import { SortSelect } from "@/components/huntry/rewards/list/sort-select";
 import { fetchRewards } from "@/lib/huntry/rewards/rewards-api";
+import { MAX_REWARDS } from "@/lib/huntry/rewards/limits";
 import { parseRewardsQuery } from "@/lib/huntry/rewards/query";
 import { fetchSponsors } from "@/lib/huntry/sponsors/sponsors-api";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
@@ -41,12 +42,26 @@ export async function RewardListView({
   }
   // @cache-components-only:end
 
+  // The rewards list is unfiltered (search params only affect sort order), so
+  // its length is the true count.
+  const limitReached = rewards.length >= MAX_REWARDS;
+
   return (
     <Box padding="medium" style={{ backgroundColor: HUNTRY_COLORS.background }}>
       <Panel header="Rewards" style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
+        {limitReached ? (
+          <Box marginBottom="medium">
+            <InlineMessage
+              header="Reward limit reached"
+              messages={[{ text: `You have reached your limit of ${MAX_REWARDS} rewards.` }]}
+              type="info"
+            />
+          </Box>
+        ) : null}
+
         <Flex alignItems="center" justifyContent="space-between" marginBottom="medium">
           <SortSelect query={query} />
-          <NewRewardButton />
+          <NewRewardButton limitReached={limitReached} />
         </Flex>
 
         <RewardListHeader />

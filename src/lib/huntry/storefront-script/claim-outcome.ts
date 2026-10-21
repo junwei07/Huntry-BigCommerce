@@ -10,6 +10,7 @@ export type ClaimOutcome =
   | { kind: "full" }
   | { kind: "limit-reached" }
   | { kind: "not-live" }
+  | { kind: "players-full" }
   | { kind: "unavailable" }
   | { kind: "rate-limited"; retryAfterSeconds: number }
   | { kind: "slow-down" }
@@ -46,6 +47,8 @@ export function toClaimOutcome(status: number, body: unknown): ClaimOutcome {
         return { kind: "limit-reached" };
       case "event_not_live":
         return { kind: "not-live" };
+      case "player_limit_reached":
+        return { kind: "players-full" };
       case "reward_unavailable":
         return { kind: "unavailable" };
       default:

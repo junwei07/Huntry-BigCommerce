@@ -40,7 +40,7 @@ export type OutcomeAction =
   | { type: "login" }
   | { type: "limit" }
   // The egg can't be claimed any more; show a dialog and stop offering it.
-  | { type: "blocked"; reason: "full" | "mine" | "not-live" | "unavailable"; icon: string; title: string; message: string }
+  | { type: "blocked"; reason: "full" | "mine" | "not-live" | "players-full" | "unavailable"; icon: string; title: string; message: string }
   // A failure worth retrying: message under the Claim button, button re-enabled.
   | { type: "inline"; message: string };
 
@@ -75,6 +75,14 @@ export function describeOutcome(outcome: ClaimOutcome): OutcomeAction {
         icon: "⏰",
         title: "This hunt isn't active",
         message: "This hunt isn't live right now, so nothing can be claimed.",
+      };
+    case "players-full":
+      return {
+        type: "blocked",
+        reason: "players-full",
+        icon: "🙁",
+        title: "This hunt is full",
+        message: "This hunt has reached its maximum number of players, so no new players can join.",
       };
     case "unavailable":
       return {

@@ -15,7 +15,7 @@ import { getAppUrl } from "@/lib/routing/app-url";
 // is the fix for the real bug BC-HUN-014 hit (a button that looked broken
 // during Turbopack's first-compile delay with no loading state) — must not
 // be reintroduced here.
-export function NewRewardButton() {
+export function NewRewardButton({ limitReached = false }: { limitReached?: boolean }) {
   const router = useRouter();
   const storeHash = useStoreHash();
   const [isPending, startTransition] = useGlobalTransition({ autoResolve: false });
@@ -28,7 +28,7 @@ export function NewRewardButton() {
 
   return (
     <Button
-      disabled={isPending}
+      disabled={isPending || limitReached}
       onClick={handleClick}
       style={{ backgroundColor: HUNTRY_COLORS.primary, borderColor: HUNTRY_COLORS.primary }}
       variant="primary"

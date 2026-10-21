@@ -36,7 +36,7 @@ function baseContext(overrides: Partial<ClaimContext> = {}): ClaimContext {
       expiresAt: null,
       placedEggClaimCapacities: [1],
     },
-    counts: { egg: 0, reward: 0, customerInEvent: 0 },
+    counts: { egg: 0, reward: 0, customerInEvent: 0, playersInEvent: 0 },
     existingCouponCode: null,
     lastClaim: null,
     ...overrides,
@@ -79,22 +79,34 @@ describe("evaluateClaim", () => {
   });
 
   it("enforces egg and reward capacity", () => {
-    expect(evaluateClaim(baseContext({ counts: { egg: 1, reward: 1, customerInEvent: 0 } }), AT_EGG, NOW)).toEqual({
+    expect(evaluateClaim(baseContext({ counts: { egg: 1, reward: 1, customerInEvent: 0, playersInEvent: 0 } }), AT_EGG, NOW)).toEqual({
       status: "capacity_full",
     });
-    expect(evaluateClaim(baseContext({ counts: { egg: 0, reward: 5, customerInEvent: 0 } }), AT_EGG, NOW)).toEqual({
+    expect(evaluateClaim(baseContext({ counts: { egg: 0, reward: 5, customerInEvent: 0, playersInEvent: 0 } }), AT_EGG, NOW)).toEqual({
       status: "capacity_full",
     });
   });
 
   it("enforces the per-player event limit, 0 meaning unlimited", () => {
-    const limited = baseContext({ counts: { egg: 0, reward: 0, customerInEvent: 2 } });
+    const limited = baseContext({ counts: { egg: 0, reward: 0, customerInEvent: 2, playersInEvent: 0 } });
 
     limited.event.maxGrabCount = 2;
     expect(evaluateClaim(limited, AT_EGG, NOW)).toEqual({ status: "limit_reached" });
-    expect(evaluateClaim(baseContext({ counts: { egg: 0, reward: 0, customerInEvent: 99 } }), AT_EGG, NOW)).toEqual({
+    expect(evaluateClaim(baseContext({ counts: { egg: 0, reward: 0, customerInEvent: 99, playersInEvent: 0 } }), AT_EGG, NOW)).toEqual({
       ok: true,
     });
+  });
+
+  it("refuses a new player once the event has 100, but not an existing one", () => {
+    const full = { egg: 0, reward: 0, playersInEvent: 100 };
+
+    expect(evaluateClaim(baseContext({ counts: { ...full, customerInEvent: 0 } }), AT_EGG, NOW)).toEqual({
+      status: "player_limit_reached",
+    });
+    expect(evaluateClaim(baseContext({ counts: { ...full, customerInEvent: 1 } }), AT_EGG, NOW)).toEqual({ ok: true });
+    expect(
+      evaluateClaim(baseContext({ counts: { egg: 0, reward: 0, customerInEvent: 0, playersInEvent: 99 } }), AT_EGG, NOW),
+    ).toEqual({ ok: true });
   });
 
   it("applies the cooldown and the speed check", () => {
