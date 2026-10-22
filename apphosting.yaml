@@ -1,0 +1,89 @@
+# Firebase App Hosting config. Plan and rationale: docs/FIREBASE-MIGRATION.md
+# Phase 0. Secrets are Secret Manager references, so this file is safe to commit.
+#
+# Before the first rollout:
+#   firebase apphosting:secrets:set BIGCOMMERCE_CLIENT_SECRET
+#   firebase apphosting:secrets:set SESSION_SECRET
+#   firebase apphosting:secrets:set CREDENTIALS_ENCRYPTION_KEY
+# then fill the two TODO values below (APP_ORIGIN needs a second rollout when
+# using the generated *.hosted.app URL, since it is baked in at build time).
+
+runConfig:
+  minInstances: 1
+  maxInstances: 5
+  # The default (false) can cut off the after() provisioning work in
+  # src/app/api/app/load/route.ts.
+  cpuAlwaysAllocated: true
+
+scripts:
+  # Skips the `vitest run` that the default `build` script runs.
+  buildCommand: node scripts/copy-maplibre-worker.mjs && node scripts/build-storefront-script.mjs && next build
+
+env:
+  # BUILD and RUNTIME (default availability): next.config.ts reads both at build.
+  - variable: CREDENTIALS_STORE_DRIVER
+    value: FIRESTORE
+  - variable: APP_ORIGIN
+    value: https://TODO-set-to-the-backend-or-custom-domain-url
+
+  # RUNTIME only
+  - variable: BIGCOMMERCE_CLIENT_ID
+    value: 8deelyhpckw64bmw88bonlt32c6uldj
+    availability:
+      - RUNTIME
+  - variable: DATA_MODE
+    value: MULTITENANT
+    availability:
+      - RUNTIME
+  - variable: FIRESTORE_DATABASE_ID
+    value: huntry-bc
+    availability:
+      - RUNTIME
+  - variable: FIREBASE_PROJECT_ID
+    value: evms-demo-d1477
+    availability:
+      - RUNTIME
+  - variable: FIREBASE_STORAGE_BUCKET
+    value: huntry-bc-images
+    availability:
+      - RUNTIME
+  # use cache: remote across instances needs a shared handler.
+  - variable: CACHE_ENABLED
+    value: "FALSE"
+    availability:
+      - RUNTIME
+  - variable: ERROR_LOGGING_ENABLED
+    value: "TRUE"
+    availability:
+      - RUNTIME
+  - variable: DEVELOPER_LOGO_FILENAME
+    value: huntry-logo.png
+    availability:
+      - RUNTIME
+  - variable: DEVELOPER_NAME
+    value: Huntry
+    availability:
+      - RUNTIME
+  - variable: SUPPORT_EMAIL
+    value: info@nytt-tech.com
+    availability:
+      - RUNTIME
+  - variable: SUPPORT_URL
+    value: https://huntry.io
+    availability:
+      - RUNTIME
+
+  # Secrets (RUNTIME only). Pinned to the latest version at build time, so
+  # redeploy after rotating.
+  - variable: BIGCOMMERCE_CLIENT_SECRET
+    secret: BIGCOMMERCE_CLIENT_SECRET
+    availability:
+      - RUNTIME
+  - variable: SESSION_SECRET
+    secret: SESSION_SECRET
+    availability:
+      - RUNTIME
+  - variable: CREDENTIALS_ENCRYPTION_KEY
+    secret: CREDENTIALS_ENCRYPTION_KEY
+    availability:
+      - RUNTIME
