@@ -1,4 +1,4 @@
-import { customersListMockHandler } from "@/lib/gift-certs-manager/customers/mock/customers-list-handler";
+import { customersListMockHandler } from "@/lib/bc-customers/mock/customers-list-handler";
 import { MockRouteHandler } from "@/lib/bc-api-client/rest-client/mock-rest-client/types";
 
 // The list of mock handlers this feature contributes to MockRestApiClient.

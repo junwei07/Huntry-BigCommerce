@@ -13,7 +13,7 @@ import {
 import { CLAIMS_LIST_TAG, eventClaimsTag } from "@/lib/huntry/claims/cache-tags";
 import { createForcedClaim } from "@/lib/huntry/claims/claims-api";
 import { issueClaimCode } from "@/lib/huntry/rewards/claim-codes";
-import { fetchCustomersByEmailUncached } from "@/lib/gift-certs-manager/customers/customers-api";
+import { fetchCustomersByEmailUncached } from "@/lib/bc-customers/customers-api";
 import { getSessionUserId } from "@/lib/session/get-session-user-id";
 import { eggTag, EGGS_LIST_TAG, eventEggsTag } from "@/lib/huntry/eggs/cache-tags";
 import {

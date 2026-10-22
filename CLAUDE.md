@@ -23,18 +23,15 @@ to decide whether to open the file.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current app
   architecture (routing, auth, caching, API clients) — living spec.
 - [`docs/TUTORIAL.md`](docs/TUTORIAL.md) — learner-facing step-by-step lab
-  walkthrough with diff links.
+  walkthrough with diff links (starter history, not current code).
 - [`docs/USING-AS-A-STARTER.md`](docs/USING-AS-A-STARTER.md) — keep/
   remove/update checklist for using this as a starter for a new app.
 - [`docs/RUN-EXAMPLE-APP.md`](docs/RUN-EXAMPLE-APP.md),
   [`docs/LOCAL-SINGLE-CLICK-APP.md`](docs/LOCAL-SINGLE-CLICK-APP.md),
-  [`docs/VERCEL-DEPLOYMENT.md`](docs/VERCEL-DEPLOYMENT.md),
-  [`docs/CLOUDFLARE-DEPLOYMENT.md`](docs/CLOUDFLARE-DEPLOYMENT.md) — the
+  [`docs/VERCEL-DEPLOYMENT.md`](docs/VERCEL-DEPLOYMENT.md) — the
   deployment guide chain, in order.
 - [`docs/APP-SETUP-COMMON.md`](docs/APP-SETUP-COMMON.md) — callback
-  URLs/scopes/secret-gen shared by all three guides above.
-- [`docs/CACHE-IMPLEMENTATION-SWAP.md`](docs/CACHE-IMPLEMENTATION-SWAP.md)
-  — companion to ARCHITECTURE.md's caching section.
+  URLs/scopes/secret-gen shared by the guides above.
 - [`docs/PROGRESSIVE-HISTORY.md`](docs/PROGRESSIVE-HISTORY.md) — tag
   conventions, commit structure, and the lab/enhancement step table for
   rebuilding the progressive history (see `AGENTS.md`).

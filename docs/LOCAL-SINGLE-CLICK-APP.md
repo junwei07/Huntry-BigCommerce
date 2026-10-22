@@ -205,7 +205,6 @@ deployment runs.
 
 Switching to a production DB provider for a hosted environment is covered in:
 - [Vercel deployment guide](./VERCEL-DEPLOYMENT.md)
-- [Cloudflare deployment guide](./CLOUDFLARE-DEPLOYMENT.md)
 
 Stored access tokens are encrypted with `CREDENTIALS_ENCRYPTION_KEY`. If you
 change that value, previously stored tokens can no longer be decrypted —

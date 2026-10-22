@@ -8,8 +8,7 @@ import { AppLink } from "@/components/ui/app-link";
 import { useStoreHash } from "@/components/ui/store-hash-context";
 import { getAppUrl } from "@/lib/routing/app-url";
 
-// Unlike the old gift-certs-manager nav (two independent top-level sibling
-// features, "/gift-certs" and "/customers"), Huntry is one feature mounted
+// Huntry is one feature mounted
 // at "/huntry" with these as nested sub-routes underneath it (see
 // app/store/[storeHash]/huntry/{page.tsx, map/, events/, rewards/,
 // sponsors/, help/} and the matching app/(root)/huntry/... pass-throughs). isIndex

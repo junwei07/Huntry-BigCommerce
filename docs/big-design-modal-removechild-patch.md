@@ -92,9 +92,8 @@ ref that mounts/unmounts a link-tracking instance on every row re-render.
 When a table's rows re-rendered via `router.push` (from sorting, pagination,
 or filtering) while a `Modal` lived as a *sibling* rather than inside the
 same always-mounted wrapper, the same class of DOM-reconciliation crash
-could occur. The fix there is to nest any filters component that renders a
-`Modal` inside `PendingOverlay` (see its comments in
-`src/components/ui/pending-overlay.tsx`), so nothing that re-renders during
+could occur. The fix there (in the since-removed gift-certs sample) was to nest any
+filters component that renders a `Modal` inside a `PendingOverlay`, so nothing that re-renders during
 a client-side transition is a sibling of a portal-rendering component.
 
 That fix alone did not resolve the crash described above — this patch was

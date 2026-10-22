@@ -32,7 +32,7 @@ const issueCodeMock = vi.hoisted(() => vi.fn());
 const customersMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/huntry/rewards/claim-codes", () => ({ issueClaimCode: issueCodeMock }));
-vi.mock("@/lib/gift-certs-manager/customers/customers-api", () => ({ fetchCustomersByEmailUncached: customersMock }));
+vi.mock("@/lib/bc-customers/customers-api", () => ({ fetchCustomersByEmailUncached: customersMock }));
 
 const cookieJar = new Map<string, string>();
 

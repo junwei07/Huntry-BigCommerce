@@ -1,6 +1,6 @@
 import { getRestApiClient } from "@/lib/bc-api-client/get-rest-api-client";
 import { V3ListResponse } from "@/lib/bc-api-client/rest-client/types";
-import { CUSTOMERS_PATH } from "@/lib/gift-certs-manager/customers/types";
+import { CUSTOMERS_PATH } from "@/lib/bc-customers/types";
 import {
   ClaimCustomer,
   GameActivityRow,
@@ -16,8 +16,7 @@ interface CustomerNameRecord {
   email: string;
 }
 
-// Same decorate-with-* shape as gift-certs-manager: a batched live lookup
-// keyed by id, since there is no local players table (docs/MIGRATION.md §1).
+// A batched live lookup keyed by id, since there is no local players table (docs/MIGRATION.md §1).
 // A failed lookup must not take the whole page down — rows just fall back to
 // the bare customer id.
 async function fetchCustomersById(

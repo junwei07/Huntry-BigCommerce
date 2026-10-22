@@ -87,7 +87,7 @@ export function useClearGlobalLoading(): void {
 }
 
 // Mounted once in the root layout, alongside ActionAlertsManager. Fixed to
-// the viewport rather than relative-to-parent like pending-overlay.tsx,
+// the viewport rather than relative-to-parent,
 // since BigDesign has no Overlay primitive to cover the whole page with.
 export function GlobalLoadingOverlay() {
   const count = useSyncExternalStore(subscribe, getSnapshot, () => 0);
@@ -104,8 +104,7 @@ export function GlobalLoadingOverlay() {
         position: "fixed",
         inset: 0,
         zIndex: 9999,
-        // Fully opaque, not a translucent dim layer like pending-overlay.tsx
-        // uses (that one dims by lowering its children's opacity instead) —
+        // Fully opaque, not a translucent dim layer —
         // this overlay has to fully hide whatever's rendering underneath
         // (e.g. a destination route's own small Suspense fallback spinner),
         // not just tint it, or the two spinners show through each other.

@@ -1,11 +1,9 @@
 # Architecture
 
 This is a starter Next.js app for building a BigCommerce single-click
-installable app. The included feature (a gift certificates manager) is a
-worked example — expect to remove `src/components/gift-certs-manager`,
-`src/lib/gift-certs-manager`, and their routes when building a real app on
-top of this starter, while keeping the auth/session/API-client/credentials
-layers described below.
+installable app. The feature built on it is Huntry (`src/components/huntry`,
+`src/lib/huntry`); the starter's original gift certificates example has been
+removed. Examples below use Huntry's events feature.
 
 ## Data modes
 
@@ -90,12 +88,12 @@ A route is split into three pieces, each with one responsibility:
    (as promises). Keeping it free of dynamic data is what lets it render
    synchronously.
 2. **The page component**
-   (e.g. `components/gift-certs-manager/gift-certificates/detail/gift-certificate-detail-page.tsx`)
+   (e.g. `components/huntry/events/list/events-page.tsx`)
    — awaits and normalizes the dynamic inputs: `params`, `searchParams`,
    route ids, the store hash. It resolves those into plain, serializable
    values and passes them down.
 3. **The view component**
-   (e.g. `gift-certificate-view.tsx`) — does the data fetching and renders
+   (e.g. `event-list-view.tsx`) — does the data fetching and renders
    the result. Because everything it receives is a plain serializable value,
    it can be a `"use cache: remote"` boundary with its own `cacheLife` and
    `cacheTag` (see the caching section below).
@@ -255,7 +253,7 @@ the literal `/store` prefix plus any wildcard tail, not on specific known
 routes). Every new Server Action under
 `src/app/store/[storeHash]/huntry/**` must still call
 `isAuthorizedForStore(storeHash)` itself at the top of the action, the same
-way `src/app/store/[storeHash]/gift-certs/[id]/actions.ts`'s actions do.
+way `src/app/store/[storeHash]/huntry/events/[id]/actions.ts`'s actions do.
 
 A failed check redirects to `/unauthorized`, a plain top-level route with no
 shell chrome — `AuthorizedPage` redirects rather than rendering inline
@@ -277,8 +275,7 @@ returns. The Postgres driver is imported through
 `postgres-driver-loader.ts`, not directly — `next.config.ts`'s
 `turbopack.resolveAlias` swaps that specifier for a `pg`-free stub
 (`postgres-driver-loader.unavailable.ts`) whenever the driver isn't
-Postgres, so `pg` (which fails to bundle on some deployment targets, e.g.
-Cloudflare Workers) is never compiled into a build that would never select
+Postgres, so `pg` (which fails to bundle on some deployment targets) is never compiled into a build that would never select
 that branch anyway.
 
 `isStoreUserLinked` is the authoritative half of `isAuthorizedForStore`'s
@@ -400,13 +397,13 @@ the client iterates.
 
 Each feature owns its own handlers and its own mock data, and exposes them
 as a single array — for example
-`lib/gift-certs-manager/gift-certificates/mock/`, whose `handlers.ts`
-exports `giftCertificatesMockHandlers`, built from the individual list and
-detail handlers alongside the `mock-gift-certificates.ts` fixtures.
+`lib/bc-customers/mock/`, whose `handlers.ts` exports
+`customersMockHandlers`, built from the list handler alongside the
+`mock-customers.ts` fixtures.
 
-That indirection is what makes the demo feature disposable. Dropping gift
-certificates from mock mode means deleting one import and one array entry
-from `handler-registry.ts`; adding a feature's mocks means adding one of
+That indirection keeps features disposable. Dropping customer lookups from
+mock mode means deleting one import and one array entry from
+`handler-registry.ts`; adding a feature's mocks means adding one of
 each. `MockRestApiClient` itself never changes either way.
 
 ## Caching
@@ -415,54 +412,21 @@ Two lifetime profiles are defined in
 `lib/cache/cache-profiles.ts`: `standard` (5 min, most data) and
 `extended` (10 min, slower-changing data like channels).
 
-Pagination is stateless (BigCommerce's v2 gift certificates endpoint
-reports no total count anywhere), so "is there a next page" is answered by
-peeking one page ahead with the same page size — that peek uses
-`fetchGiftCertificatesPage` itself, cached the same way, so if the user
-actually clicks "next" the real fetch for that page hits the same cache
-entry the peek already created instead of re-fetching.
-
 Route Handlers that must never be cached by the browser (as opposed to
 Next's own server-side cache) explicitly set `Cache-Control: no-store` — a
 GET Route Handler's response is otherwise eligible for normal HTTP caching.
 
-Two different caching implementations are used in this app:
-
-### Default Implementation
+### Cache Components
 
 The app uses Next's Cache Components (`cacheComponents: true`). Each `use cache` 
 boundary selects a cache profile by calling `cacheLife(cacheProfile("standard"))`.
 
 Data-fetching functions that back a page (e.g.
-`fetchGiftCertificatesPage`) are `"use cache: remote"` and tag themselves
+`fetchEvents`) are `"use cache: remote"` and tag themselves
 with both a shared list tag and a per-record tag (added after the fetch
-resolves, once record ids are known). Mutations call `updateTag` on the
+resolves, once record ids are known; see `lib/huntry/events/cache-tags.ts`). Mutations call `updateTag` on the
 relevant tags so a change is visible immediately rather than waiting out
 the `cacheLife`.
-
-### Cloudflare Target
-
-Scaffolding the app for Cloudflare switches it to fetch-level caching and
-sets `cacheComponents` to `false`. That's necessary because Cache Components
-(PPR) corrupts streamed HTML on Cloudflare Workers via
-`@opennextjs/cloudflare`.
-
-In that implementation, data-fetching functions pass a `cache` option to the
-REST client naming a profile and the tags the response should be stored
-under, and the client turns that into Next's `next: { revalidate, tags }`
-fetch option.
-
-Detail fetches tag per record (`gift-cert:<id>`, `customer:<id>`); list
-fetches carry only the shared list tag, since fetch tags have to be known
-*before* the request is issued and a listing's record ids aren't. Every
-mutation revalidates the relevant list tag alongside the record's own tag,
-so a stale listing still isn't possible.
-
-The `use cache` boundaries in the components have no fetch-level equivalent,
-so they're removed in that implementation and caching moves down to the
-fetches they wrapped. See
-[CACHE-IMPLEMENTATION-SWAP.md](./CACHE-IMPLEMENTATION-SWAP.md) for how that
-conversion is performed and what it expects you to keep up to date.
 
 ### Enabling and disabling caching
 
@@ -486,11 +450,10 @@ is explicitly `true`. Two defaults are worth keeping apart:
 > where data should always be up-to-date. Evaluate your
 > own app's use case.
 >
-> In the Gift Certificates Manager example, cached data
-> will be appropriately invalidated based on the app's own actions
-> (such as refilling a gift certificate), but stale data will persist
-> for the cache lifetime when external updates occur (such as 
-> new gift certificates being purchased).)
+> Cached data is invalidated based on the app's own actions
+> (such as editing an event), but stale data will persist
+> for the cache lifetime when external updates occur (such as
+> a customer being edited in the BigCommerce control panel).
 >
 > When your own apps utilize caching, use [webhooks](https://docs.bigcommerce.com/developer/docs/integrations/webhooks/overview) to invalidate cached data wherever possible.
 
@@ -512,19 +475,16 @@ is explicitly `true`. Two defaults are worth keeping apart:
 - **Boundaries**: one `error.tsx` per real route segment
   (`app/(root)`, `app/store/[storeHash]`) plus a root `global-error.tsx` and
   root `not-found.tsx`. Data-access functions that might not find a record
-  (e.g. `fetchCustomer`) return `undefined`/throw rather than calling
+  (e.g. `fetchEvent`) return `undefined`/throw rather than calling
   `notFound()` themselves, since the same function can be called from a
   Server Action (where a 404 navigation would be wrong) as well as a page
   render — the calling page component makes that call.
 
-## The Gift Certificates Manager example
-
-The included feature demonstrates a few patterns worth understanding even
-though the feature itself is disposable:
+## Patterns worth understanding
 
 ### App Extension registration (idempotent)
 
-`lib/gift-certs-manager/register-app-extension.ts`'s `findOrCreateAppExtension`
+`lib/huntry/register-app-extension.ts`'s `findOrCreateAppExtension`
 queries BigCommerce for an existing App Extension matching this app's own
 URL before creating one. This matters because registration can run more
 than once for the same store (a user-triggered retry after a partial
@@ -536,20 +496,9 @@ a failed registration shouldn't block install, since the app is still fully
 usable without the menu shortcut. It's logged rather than silently
 swallowed, since that's the only way to notice a store missing its
 shortcut. A separate, user-triggered retry action
-(`components/gift-certs-manager/app-extension-status-banner/`) shares the
+(`components/huntry/app-extension-status-banner/`) shares the
 same `findOrCreateAppExtension` call but surfaces success/failure to the UI
 instead of swallowing it.
-
-### Cross-origin control panel navigation
-
-`components/ui/control-panel-link.tsx` navigates the BigCommerce control
-panel's parent frame (not this app's own iframe) for links to native
-control-panel pages this app doesn't reimplement. It can't use `next/link`
-(no in-app transition is happening), so it renders a real `<a href>` (so
-modifier-clicks/middle-click still work) but intercepts a plain click to
-set `window.top.location` instead: an iframe can't read/write a
-cross-origin parent frame's properties, but assigning `window.top.location`
-for a top-level navigation is allowed regardless.
 
 ## Deployment scaffolding
 

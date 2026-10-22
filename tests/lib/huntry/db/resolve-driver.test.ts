@@ -34,7 +34,6 @@ describe("resolveCredentialsStoreDriver", () => {
   it.each([
     ["sqlite", "SQLITE"],
     [" Postgres ", "POSTGRES"],
-    ["D1", "D1"],
     [" firestore ", "FIRESTORE"],
   ])("normalizes %j to %s", (value, expected) => {
     process.env.CREDENTIALS_STORE_DRIVER = value;

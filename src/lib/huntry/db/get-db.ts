@@ -47,23 +47,12 @@ function getSqliteDb(): DatabaseSync {
   return sqliteDb;
 }
 
-// D1 isn't a supported Huntry driver yet (Cloudflare support is a later
-// phase — see docs/MIGRATION.md's phased rollout, Phase 8). An explicit "D1"
-// throws rather than silently running Huntry's production data against a
-// local SQLite file on a Cloudflare deployment. Unrecognized values throw in
-// the shared resolver.
+// Unrecognized driver values throw in the shared resolver.
 function getHuntryDbDriver(): "SQLITE" | "POSTGRES" {
   const configuredDriver = resolveCredentialsStoreDriver();
 
   if (configuredDriver === "POSTGRES") {
     return "POSTGRES";
-  }
-
-  if (configuredDriver === "D1") {
-    throw new Error(
-      "getHuntryDb: the D1 driver is not yet supported for Huntry's own database " +
-        "(CREDENTIALS_STORE_DRIVER=D1 is only valid for credentials-store so far).",
-    );
   }
 
   // Huntry's own data on Firestore goes through getHuntryRepository(), never a raw

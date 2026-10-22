@@ -47,7 +47,7 @@ export function EditSponsorForm({ sponsor }: { sponsor: HuntrySponsor }) {
         // get permanently stuck re-rendering this same edit form (no
         // error, only a hard refresh recovers; router.push + router.refresh
         // was tried first and didn't fix it either). window.location (not
-        // window.top.location — see control-panel-link.tsx) only reloads
+        // window.top.location) only reloads
         // this app's own iframe content, never BigCommerce's own admin
         // frame around it.
         window.location.href = getAppUrl(storeHash, "/huntry/sponsors");

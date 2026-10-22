@@ -52,7 +52,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# Cloudflare
+# Local deployment secrets (keep ignored)
 .open-next
 .wrangler
 .dev.vars*

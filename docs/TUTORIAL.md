@@ -1,5 +1,7 @@
 # Lab Tutorial: BigCommerce Single-Click App Starter
 
+> **Starter history.** This document describes the original starter kit (including its gift certificates example and Cloudflare deployment). Those have been removed from this repo; file paths and steps below no longer match the current code. See `AGENTS.md` and `docs/ARCHITECTURE.md` for the current app.
+
 > **Based on version 1.2.0** 
 
 This document lists the lab exercises and their step-by-step diffs. Each

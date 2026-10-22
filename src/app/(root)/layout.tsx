@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/gift-certs-manager/app-shell";
+import { AppShell } from "@/components/layout/app-shell";
 import { renderRootRoute } from "@/lib/routing/root-route-guard";
 
 // Wraps the root-level dev routes (no [storeHash] segment) in the same

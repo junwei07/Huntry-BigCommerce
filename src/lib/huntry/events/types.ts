@@ -1,6 +1,4 @@
-// Deliberately local rather than imported from
-// gift-certs-manager/customers/types.ts — Huntry code shouldn't depend on
-// the example feature slated for removal.
+// Deliberately local rather than imported from another feature's types.
 // Both options sort ascending: "name" is A-Z, "time" is soonest start first
 // (unscheduled events last).
 export type EventSort = "name" | "time";
@@ -101,7 +99,7 @@ export const DEFAULT_EVENT_THEME: EventTheme = {
   locationMarker: DEFAULT_LOCATION_MARKER,
 };
 
-// camelCase, unlike GiftCertificate — this is our own schema, not a
+// camelCase — this is our own schema, not a
 // passthrough of an external wire format, so it follows CredentialsStore's
 // convention (StoreRecord.storeHash etc.) instead. See events-api.ts for the
 // snake_case row -> this mapping.
@@ -126,7 +124,7 @@ export interface HuntryEvent {
 }
 
 // No text/status filters yet — nothing in tickets.md requests events list
-// filtering (unlike gift-certs, which gets its own filtering enhancement).
+// filtering.
 // This is a placeholder ready for a future ticket to extend.
 export interface EventsQuery {
   sort: EventSort;

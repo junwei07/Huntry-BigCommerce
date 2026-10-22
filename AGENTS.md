@@ -1,8 +1,9 @@
 # BigCommerce Single-Click App Starter Lab Project
 
-A tutorial-shaped progressive history that teaches how to build a
-BigCommerce single-click installable app on Next.js, using a gift
-certificates manager as the worked example feature.
+A BigCommerce single-click installable app on Next.js, built from a starter
+kit, whose feature is the Huntry events plugin (see `docs/MIGRATION.md`).
+The starter's gift certificates example and Cloudflare scaffolding have been
+removed.
 
 ## Terminology and Git Model
 
@@ -17,12 +18,10 @@ This repository maintains two kinds of history **separately**:
   an independent commit chain per project version, identified by a
   project-version tag plus step tags.
 
-`main` and the latest progressive history have **different tip commits but
-identical file trees**. Every change must be replicated across both, using
-the `bcedu-lab-sync` skill, and verified with its `validate-sync` command.
-**Note:** as of this writing, no `bcedu-lab-sync` skill exists on disk (no
-`.claude/skills/` directory in this repo) — treat it as aspirational/
-not-yet-built, not missing due to a session restart.
+The progressive history (and the `bcedu-lab-sync` skill, which never existed
+on disk) described the starter product. It no longer applies to this repo:
+`main` is the only maintained history, and changes need not be replicated
+anywhere else.
 
 For the full tag-naming scheme, commit-history structure, the lab/
 enhancement step breakdown, project-version/changelog mechanics, and the
@@ -55,8 +54,8 @@ removal:
 
 * `.env.local`
 * `data/` (the gitignored local SQLite credentials file)
-* `.dev.vars` (the gitignored local Cloudflare Workers dev vars)
-* `.secrets.production` (the gitignored Cloudflare deployment secrets)
+* `.dev.vars` (gitignored local dev vars, if present)
+* `.secrets.production` (gitignored deployment secrets, if present)
 
 ## Never Commit Local Secrets
 
@@ -70,7 +69,7 @@ on any branch, in any commit:
 
 The repository's `.gitignore` covers them, but **only from the commit that
 introduces those rules onward**. When rebuilding a progressive history the
-Cloudflare ignore rules do not exist until the Cloudflare enhancement, so
+ignore rules do not exist until the commit that introduces them, so
 every commit before that point is unprotected — and the working tree still
 holds the developer's real files.
 

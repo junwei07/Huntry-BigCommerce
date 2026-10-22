@@ -12,7 +12,7 @@ import { HuntrySponsor } from "@/lib/huntry/sponsors/types";
 import { getAppUrl } from "@/lib/routing/app-url";
 
 // Mirrors EventActionsMenu's exact Dropdown/kebab-Button/confirm-Modal
-// shape (itself ported from GiftCertificateActionsMenu).
+// shape.
 export function SponsorActionsMenu({ sponsor }: { sponsor: HuntrySponsor }) {
   const router = useRouter();
   const storeHash = useStoreHash();

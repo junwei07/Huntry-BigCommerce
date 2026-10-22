@@ -55,9 +55,8 @@ export const HUNTRY_COLORS = {
 ```
 
 **Scoped to `src/components/huntry/**` only** — a deliberate decision, not
-an oversight. The shared nav/shell (`src/components/gift-certs-manager/app-shell.tsx`,
-`src/components/layout/main-nav.tsx`) and the still-present legacy
-`gift-certs-manager` screens keep BigDesign's default theme. Apply
+an oversight. The shared nav/shell (`src/components/layout/app-shell.tsx`,
+`src/components/layout/main-nav.tsx`) keeps BigDesign's default theme. Apply
 `HUNTRY_COLORS` via inline `style`/styled-components within Huntry
 components, not by overriding BigDesign's global `ThemeProvider`.
 
@@ -69,8 +68,8 @@ color/layout fidelity over exact radius matching.
 
 ## List layout: row cards, not BigDesign's `Table`
 
-Every other list in this app (gift certificates, customers) uses
-BigDesign's `Table` component. Huntry's admin lists use **row-style
+The starter's original lists used BigDesign's `Table` component (since
+removed). Huntry's admin lists use **row-style
 cards** instead — `EventCard` (`src/components/huntry/events/list/event-card.tsx`)
 is the template: thumbnail image, name, a colored status pill, and
 secondary detail (date range), styled with `HUNTRY_COLORS`. This is a
@@ -234,26 +233,22 @@ URLs by design, not uploads. Without `FIREBASE_STORAGE_BUCKET` the control is pr
 
 Events gained a 3-dot kebab menu (`list/event-actions-menu.tsx`) matching
 EVMS's own event card menu — Edit / Delete — built directly on this app's
-own existing pattern, `GiftCertificateActionsMenu`
-(`src/components/gift-certs-manager/gift-certificates/list/gift-certificate-actions-menu.tsx`):
+own pattern (`EventActionsMenu`, in
+`src/components/huntry/events/list/event-actions-menu.tsx`):
 BigDesign `Dropdown` + a `MoreHorizIcon`-only `Button` toggle + the
-`dropdownKey`-remount workaround (documented there — a downshift/BigDesign
+`dropdownKey`-remount workaround (a downshift/BigDesign
 `Dropdown` stale-state bug) + a confirmation `Modal` for the destructive
 action. Reuse this exact shape for rewards/sponsors kebab menus later.
 
 - **Edit** navigates to `/huntry/events/[id]`, a 3-layer page (`page.tsx`
-  → page-component → view-component, mirroring
-  `GiftCertificateDetailPage`/`GiftCertificateView`) that fetches the
+  → page-component → view-component) that fetches the
   record, pre-fills a form, and submits an update. Per-record Server
-  Actions (`update*`/`delete*`) live in `events/[id]/actions.ts`, mirroring
-  `gift-certs/[id]/actions.ts` — separate from the collection-level
+  Actions (`update*`/`delete*`) live in `events/[id]/actions.ts`, separate from the collection-level
   `events/actions.ts` that only holds `create*`.
 - **The update action re-fetches uncached** (`fetchEventUncached`) right
   before writing, specifically to preserve whichever fields aren't in the
   edit form (`headerBannerUrl`, `isFeatured`, `featuredOrder`) instead of
-  silently resetting them — the same reasoning
-  `gift-certs/[id]/actions.ts`'s own re-fetch-before-mutate pattern
-  documents. Any future edit form with fields the create form doesn't
+  silently resetting them. Any future edit form with fields the create form doesn't
   collect needs the same treatment.
 - **Delete is a genuine hard delete**, confirmed explicitly with the user
   — `huntry_events` has no soft-delete/archive column (unlike

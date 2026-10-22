@@ -21,9 +21,7 @@ const EVENT_NOT_FOUND_MESSAGE =
 // isFeatured/featuredOrder aren't edit-form fields (featuring is a separate
 // ticket's territory), and a blank/unchanged headerBannerUrl keeps the
 // current banner — re-fetching fresh (not fetchEvent's cached read) before
-// writing preserves them instead of resetting them to defaults, the same reasoning
-// gift-certs/[id]/actions.ts's own re-fetch-before-mutate pattern
-// documents.
+// writing preserves them instead of resetting them to defaults.
 export async function updateHuntryEvent(id: number, input: EventFormInput, storeHash: string | undefined): Promise<ActionResult> {
   if (!(await isAuthorizedForStore(storeHash))) {
     return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };

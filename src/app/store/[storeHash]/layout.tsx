@@ -1,4 +1,4 @@
-import { AppShell } from "@/components/gift-certs-manager/app-shell";
+import { AppShell } from "@/components/layout/app-shell";
 import { BigCommerceControlPanelSync } from "@/components/layout/bigcommerce-control-panel-sync";
 
 // AppShell renders synchronously, so it sits outside the Suspense boundary

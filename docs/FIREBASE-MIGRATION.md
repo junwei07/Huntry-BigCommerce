@@ -83,7 +83,7 @@ Proves hosting before touching data.
   The App Hosting docs do not say how to set the Node version. Confirm with a
   test rollout.
 - Start with `CACHE_ENABLED=false`; `use cache: remote` across instances needs
-  a shared handler (see `docs/CACHE-IMPLEMENTATION-SWAP.md`).
+  a shared handler.
 
 ### Phase 1: repository seam, no behaviour change  [x]
 
@@ -455,7 +455,7 @@ consequence is that map freshness is bounded by HTTP caching, not Firestore:
 (`src/app/api/public/huntry/[storeHash]/`), so a filled egg can look available for
 up to about 90s; tapping it ends in `capacity_full`, which `claim-outcome.ts`
 shows as "full". `revalidateTag` in the claim route is per-instance on Cloud Run
-(see Phase 0 and `docs/CACHE-IMPLEMENTATION-SWAP.md`).
+(see Phase 0).
 
 If fresher data is wanted, in order of preference:
 

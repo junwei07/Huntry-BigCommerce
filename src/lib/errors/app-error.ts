@@ -34,10 +34,10 @@ export function toSafeMessage(error: unknown, fallback = "Something went wrong."
 //
 //   - a real 404 from BigCommerce, surfaced by the REST client as an
 //     UPSTREAM_API AppError carrying status 404 (v2 single-resource
-//     endpoints, e.g. a gift certificate by id);
+//     endpoints, e.g. a v2 resource by id);
 //   - an explicit NOT_FOUND AppError raised by a data-access function that
 //     had to decide for itself, since v3 list-style lookups report a missing
-//     record as an empty result rather than a 404 (see customers-api.ts).
+//     record as an empty result rather than a 404 (see bc-customers/customers-api.ts).
 //
 // Callers use this to tell the user the record is gone (most likely deleted
 // since the page was loaded) rather than showing a generic failure message.

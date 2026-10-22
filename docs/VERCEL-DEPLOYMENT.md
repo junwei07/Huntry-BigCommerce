@@ -104,9 +104,9 @@ aren't protected by default.
 ## 3. Verify the Deployment in MOCK Mode
 
 Open the production URL. In `MOCK` mode the root-level routes under
-`app/(root)` serve real content, so you should see the gift certificates
-list rendered with in-memory mock data, a data-mode banner, and working
-navigation to the customers pages.
+`app/(root)` serve real content, so you should see the Huntry overview
+rendered with in-memory mock data, a data-mode banner, and working
+navigation to the Huntry pages.
 
 This confirms the build, the runtime, and the UI all work on Vercel before
 any BigCommerce or database configuration is involved. If something is

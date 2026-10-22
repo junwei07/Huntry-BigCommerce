@@ -8,9 +8,8 @@ store data on their behalf.
 The starter provides the layers every such app needs: the OAuth install and
 launch flow, session management and per-request authorization, per-store
 credential storage, BigCommerce REST and GraphQL API clients with rate-limit
-and timeout handling, caching, and error handling. A gift certificates
-manager is included as a worked example feature, demonstrating those layers
-in something real and complete.
+and timeout handling, caching, and error handling. The Huntry events feature
+(`src/components/huntry`, `src/lib/huntry`) is built on top of those layers.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design and the
 reasoning behind it — data modes, the install/session flow, two-tier
@@ -52,14 +51,13 @@ This app is intended as an example, tutorial, and starter. Choose the path that 
 
 ### Option 1: Run the Example App
 
-If you just want a quick start with the fully functional Gift Certificates Manager example,
+If you just want a quick start with the fully functional Huntry app (in MOCK data mode),
 you can clone and run the app in a few easy steps.
 
 See [docs/RUN-EXAMPLE-APP.md](docs/RUN-EXAMPLE-APP.md) for quick setup instructions, which detail the configuration steps
 to go from a dependency-free start with mock records all the way through a functional single-click app connected to your
 own store's data.
 
-The example app demonstrates full implementations of core patterns.
 
 ### Option 2: Use the App as a Tutorial
 
@@ -71,46 +69,17 @@ This starter app clearly separates its example use case from core libraries that
 
 If you just want to get started building your own app on this foundation, follow [docs/USING-AS-A-STARTER.md](docs/USING-AS-A-STARTER.md) for a guide on what to remove and update.
 
-## The Gift Certificates Manager Example
+## The Huntry Feature
 
-The included feature is a working admin UI for a store's gift certificates,
-chosen because it exercises the parts of an app that are genuinely
-interesting rather than just rendering a list.
-
-What it does:
-
-* **Lists gift certificates** with filtering by code, recipient name, and
-  recipient email, plus sorting and pagination. Pagination is stateless —
-  BigCommerce's v2 endpoint reports no total count, so "is there a next
-  page" is answered by peeking one page ahead through the same cached
-  function the real fetch would use.
-* **Shows certificate detail** across tabs, with the purchaser and recipient
-  on a party panel, decorated with the registered customer account matching
-  the recipient's email when one exists.
-* **Updates status and refills balance** through Server Actions that
-  invalidate the relevant cache tags so changes appear immediately.
-* **Transfers a balance to store credit** — debiting the certificate and
-  crediting the customer across two independent API calls with no shared
-  transaction, including a compensating call if the second one fails. A
-  worked example of handling a partial failure honestly.
-* **Browses customers** in a separate section, with a list, detail pages, and
-  channel decoration, demonstrating a second feature sharing the same
-  patterns.
-* **Registers an app extension** on install, adding a shortcut to this app
-  inside the control panel's own customer pages. Registration is idempotent
-  and never blocks an install, with a user-triggered retry banner when it
-  fails.
-* **Links into the BigCommerce control panel** for native pages the app
-  doesn't reimplement, navigating the parent frame from inside a
-  cross-origin iframe.
-
-Along the way it demonstrates the app-level concerns worth copying: cache
-tagging and invalidation, Suspense boundaries and loading states, Server
-Actions returning structured results instead of throwing, mock handlers that
-mirror the real API's quirks, and per-request memoization.
-
-[ARCHITECTURE.md](docs/ARCHITECTURE.md) covers the non-obvious decisions in
-this feature in detail.
+The app's feature is Huntry, a migration of a legacy WordPress events plugin:
+events, rewards, sponsors, featured placements, a map, and player claims,
+managed from an admin UI inside the BigCommerce control panel. See
+[docs/MIGRATION.md](docs/MIGRATION.md) for the design and
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the non-obvious decisions in
+the underlying layers. The starter's original gift certificates example has
+been removed; [docs/TUTORIAL.md](docs/TUTORIAL.md) and
+[docs/USING-AS-A-STARTER.md](docs/USING-AS-A-STARTER.md) remain as starter
+history.
 
 ## Hosting Provider Support
 
@@ -118,4 +87,3 @@ The app comes with built-in scaffolding supporting multiple
 hosting providers. See the dedicated guides:
 
 - [Vercel Deployment Guide](./docs/VERCEL-DEPLOYMENT.md)
-- [Cloudflare Deployment Guide](./docs/CLOUDFLARE-DEPLOYMENT.md)

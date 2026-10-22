@@ -22,7 +22,7 @@ let firestoreRepository: HuntryRepository | undefined;
 // Selects the Huntry storage implementation from the same
 // CREDENTIALS_STORE_DRIVER that governs credentials (shared resolver, so the two
 // can't diverge). The SQL implementation serves SQLITE and POSTGRES; it picks
-// between them itself through getHuntryDb(), which also rejects D1.
+// between them itself through getHuntryDb().
 export function getHuntryRepository(): HuntryRepository {
   const driver = resolveCredentialsStoreDriver();
 
@@ -34,10 +34,5 @@ export function getHuntryRepository(): HuntryRepository {
       firestoreRepository ??= createFirestoreHuntryRepository();
 
       return firestoreRepository;
-    case "D1":
-      throw new Error(
-        "getHuntryRepository: the D1 driver is not yet supported for Huntry's own database " +
-          "(CREDENTIALS_STORE_DRIVER=D1 is only valid for credentials-store so far).",
-      );
   }
 }

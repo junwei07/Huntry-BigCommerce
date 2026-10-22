@@ -1,9 +1,8 @@
 # BigCommerce App Setup: Callbacks, Scopes, and Secrets
 
-Shared across all three BigCommerce app setup guides —
-[LOCAL-SINGLE-CLICK-APP.md](./LOCAL-SINGLE-CLICK-APP.md),
-[VERCEL-DEPLOYMENT.md](./VERCEL-DEPLOYMENT.md), and
-[CLOUDFLARE-DEPLOYMENT.md](./CLOUDFLARE-DEPLOYMENT.md) — since the
+Shared across the BigCommerce app setup guides —
+[LOCAL-SINGLE-CLICK-APP.md](./LOCAL-SINGLE-CLICK-APP.md) and
+[VERCEL-DEPLOYMENT.md](./VERCEL-DEPLOYMENT.md) — since the
 developer-portal callback URLs, scopes, and secret-generation command are
 identical regardless of where `<APP_ORIGIN>` points.
 

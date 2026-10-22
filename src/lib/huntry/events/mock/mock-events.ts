@@ -104,9 +104,7 @@ export let MOCK_EVENTS: EventFields[] = [
 
 // Simulates creation in MOCK mode by pushing a new fixture into the
 // in-memory array — ephemeral, resets on process restart, matching "in
-// -memory mock data." Unlike gift-certs-manager's mutations (which have no
-// MOCK support at all, since gift certificates are BigCommerce-sourced with
-// nothing local to mutate), docs/MIGRATION.md §6 states Phase 1 admin CRUD
+// -memory mock data." docs/MIGRATION.md §6 states Phase 1 admin CRUD
 // for Huntry's own concepts is "MOCK-mode testable: Yes," which requires
 // creation to actually work here.
 // slug is supplied by the caller (events-api.ts's createEvent), already

@@ -20,7 +20,7 @@ function buildUrl(storeHash: string, path: string, params: ApiRequestOptions["pa
 }
 
 // Query-string values can carry customer PII for this app's endpoints (e.g.
-// a customer/gift-certificate search by email) — this diagnostic log must
+// a customer search by email) — this diagnostic log must
 // never write that to stdout in plaintext, so only the path + param *names*
 // (never values) are logged, not the full URL.
 function toLoggableUrl(url: string): string {

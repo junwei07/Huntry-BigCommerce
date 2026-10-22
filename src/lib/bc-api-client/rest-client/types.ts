@@ -3,9 +3,8 @@ import { CacheOptions } from "@/lib/cache/cache-profiles";
 export type ApiRequestParams = Record<string, string | number | boolean | undefined>;
 
 // The standard BigCommerce v3 list-endpoint envelope: a page of records plus
-// offset-pagination metadata. v2 endpoints (e.g. gift certificates) instead
-// return a bare array and communicate pagination via response headers — see
-// lib/gift-certificates/types.ts.
+// offset-pagination metadata. v2 endpoints instead
+// return a bare array and communicate pagination via response headers.
 export interface V3Pagination {
   total: number;
   count: number;
@@ -33,9 +32,9 @@ export interface ApiMutationOptions {
   body?: unknown;
 }
 
-// v2 list endpoints (e.g. gift certificates) report their total count via
+// v2 list endpoints report their total count via
 // response headers rather than a body field, so callers that need it have to
-// read headers alongside the parsed body — see gift-certificates-api.ts.
+// read headers alongside the parsed body.
 export interface ApiResponse<TResponse> {
   data: TResponse;
   headers: Headers;

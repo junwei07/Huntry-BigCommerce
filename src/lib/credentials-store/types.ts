@@ -1,4 +1,4 @@
-export type CredentialsStoreDriver = "SQLITE" | "POSTGRES" | "D1" | "FIRESTORE";
+export type CredentialsStoreDriver = "SQLITE" | "POSTGRES" | "FIRESTORE";
 
 // A store's OAuth grant. adminUserId is the id of the user who completed
 // the install — every store has exactly one.

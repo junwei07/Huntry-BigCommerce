@@ -1,9 +1,6 @@
-import { CustomerWireRecord } from "@/lib/gift-certs-manager/customers/customers-api";
+import { CustomerWireRecord } from "@/lib/bc-customers/customers-api";
 
-// Registered customer accounts for the emails referenced in
-// mock-gift-certificates.ts. Names occasionally differ from the name
-// entered on the certificate (e.g. a middle initial) to demonstrate that
-// the two are independent.
+// Registered customer accounts served by the mock customers endpoint.
 function withStoreCredit(amount: number): Array<{ amount: string }> {
   return amount > 0 ? [{ amount: amount.toFixed(2) }] : [];
 }

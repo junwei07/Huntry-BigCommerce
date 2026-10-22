@@ -1,5 +1,7 @@
 # Using This App as a Starter
 
+> **Starter history.** This document describes the original starter kit (including its gift certificates example and Cloudflare deployment). Those have been removed from this repo; file paths and steps below no longer match the current code. See `AGENTS.md` and `docs/ARCHITECTURE.md` for the current app.
+
 This guide covers turning this repository into the foundation for your own
 BigCommerce single-click app: what to keep, what to eventually delete, what
 to rewire, and which patterns to follow as you build your own features.
@@ -380,7 +382,6 @@ in.
    
 For more information on `MULTITENANT` in deployed environments, see the deployment guides:
 - [Deploying to Vercel](./VERCEL-DEPLOYMENT.md)
-- [Deploying to Cloudflare](./CLOUDFLARE-DEPLOYMENT.md)
 
 Skipping straight to step 4 with a new feature means debugging a UI bug, a
 malformed API request, a session problem, and a build configuration issue all

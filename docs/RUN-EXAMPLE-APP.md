@@ -35,7 +35,7 @@ In your store's control panel, create a store-level API account
 (**Settings > API > Store-level API accounts**) with:
 
 - "Modify" scopes for
-Marketing (gift certificates) and Customers
+Marketing (coupons) and Customers
 - "Read-Only" scopes for Channel Settings, Channel Listings, and Information & Settings. 
 
 Then in
@@ -102,10 +102,8 @@ see, which is what the Postgres driver
 Hosting-specific tooling is opt-in via `pnpm scaffold <profile>` rather than
 baked into the app, a strategy that supports your ability to target any hosting provider you choose.
 
-Two providers have built-in support today: **Vercel**
-(`pnpm scaffold vercel`), paired with Neon Postgres, and **Cloudflare
-Workers** (`pnpm scaffold cloudflare`), paired with D1.
+One provider has built-in scaffolding today: **Vercel**
+(`pnpm scaffold vercel`), paired with Neon Postgres.
 
 See the dedicated deployment guides for full walkthroughs:
 - [VERCEL-DEPLOYMENT.md](./VERCEL-DEPLOYMENT.md)
-- [CLOUDFLARE-DEPLOYMENT.md](./CLOUDFLARE-DEPLOYMENT.md)

@@ -1,5 +1,7 @@
 # Progressive History Reference
 
+> **Starter history.** This document describes the original starter kit (including its gift certificates example and Cloudflare deployment). Those have been removed from this repo; file paths and steps below no longer match the current code. See `AGENTS.md` and `docs/ARCHITECTURE.md` for the current app.
+
 Deep reference for the BigCommerce Single-Click App Starter Lab Project's
 tutorial-shaped progressive history: tag conventions, commit structure, the
 full lab/enhancement step breakdown, project-version/changelog mechanics,

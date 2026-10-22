@@ -85,9 +85,7 @@ export async function createHuntryReward(input: RewardFormInput, storeHash: stri
 
     // BC-HUN-020: create/update the BigCommerce Promotion + coupon code
     // right after the local DB write succeeds. No compensating rollback of
-    // the reward row if this fails (unlike
-    // transferGiftCertificateBalanceToStoreCredit's two-mutation symmetry)
-    // — the reward row is cheap and safe to keep even coupon-less; the
+    // the reward row if this fails — the reward row is cheap and safe to keep even coupon-less; the
     // admin can retry by editing (bcPromotionId is still null, so
     // syncRewardCoupon creates rather than updates on the retry).
     try {

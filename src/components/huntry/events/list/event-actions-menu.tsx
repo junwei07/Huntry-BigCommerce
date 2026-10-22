@@ -11,9 +11,7 @@ import { useStoreHash } from "@/components/ui/store-hash-context";
 import { HuntryEvent } from "@/lib/huntry/events/types";
 import { getAppUrl } from "@/lib/routing/app-url";
 
-// Ported from GiftCertificateActionsMenu
-// (src/components/gift-certs-manager/gift-certificates/list/gift-certificate-actions-menu.tsx)
-// — same Dropdown/kebab-Button/confirm-Modal shape, matching EVMS's own
+// Dropdown/kebab-Button/confirm-Modal shape, matching EVMS's own
 // event card 3-dot menu layout (see docs/HUNTRY-UI-REFERENCE.md).
 export function EventActionsMenu({ event }: { event: HuntryEvent }) {
   const router = useRouter();
@@ -28,15 +26,14 @@ export function EventActionsMenu({ event }: { event: HuntryEvent }) {
   // spinner and shouldn't trigger the full-page overlay.
   const [, startEditTransition] = useGlobalTransition({ autoResolve: false });
   // Bumped on every selection to force Dropdown (downshift's useSelect
-  // underneath) to remount with a fresh internal reducer — see
-  // GiftCertificateActionsMenu for why.
+  // underneath) to remount with a fresh internal reducer, so a
+  // reopened menu doesn't keep stale selection state.
   const [dropdownKey, setDropdownKey] = useState(0);
 
   const closeModal = () => setIsConfirmingDelete(false);
 
   const handleConfirmDelete = () => {
-    // Closed synchronously on click, not after the action resolves — see
-    // GiftCertificateActionsMenu's identical comment (avoids a stale
+    // Closed synchronously on click, not after the action resolves (avoids a stale
     // reopened modal if this component gets frozen mid-transition in
     // Next's client Router Cache).
     closeModal();

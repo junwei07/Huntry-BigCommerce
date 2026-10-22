@@ -16,7 +16,7 @@ import { getDataMode } from "@/lib/bc-api-client/data-mode";
 // only ever clears the caller's own cookie, so there's no store hash or user
 // id to validate and nothing an attacker gains by POSTing it (the worst case
 // is logging yourself out). That's why there's no isAuthorizedForStore check
-// here, unlike the mutating actions in gift-certs/[id]/actions.ts.
+// here, unlike the mutating Server Actions.
 //
 // Errors are swallowed rather than reported: this is a fire-and-forget
 // security cleanup with no UI to surface a failure to, and the session's own

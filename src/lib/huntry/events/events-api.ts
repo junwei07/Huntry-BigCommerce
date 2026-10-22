@@ -105,8 +105,7 @@ function sortMockEvents(events: HuntryEvent[], sort: EventSort): HuntryEvent[] {
 }
 
 // MOCK mode never touches the repository — it returns deterministic fixture
-// data instead, matching gift-certificates-api.ts's own MOCK behavior and
-// the app's DATA_MODE philosophy ("no real API calls; in-memory mock
+// data instead, matching the app's DATA_MODE philosophy ("no real API calls; in-memory mock
 // data"), rather than letting a contributor's local SQLite file silently
 // accumulate real state across dev sessions.
 export async function fetchEvents(query: EventsQuery, storeHash: string | undefined): Promise<HuntryEvent[]> {
@@ -144,9 +143,8 @@ export async function fetchEvent(id: number, storeHash: string | undefined): Pro
 
 // Uncached counterpart to fetchEvent — used by updateHuntryEvent to read
 // the current headerBannerUrl/isFeatured/featuredOrder (none of which are
-// edit-form fields) right before writing, the same reasoning
-// gift-certificates-api.ts's fetchGiftCertificateUncached documents: a
-// Server Action about to mutate a record should never trust a cached read.
+// edit-form fields) right before writing, the same reasoning:
+// a Server Action about to mutate a record should never trust a cached read.
 export async function fetchEventUncached(id: number, storeHash: string | undefined): Promise<HuntryEvent | undefined> {
   if (getDataMode() === "MOCK") {
     const fields = MOCK_EVENTS.find((event) => event.id === id);
@@ -221,8 +219,7 @@ async function createEventInDb(input: CreateEventInput, storeHash: string): Prom
 }
 
 // MOCK mode pushes into the in-memory fixture array instead of throwing —
-// unlike gift-certs' mutations, which have no MOCK support at all, Huntry's
-// own concepts need creation to actually work in MOCK mode (see
+// Huntry's own concepts need creation to actually work in MOCK mode (see
 // docs/MIGRATION.md §6 Phase 1: "MOCK-mode testable: Yes"). See
 // docs/HUNTRY-UI-REFERENCE.md for the full rationale.
 export async function createEvent(input: CreateEventInput, storeHash: string | undefined): Promise<HuntryEvent> {

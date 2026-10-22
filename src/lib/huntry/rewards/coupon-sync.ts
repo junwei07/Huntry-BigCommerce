@@ -182,12 +182,10 @@ async function syncPromotion(
 // Called with the just-written HuntryReward (post createReward/
 // updateReward, so reward.couponCode is already the admin's current,
 // already-persisted value). Never touches huntry_rewards itself — pure
-// "talk to BigCommerce", mirroring gift-certificates-api.ts's separation
-// from its own Server Actions. Throws rather than swallowing errors —
+// "talk to BigCommerce", keeping it separate from the Server Actions. Throws rather than swallowing errors —
 // apiClient.post/.put already throw AppError("UPSTREAM_API", ...) on
 // failure (rest-client.ts); the calling Server Action decides what to
-// report, following the gift-certs compensating-rollback precedent rather
-// than register-app-extension.ts's never-throw/log-only pattern, since a
+// report, rather than a never-throw/log-only pattern, since a
 // reward with a broken coupon is a real bug, not an acceptable degraded
 // state. Deliberately doesn't port the legacy re-entrancy lock
 // (coupon-sync.php's huntry_reward_coupon_sync_lock()) — BigCommerce has no

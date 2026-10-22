@@ -1,6 +1,6 @@
 // Deliberately local rather than imported from events/types.ts — kept
 // independent of the events DAL the same way events/types.ts stays independent
-// of gift-certs-manager, rather than introducing a cross-import between
+// of other features, rather than introducing a cross-import between
 // sibling Huntry feature directories for a one-line type.
 export type SortDirection = "ASC" | "DESC";
 
