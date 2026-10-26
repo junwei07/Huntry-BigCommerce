@@ -23,6 +23,16 @@ env:
     value: FIRESTORE
   - variable: APP_ORIGIN
     value: https://huntry-bc--evms-demo-d1477.europe-west4.hosted.app/
+  # Read by the prerendered Help page (help-page.tsx), so they must exist at
+  # build time; RUNTIME-only would bake in the fallback values.
+  - variable: DEVELOPER_LOGO_FILENAME
+    value: huntry-logo.png
+  - variable: DEVELOPER_NAME
+    value: Huntry
+  - variable: SUPPORT_EMAIL
+    value: info@nytt-tech.com
+  - variable: SUPPORT_URL
+    value: https://huntry.io
 
   # RUNTIME only
   - variable: BIGCOMMERCE_CLIENT_ID
@@ -52,22 +62,6 @@ env:
       - RUNTIME
   - variable: ERROR_LOGGING_ENABLED
     value: "TRUE"
-    availability:
-      - RUNTIME
-  - variable: DEVELOPER_LOGO_FILENAME
-    value: huntry-logo.png
-    availability:
-      - RUNTIME
-  - variable: DEVELOPER_NAME
-    value: Huntry
-    availability:
-      - RUNTIME
-  - variable: SUPPORT_EMAIL
-    value: info@nytt-tech.com
-    availability:
-      - RUNTIME
-  - variable: SUPPORT_URL
-    value: https://huntry.io
     availability:
       - RUNTIME
 

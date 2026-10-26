@@ -36,6 +36,10 @@ On the **Scopes** tab, enable at minimum:
   reward product picker — a distinct scope from Customers; conflating the
   two caused a live 403 the first time the picker was exercised, see
   `HBC-CHANGELOG.md`'s BC-HUN-019 entry)
+* **Information & Settings**: read-only (`store_v2_information_read_only`; gates
+  `GET /v2/store`, the CORS origin source in
+  `src/lib/huntry/public-api/cors.ts`. Missing it gives a live 403 "You don't
+  have a required scope" and the Huntry tab shows "couldn't load")
 * **Storefront API Customer Impersonation Tokens**: required for
   `customer/current.jwt`
 * **Orders**: read-only (gates webhook registration for

@@ -9,7 +9,7 @@ const THUMB_SIZE = "40px";
 // Ported from huntry/includes/events/index.php's "Item markers" section —
 // one preset picks BOTH the unclaimed and claimed icon together (18 linked
 // pairs), or a custom pair of URLs. No real file upload exists in this
-// starter (no object storage — docs/MIGRATION.md §8), so "custom" is two
+// picker (the bucket uploads cover banners and logos only — docs/MIGRATION.md §8), so "custom" is two
 // URL inputs rather than an upload widget. See docs/HUNTRY-UI-REFERENCE.md.
 export function ItemMarkerPicker({
   value,

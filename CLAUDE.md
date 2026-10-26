@@ -2,44 +2,28 @@
 
 @AGENTS.md
 
-This repo is two things layered together:
-
-1. A BigCommerce single-click-app **tutorial/starter-kit product**
-   (`AGENTS.md` governs its dual-history git model).
-2. An active **migration** of a legacy WordPress plugin (`huntry/`) into a
-   real feature built on top of that starter kit.
-
-Recent work is almost entirely (2) — building the Huntry events feature.
+A BigCommerce single-click app (Next.js) whose feature is Huntry, migrated
+from a legacy WordPress plugin (`huntry/`). `AGENTS.md` holds the git model,
+doc style and secrets rules.
 
 ## Doc map
 
 Everything below is read on demand, not auto-loaded. Each line is enough
 to decide whether to open the file.
 
-**Starter-kit product docs:**
+**App docs:**
 
-- [`README.md`](README.md) — entry point: app purpose, data modes, links
-  to the docs below.
+- [`README.md`](README.md) — what the app is, plus dev and prod setup guides.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — current app
   architecture (routing, auth, caching, API clients) — living spec.
-- [`docs/TUTORIAL.md`](docs/TUTORIAL.md) — learner-facing step-by-step lab
-  walkthrough with diff links (starter history, not current code).
-- [`docs/USING-AS-A-STARTER.md`](docs/USING-AS-A-STARTER.md) — keep/
-  remove/update checklist for using this as a starter for a new app.
-- [`docs/RUN-EXAMPLE-APP.md`](docs/RUN-EXAMPLE-APP.md),
-  [`docs/LOCAL-SINGLE-CLICK-APP.md`](docs/LOCAL-SINGLE-CLICK-APP.md),
-  [`docs/VERCEL-DEPLOYMENT.md`](docs/VERCEL-DEPLOYMENT.md) — the
-  deployment guide chain, in order.
+- [`docs/LOCAL-SINGLE-CLICK-APP.md`](docs/LOCAL-SINGLE-CLICK-APP.md),
+  [`docs/VERCEL-DEPLOYMENT.md`](docs/VERCEL-DEPLOYMENT.md) — local tunnel
+  and Vercel deployment guides.
 - [`docs/APP-SETUP-COMMON.md`](docs/APP-SETUP-COMMON.md) — callback
   URLs/scopes/secret-gen shared by the guides above.
-- [`docs/PROGRESSIVE-HISTORY.md`](docs/PROGRESSIVE-HISTORY.md) — tag
-  conventions, commit structure, and the lab/enhancement step table for
-  rebuilding the progressive history (see `AGENTS.md`).
 - [`docs/big-design-modal-removechild-patch.md`](docs/big-design-modal-removechild-patch.md)
   — root cause + patch for a BigDesign `Modal` crash; re-check when bumping
   BigDesign.
-- [`CHANGELOG.md`](CHANGELOG.md) — progressive-history/tutorial version log
-  (distinct from `HBC-CHANGELOG.md` below).
 
 **Huntry migration docs:**
 

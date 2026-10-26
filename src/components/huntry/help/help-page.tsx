@@ -2,7 +2,7 @@ import Image from "next/image";
 import { Box, Flex, H1, H4, Link, Panel, Small, Text } from "@bigcommerce/big-design";
 import { BaselineHelpIcon } from "@bigcommerce/big-design-icons";
 
-const DEVELOPER_LOGO_FILENAME = process.env.DEVELOPER_LOGO_FILENAME || "developer-logo.svg";
+const DEVELOPER_LOGO_FILENAME = process.env.DEVELOPER_LOGO_FILENAME || "huntry-logo.png";
 const DEVELOPER_NAME = process.env.DEVELOPER_NAME || "Huntry";
 const SUPPORT_EMAIL = process.env.SUPPORT_EMAIL || "info@nytt-tech.com";
 const SUPPORT_URL = process.env.SUPPORT_URL || "https://huntry.io";

@@ -36,9 +36,8 @@ export const DEFAULT_EVENT_THEME_COLORS: EventThemeColors = EVENT_THEME_PRESETS[
 
 // The linked unclaimed+claimed icon pair for map markers — picked together
 // as one preset (huntry_render_event_details_meta_box()'s "Item markers"
-// section), or a custom URL pair. No real file upload exists in this
-// starter (no object storage — see docs/MIGRATION.md §8, same reasoning as
-// headerBannerUrl), so "custom" is a URL input, not an upload widget.
+// section), or a custom URL pair. No real file upload exists for
+// markers (see docs/MIGRATION.md §8), so "custom" is a URL input, not an upload widget.
 export interface EventItemMarker {
   source: "preset" | "custom";
   presetIndex: number | null;

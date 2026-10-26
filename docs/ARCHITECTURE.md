@@ -1,9 +1,8 @@
 # Architecture
 
-This is a starter Next.js app for building a BigCommerce single-click
-installable app. The feature built on it is Huntry (`src/components/huntry`,
-`src/lib/huntry`); the starter's original gift certificates example has been
-removed. Examples below use Huntry's events feature.
+This is a Next.js BigCommerce single-click installable app. Its feature is
+Huntry (`src/components/huntry`, `src/lib/huntry`). Examples below use
+Huntry's events feature.
 
 ## Data modes
 
@@ -504,6 +503,7 @@ instead of swallowing it.
 
 Vercel- and Postgres-specific tooling (build scripts, migration runner,
 `.env.vercel.example`) is opt-in via `pnpm scaffold vercel`
-(`scripts/scaffold.mjs`), not baked into the base app — this starter is
-meant to target any hosting provider. See `scripts/vercel/scaffold.mjs`'s
+(`scripts/scaffold.mjs`), not baked into the base app — the app is meant
+to target any hosting provider (production runs on Firebase App Hosting, see
+`FIREBASE-DEPLOYMENT.md`). See `scripts/vercel/scaffold.mjs`'s
 own comments for what it adds.

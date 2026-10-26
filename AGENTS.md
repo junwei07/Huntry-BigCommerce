@@ -1,33 +1,15 @@
-# BigCommerce Single-Click App Starter Lab Project
+# Huntry for BigCommerce
 
-A BigCommerce single-click installable app on Next.js, built from a starter
-kit, whose feature is the Huntry events plugin (see `docs/MIGRATION.md`).
-The starter's gift certificates example and Cloudflare scaffolding have been
-removed.
+A BigCommerce single-click app on Next.js whose feature is Huntry: events,
+rewards, sponsors, featured placements, a map and player claims, managed from
+an admin UI inside the BigCommerce control panel. It is a migration of a legacy
+WordPress plugin (`huntry/`), see `docs/MIGRATION.md`.
 
-## Terminology and Git Model
+## Git model
 
-This repository maintains two kinds of history **separately**:
-
-- **Traditional branch** (`main`): a normal Git branch with stable,
-  append-only history. Custom-code changes are made on feature branches,
-  reviewed via pull request, and merged here. `main`'s history is never
-  rewritten.
-- **Progressive history**: a tutorial-shaped commit chain (clean framework
-  install → setup/boilerplate → step commits → end metadata) rebuilt as
-  an independent commit chain per project version, identified by a
-  project-version tag plus step tags.
-
-The progressive history (and the `bcedu-lab-sync` skill, which never existed
-on disk) described the starter product. It no longer applies to this repo:
-`main` is the only maintained history, and changes need not be replicated
-anywhere else.
-
-For the full tag-naming scheme, commit-history structure, the lab/
-enhancement step breakdown, project-version/changelog mechanics, and the
-framework install command, see
-[`docs/PROGRESSIVE-HISTORY.md`](docs/PROGRESSIVE-HISTORY.md) — only needed
-when rebuilding or extending the progressive history.
+`main` is the only maintained history: stable and append-only. Make changes on
+feature branches, review via pull request, merge to `main`. Never rewrite
+`main`'s history.
 
 ## Doc Style: Pointer-First
 
@@ -40,22 +22,9 @@ auto-loaded).
 
 When two docs would otherwise explain the same decision, pick one as
 authoritative and have the other link to it rather than re-deriving the
-rationale — e.g. `docs/ARCHITECTURE.md` explains *why* a pattern exists and
-`docs/USING-AS-A-STARTER.md` says *what to do* with it for a new app, rather
-than each explaining the pattern itself. Prefer "see `path/to/file.ts`" over
-restating what's already readable in the code, and prefer a short index
-(name + one line) over a long narrative when a reader just needs to decide
-whether to open something.
-
-## File Removal - Protected Paths
-
-When creating a clean orphan branch, protect these additional paths from
-removal:
-
-* `.env.local`
-* `data/` (the gitignored local SQLite credentials file)
-* `.dev.vars` (gitignored local dev vars, if present)
-* `.secrets.production` (gitignored deployment secrets, if present)
+rationale. Prefer "see `path/to/file.ts`" over restating what's already
+readable in the code, and prefer a short index (name + one line) over a long
+narrative when a reader just needs to decide whether to open something.
 
 ## Never Commit Local Secrets
 
@@ -66,28 +35,15 @@ on any branch, in any commit:
 * `.env.production.local`
 * `.dev.vars`
 * `.secrets.production`
+* `data/` (the gitignored local SQLite files)
 
-The repository's `.gitignore` covers them, but **only from the commit that
-introduces those rules onward**. When rebuilding a progressive history the
-ignore rules do not exist until the commit that introduces them, so
-every commit before that point is unprotected — and the working tree still
-holds the developer's real files.
-
-Because of that, **never use `git add -A`, `git add .`, or `git commit -a`
-while rebuilding or rebasing a history.** Stage explicit paths instead:
+The repository's `.gitignore` covers them. Stage explicit paths instead of
+using `git add -A`, `git add .` or `git commit -a`:
 
 ```shell
 git add src/lib/example.ts docs/EXAMPLE.md
 ```
 
-If a bulk add is genuinely unavoidable, verify the result before committing
-and untrack anything unintended:
-
-```shell
-git status --short
-git rm --cached .secrets.production .dev.vars
-```
-
-Deleting one of these files is equally damaging: the values usually cannot be
-regenerated. See the protected-paths list above before any operation that
-cleans the working tree.
+If a bulk add is unavoidable, check `git status --short` first and untrack
+anything unintended with `git rm --cached <path>`. Deleting one of these files
+is equally damaging: the values usually cannot be regenerated.

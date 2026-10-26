@@ -68,7 +68,7 @@ color/layout fidelity over exact radius matching.
 
 ## List layout: row cards, not BigDesign's `Table`
 
-The starter's original lists used BigDesign's `Table` component (since
+An earlier version of the lists used BigDesign's `Table` component (since
 removed). Huntry's admin lists use **row-style
 cards** instead — `EventCard` (`src/components/huntry/events/list/event-card.tsx`)
 is the template: thumbnail image, name, a colored status pill, and
@@ -164,7 +164,7 @@ export interface EventTheme {
   from `huntry/assets/images/location-markers/`). Resolve via
   `getLocationMarkerPresetUrl(presetIndex)`.
 - **No real file upload** for "custom" in either marker section — no
-  object storage exists in this starter (same constraint as
+  object storage existed at the time (same constraint as
   `headerBannerUrl` below), so "custom" is a URL text input, not an
   upload widget. Labeled honestly (e.g. "Unclaimed icon URL"), not
   presented as a fake upload button.

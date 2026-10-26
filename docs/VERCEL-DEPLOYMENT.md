@@ -3,8 +3,7 @@
 This guide covers deploying this app to Vercel as a hosted BigCommerce
 single-click app, backed by a Neon Postgres database.
 
-This is step 4 of the four-step strategy in
-[Run the Example App](./RUN-EXAMPLE-APP.md). Working through
+Working through
 [Running Locally as a Single-Click App](./LOCAL-SINGLE-CLICK-APP.md) first is
 recommended but not required — the concepts (`MULTITENANT` mode,
 `APP_ORIGIN`, the developer portal callbacks) are the same, with a real host
@@ -34,7 +33,7 @@ healthy, then layering on the real configuration:
 ## 1. Scaffold the Vercel Tooling
 
 Hosting-specific tooling is opt-in rather than baked into the base app, so
-this starter can target any provider. Add the Vercel profile:
+the app can target any provider. Add the Vercel profile:
 
 ```shell
 pnpm scaffold vercel
