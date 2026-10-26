@@ -1,12 +1,10 @@
 # Firebase App Hosting config. Plan and rationale: docs/FIREBASE-MIGRATION.md
 # Phase 0. Secrets are Secret Manager references, so this file is safe to commit.
 #
-# Before the first rollout:
+# BC client secret, session secret and credentials encryption key are set with:
 #   firebase apphosting:secrets:set BIGCOMMERCE_CLIENT_SECRET
 #   firebase apphosting:secrets:set SESSION_SECRET
 #   firebase apphosting:secrets:set CREDENTIALS_ENCRYPTION_KEY
-# then fill the two TODO values below (APP_ORIGIN needs a second rollout when
-# using the generated *.hosted.app URL, since it is baked in at build time).
 
 runConfig:
   minInstances: 1
@@ -24,7 +22,7 @@ env:
   - variable: CREDENTIALS_STORE_DRIVER
     value: FIRESTORE
   - variable: APP_ORIGIN
-    value: https://TODO-set-to-the-backend-or-custom-domain-url
+    value: https://huntry-bc--evms-demo-d1477.europe-west4.hosted.app/
 
   # RUNTIME only
   - variable: BIGCOMMERCE_CLIENT_ID

@@ -45,6 +45,9 @@ to decide whether to open the file.
 
 - [`docs/MIGRATION.md`](docs/MIGRATION.md) — the migration design/plan:
   data model mapping, feature plan, phased rollout, open risks. Living.
+- [`docs/FIREBASE-DEPLOYMENT.md`](docs/FIREBASE-DEPLOYMENT.md) — Firebase
+  App Hosting deploy runbook, decisions and a progress table of what's done
+  so far; also the BigCommerce marketplace publishing checklist. Living.
 - [`docs/HUNTRY-UI-REFERENCE.md`](docs/HUNTRY-UI-REFERENCE.md) — which
   legacy app (WP plugin vs. Flutter reference apps) is the UI
   source-of-truth for each piece of the new admin UI.
