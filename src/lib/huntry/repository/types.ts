@@ -102,6 +102,9 @@ export interface GameActivityRepository {
 export interface LeaderboardRepository {
   // Excludes forced claims; ties go to the earliest last claim.
   getLeaderboard(storeHash: string, eventId: number, limit: number): Promise<LeaderboardEntry[]>;
+  // Distinct customers with a non-forced claim in the event: the full ranking
+  // size, which `getLeaderboard`'s limit hides.
+  countPlayers(storeHash: string, eventId: number): Promise<number>;
 }
 
 export interface ClaimRateLimitRepository {

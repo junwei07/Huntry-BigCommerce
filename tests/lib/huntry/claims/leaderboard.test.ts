@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createForcedClaim } from "@/lib/huntry/claims/claims-api";
 import { fetchGameActivity } from "@/lib/huntry/claims/game-activity";
-import { fetchLeaderboard } from "@/lib/huntry/claims/leaderboard";
+import { fetchLeaderboard, fetchPlayerCount } from "@/lib/huntry/claims/leaderboard";
 import { getHuntryDb } from "@/lib/huntry/db/get-db";
 
 let tempDir: string;
@@ -71,6 +71,21 @@ describe("fetchLeaderboard (SQLite)", () => {
       [2, 1],
     ]);
     expect(rows[0].lastClaimedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe("fetchPlayerCount (SQLite)", () => {
+  it("counts distinct non-forced claimants in the event, beyond the leaderboard limit", async () => {
+    await seed("egg-a", 1, { forced: false });
+    await seed("egg-b", 1, { forced: false });
+    await seed("egg-a", 2, { forced: false });
+    await seed("egg-a", 3, { forced: true });
+    await seed("egg-z", 4, { forced: false, eventId: 2 });
+    await seed("egg-y", 5, { forced: false });
+
+    expect(await fetchPlayerCount(1, "store1")).toBe(3);
+    expect(await fetchLeaderboard(1, "store1", 1)).toHaveLength(1);
+    expect(await fetchPlayerCount(99, "store1")).toBe(0);
   });
 });
 

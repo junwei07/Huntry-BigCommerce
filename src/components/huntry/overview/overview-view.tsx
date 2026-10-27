@@ -3,17 +3,21 @@ import { EventPicker } from "@/components/huntry/overview/event-picker";
 import { ActivityItem, GameActivityPanel } from "@/components/huntry/overview/game-activity-panel";
 import { LeaderboardPanel } from "@/components/huntry/overview/leaderboard-panel";
 import { OverviewMap } from "@/components/huntry/overview/overview-map";
+import { StatCard, StatRow } from "@/components/huntry/stat-card";
 import { decorateClaimsWithCustomers, decorateLeaderboardWithCustomers } from "@/lib/huntry/claims/decorate-with-customers";
 import { fetchEggClaimCounts } from "@/lib/huntry/claims/claims-api";
 import { fetchGameActivity, GAME_ACTIVITY_LIMIT } from "@/lib/huntry/claims/game-activity";
-import { fetchLeaderboard } from "@/lib/huntry/claims/leaderboard";
+import { fetchLeaderboard, fetchPlayerCount } from "@/lib/huntry/claims/leaderboard";
 import { fetchEggs } from "@/lib/huntry/eggs/eggs-api";
+import { formatDateRange } from "@/lib/huntry/events/date-range";
 import { DEFAULT_QUERY } from "@/lib/huntry/events/query";
 import { fetchEvents } from "@/lib/huntry/events/events-api";
 import { resolveItemMarkerUrl } from "@/lib/huntry/events/marker-urls";
+import { EVENT_STATUS_COLOR, EVENT_STATUS_LABEL } from "@/lib/huntry/events/status";
 import { parseSelectedEventId } from "@/lib/huntry/map/query";
 import { DEFAULT_QUERY as DEFAULT_REWARDS_QUERY } from "@/lib/huntry/rewards/query";
 import { fetchRewards } from "@/lib/huntry/rewards/rewards-api";
+import { summarizeEventRewards } from "@/lib/huntry/rewards/summary";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 
 // @cache-components-only:start
@@ -80,11 +84,12 @@ export async function OverviewView({
     );
   }
 
-  const [eggs, claimCounts, leaderboardEntries, activityClaims] = await Promise.all([
+  const [eggs, claimCounts, leaderboardEntries, activityClaims, playerCount] = await Promise.all([
     fetchEggs(selectedEvent.id, storeHash),
     fetchEggClaimCounts(selectedEvent.id, storeHash),
     fetchLeaderboard(selectedEvent.id, storeHash),
     fetchGameActivity(selectedEvent.id, storeHash),
+    fetchPlayerCount(selectedEvent.id, storeHash),
   ]);
   const [leaderboard, activity] = await Promise.all([
     decorateLeaderboardWithCustomers(leaderboardEntries, storeHash),
@@ -111,6 +116,11 @@ export async function OverviewView({
   // Forced claims count toward capacity, same as the Map tab.
   const claimCountByEgg = Object.fromEntries([...claimCounts].map(([eggId, value]) => [eggId, value.count]));
 
+  // Stat cards mirror huntry_render_overview_page(). Claims counts every claim
+  // for the event (forced included) over placed items x per-item claim capacity.
+  const { totalPlaced, totalCapacity, rewardCount } = summarizeEventRewards(rewards, eggs);
+  const totalClaims = [...claimCounts.values()].reduce((sum, value) => sum + value.count, 0);
+
   // @cache-components-only:start
   cacheTag(eventClaimsTag(selectedEvent.id), eventEggsTag(selectedEvent.id));
 
@@ -123,6 +133,18 @@ export async function OverviewView({
     <Box padding="medium" style={{ backgroundColor: HUNTRY_COLORS.background }}>
       <Panel header="Overview">
         <EventPicker events={pickerEvents} selectedEventId={selectedEvent.id} />
+        <StatRow>
+          <StatCard
+            label="Event Status"
+            sub={formatDateRange(selectedEvent.startsAt, selectedEvent.endsAt)}
+            value={EVENT_STATUS_LABEL[selectedEvent.status]}
+            valueColor={selectedEvent.status === "not-scheduled" ? undefined : EVENT_STATUS_COLOR[selectedEvent.status]}
+          />
+          <StatCard label="Items Placed" value={totalPlaced} valueMuted={totalCapacity} />
+          <StatCard label="Claims" value={totalClaims} valueMuted={totalPlaced * selectedEvent.eggClaimCapacity} />
+          <StatCard label="Rewards" value={rewardCount} />
+          <StatCard label="Players" value={playerCount} />
+        </StatRow>
         {/* Plain flex rows (not BigDesign Panels) so the leaderboard stretches to the left column's height, as in WP. */}
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "stretch", gap: 16 }}>
           <div style={{ flex: "2 1 480px", minWidth: 0, display: "flex", flexDirection: "column", gap: 16 }}>

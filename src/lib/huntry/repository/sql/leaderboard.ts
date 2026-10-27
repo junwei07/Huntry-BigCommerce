@@ -51,6 +51,34 @@ async function selectLeaderboard(storeHash: string, eventId: number, limit: numb
   }));
 }
 
+async function countLeaderboardPlayers(storeHash: string, eventId: number): Promise<number> {
+  const db = getHuntryDb();
+  let row: { player_count: number | string } | undefined;
+
+  if (db instanceof DatabaseSync) {
+    row = db
+      .prepare(
+        `SELECT COUNT(DISTINCT bc_customer_id) AS player_count
+         FROM huntry_claims
+         WHERE store_hash = ? AND event_id = ? AND is_forced = 0`,
+      )
+      .get(storeHash, eventId) as unknown as typeof row;
+  } else {
+    row = (
+      await db.query<{ player_count: number | string }>(
+        `SELECT COUNT(DISTINCT bc_customer_id) AS player_count
+         FROM huntry_claims
+         WHERE store_hash = $1 AND event_id = $2 AND is_forced = FALSE`,
+        [storeHash, eventId],
+      )
+    ).rows[0];
+  }
+
+  // COUNT comes back as a string from node-postgres (bigint).
+  return Number(row?.player_count ?? 0);
+}
+
 export const sqlLeaderboardRepository: LeaderboardRepository = {
   getLeaderboard: selectLeaderboard,
+  countPlayers: countLeaderboardPlayers,
 };

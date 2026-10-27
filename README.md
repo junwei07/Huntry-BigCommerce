@@ -14,7 +14,7 @@ plugin (`huntry/`), see [docs/MIGRATION.md](docs/MIGRATION.md).
   APIs under `/api/public/huntry/{storeHash}/*`.
 - **Data:** Firestore holds store credentials (tokens encrypted at rest) and all
   Huntry data. Uploaded images go to a dedicated Cloud Storage bucket.
-- **Hosting:** Firebase App Hosting. Production lives at `https://app.huntry.io`.
+- **Hosting:** Firebase App Hosting. Served from the default Firebase URL today; `https://app.huntry.io` is the production target (not applied yet).
 - **BigCommerce:** the app is registered in the
   [Developer Portal](https://developer.bigcommerce.com/) and talks to each store
   through its OAuth access token, webhooks and a storefront script.
@@ -31,62 +31,93 @@ flow, authorization, credentials storage, the API clients and caching, and
 - A Google Cloud project with Firestore and Cloud Storage, the `gcloud` and
   `firebase` CLIs, and an account allowed to impersonate the app's service
   account
-- A public HTTPS URL for your dev server (tunnel), see
+- For the local-server mode, a public HTTPS tunnel to your dev server, see
   [docs/LOCAL-SINGLE-CLICK-APP.md](docs/LOCAL-SINGLE-CLICK-APP.md)
+
+The app's origin (`APP_ORIGIN`) depends on where it runs:
+
+| Where | Origin |
+| --- | --- |
+| Local server | your tunnel URL (e.g. cloudflared tunnel) |
+| Firebase App Hosting backend | `https://huntry-bc--evms-demo-d1477.europe-west4.hosted.app/` (default  URL) |
+| Production target (TODO) | e.g. `https://app.huntry.io` |
 
 ## Development setup
 
-Development uses its own BigCommerce app, Firestore database and bucket. Do not
-point a dev machine at production data.
+Development uses its own BigCommerce app, Firestore database and storage bucket. You can run dev in two ways: a local
+server behind a tunnel, or the live Firebase App Hosting backend. Both need a
+dev app and the same variables, which differ by where they are set:
 
-1. **Register a dev app** in the Developer Portal. Set the callback URLs
-   (`/api/app/auth`, `/load`, `/uninstall`) to your tunnel URL
-   and enable the scopes and Multiple Users as listed in
-   [docs/APP-SETUP-COMMON.md](docs/APP-SETUP-COMMON.md). Note the client ID and
-   secret.
+1. **Register a dev app** in the Developer Portal and note its client ID and
+   secret. Enable the scopes and Multiple Users as listed in
+   [docs/APP-SETUP-COMMON.md](docs/APP-SETUP-COMMON.md). Its callback URLs
+   (`/api/app/auth`, `/load`, `/uninstall`, `/remove_user`) point at one origin
+   at a time, so they depend on the mode below.
 2. **Install dependencies:** `pnpm install`.
-3. **Configure the environment.** Copy `.env.example` to `.env.local` for a
-   local run. A dev backend on Firebase App Hosting takes the same names from
-   `apphosting.yaml` and Secret Manager instead.
 
-   | Variable | Local `.env.local` | Firebase hosting (`apphosting.yaml`) | Notes |
-   | --- | --- | --- | --- |
-   | `BIGCOMMERCE_CLIENT_ID` | dev app's client ID | plain value, runtime | Developer Portal |
-   | `BIGCOMMERCE_CLIENT_SECRET` | dev app's secret | Secret Manager, runtime | never committed |
-   | `APP_ORIGIN` | your tunnel URL | backend URL or custom domain, build and runtime | baked in at build, a change needs a new rollout |
-   | `SESSION_SECRET` | generated value | Secret Manager, runtime | command in [APP-SETUP-COMMON.md](docs/APP-SETUP-COMMON.md); differs per environment |
-   | `CREDENTIALS_ENCRYPTION_KEY` | generated value | Secret Manager, runtime | differs per environment; changing it orphans stored tokens |
-   | `DATA_MODE` | `MULTITENANT` | `MULTITENANT`, runtime | `MOCK` and `STATIC` are for UI work without a store |
-   | `CREDENTIALS_STORE_DRIVER` | `FIRESTORE` (or `SQLITE` for a no-cloud run) | `FIRESTORE`, build and runtime | SQLite throws on Cloud Run |
-   | `FIRESTORE_DATABASE_ID` | database name | database name, runtime | required, never defaulted |
-   | `FIREBASE_PROJECT_ID` | project ID | project ID, runtime | optional locally if ADC supplies it |
-   | `FIREBASE_STORAGE_BUCKET` | bucket name | bucket name, runtime | unset keeps image fields preview-only |
-   | `CACHE_ENABLED` | `FALSE` | `"FALSE"`, runtime | per-instance cache, keep off |
-   | `ERROR_LOGGING_ENABLED` | `TRUE` | `"TRUE"`, runtime | |
-   | `DEVELOPER_NAME`, `DEVELOPER_LOGO_FILENAME`, `SUPPORT_EMAIL`, `SUPPORT_URL` | branding for the Help page | same, build and runtime | read at build time |
-   | `LOG_API_REQUESTS` | optional `TRUE` | not set | logs BigCommerce calls |
-   | `CREDENTIALS_SQLITE_PATH`, `HUNTRY_SQLITE_PATH` | SQLite driver only | not set | default `./data/` |
-   | `FIRESTORE_EMULATOR_HOST`, `FIREBASE_STORAGE_EMULATOR_HOST` | emulator only | never set | the app refuses to start with the first on Cloud Run |
-   | `FIRESTORE_TEST_LIVE`, `STORAGE_TEST_LIVE` | opt-in live test runs | not set | see `.env.example` |
+| Variable | Local server (`.env.local`) | Hosted backend (`apphosting.yaml`, Secret Manager) | Notes |
+| --- | --- | --- | --- |
+| `BIGCOMMERCE_CLIENT_ID` | dev app's client ID | plain value, runtime | Developer Portal |
+| `BIGCOMMERCE_CLIENT_SECRET` | dev app's secret | Secret Manager, runtime | Developer Portal |
+| `APP_ORIGIN` | your tunnel URL | backend URL or custom domain, build and runtime | baked in at build; a change needs a new rollout |
+| `SESSION_SECRET` | generated value | Secret Manager, runtime | command in [APP-SETUP-COMMON.md](docs/APP-SETUP-COMMON.md); differs per environment |
+| `CREDENTIALS_ENCRYPTION_KEY` | generated value | Secret Manager, runtime | differs per environment; changing it orphans stored tokens |
+| `DATA_MODE` | `MULTITENANT` | `MULTITENANT`, runtime | `MOCK` and `STATIC` are for UI work without a store |
+| `CREDENTIALS_STORE_DRIVER` | `FIRESTORE` (or `SQLITE` for local db) | `FIRESTORE`, build and runtime | SQLite throws on Cloud Run |
+| `FIRESTORE_DATABASE_ID` | - | database name, runtime | required, never defaulted |
+| `FIREBASE_PROJECT_ID` | - | project ID, runtime | optional locally if ADC supplies it |
+| `FIREBASE_STORAGE_BUCKET` | - | bucket name, runtime | unset keeps image fields preview-only |
+| `CACHE_ENABLED` | `FALSE` | `"FALSE"`, runtime | per-instance cache, keep off |
+| `ERROR_LOGGING_ENABLED` | `TRUE` | `"TRUE"`, runtime | |
+| `DEVELOPER_NAME`, `DEVELOPER_LOGO_FILENAME`, `SUPPORT_EMAIL`, `SUPPORT_URL` | as appropriate | as appropriate | branding for the Help page |
+| `LOG_API_REQUESTS` | optional `TRUE` | - | logs BigCommerce calls |
+| `CREDENTIALS_SQLITE_PATH`, `HUNTRY_SQLITE_PATH` | SQLite driver only | - | default `./data/` |
+| `FIRESTORE_EMULATOR_HOST`, `FIREBASE_STORAGE_EMULATOR_HOST` | emulator only | - | the app refuses to start with the first on Cloud Run |
+| `FIRESTORE_TEST_LIVE`, `STORAGE_TEST_LIVE` | opt-in live test runs | - | see `.env.example` |
 
-   Locally there is no key file: `gcloud` impersonation (step 4) supplies the
-   Google identity. On App Hosting the backend's service account does.
-4. **Authenticate to Google Cloud** as the dev service account, with no key file:
+### A. Local server with a tunnel
+
+Callbacks use your tunnel URL, and `APP_ORIGIN` in `.env.local` is the same URL.
+
+1. Copy `.env.example` to `.env.local` and set the Local column above.
+2. **Authenticate to Google Cloud** as the dev service account, with no key file:
    `gcloud auth application-default login --impersonate-service-account=<dev-service-account>`.
-5. **Deploy Firestore rules and indexes** to the dev database once, see
+3. **Deploy Firestore rules and indexes** to the dev database once, see
    [docs/FIREBASE-DEPLOYMENT.md](docs/FIREBASE-DEPLOYMENT.md) (Rules and indexes).
-6. **Run:** `pnpm dev`, expose it through your tunnel, then install the dev app
-   on the sandbox store and open it from the control panel.
-7. **Test:** `pnpm test` runs the suites on SQLite. `pnpm test:firestore` runs
+4. **Run:** `pnpm dev`, start your tunnel, set the portal callbacks to the tunnel
+   URL, then install the dev app on the sandbox store and open it from the
+   control panel.
+5. **Test:** `pnpm test` runs the suites on SQLite. `pnpm test:firestore` runs
    the repository and credentials suites on the Firestore emulator (needs
    JDK 21 or later).
 
 Restart `pnpm dev` after changing `CREDENTIALS_STORE_DRIVER`, because
 `next.config.ts` reads it at startup.
 
+### B. Live Firebase App Hosting backend
+
+The backend runs as its own service account, so there is no `gcloud`
+impersonation step. Values come from `apphosting.yaml` and Secret Manager.
+
+1. Set `APP_ORIGIN` in `apphosting.yaml` to the backend's URL and make sure the
+   secrets exist and are readable by the backend (Production setup, steps 3 and 5).
+2. Set the portal callbacks to that URL.
+3. **Deploy** by pushing to `main`, or without a commit:
+
+   ```powershell
+   firebase apphosting:rollouts:create <backend-id> --git-branch main --project <project>
+   firebase apphosting:rollouts:list --backend <backend-id> --project <project>
+   ```
+
+4. Install or re-open the dev app on the sandbox store.
+
+> **The hosted backend currently serves from the default Firebase URL**
+> (`https://huntry-bc--evms-demo-d1477.europe-west4.hosted.app/`)
+
+
 ## Production setup
 
-Production is a separate BigCommerce app with its own client ID and secret, its
+Production should be a separate BigCommerce app with its own client ID and secret, its
 own database and bucket, and its own secrets. The full runbook, decisions and
 progress log are in [docs/FIREBASE-DEPLOYMENT.md](docs/FIREBASE-DEPLOYMENT.md).
 Commands are PowerShell; `<project>` is the Google Cloud project and
@@ -144,7 +175,8 @@ Commands are PowerShell; `<project>` is the Google Cloud project and
 7. **Configure `apphosting.yaml`:** `APP_ORIGIN`, `BIGCOMMERCE_CLIENT_ID`,
    `FIRESTORE_DATABASE_ID`, `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`.
    `APP_ORIGIN` is baked in at build time, so changing it needs a new rollout.
-8. **Add the custom domain** `app.huntry.io`. This is console only: App Hosting,
+8. **Add the custom domain** `app.huntry.io` (not applied yet, see the note under
+   Development setup B). This is console only: App Hosting,
    the backend, Settings, Add custom domain, then add the listed records in the
    DNS provider (Vultr) without touching existing records.
 9. **Roll out and check.** A push to `main` starts a rollout; to redeploy

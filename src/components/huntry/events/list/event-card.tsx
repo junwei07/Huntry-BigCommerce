@@ -1,23 +1,10 @@
 import { Box, Text } from "@bigcommerce/big-design";
 import { EventActionsMenu } from "@/components/huntry/events/list/event-actions-menu";
 import { EVENT_ROW_GRID_TEMPLATE } from "@/components/huntry/events/list/event-row-grid";
+import { formatDateRange } from "@/lib/huntry/events/date-range";
 import { EVENT_STATUS_COLOR, EVENT_STATUS_LABEL } from "@/lib/huntry/events/status";
 import { HuntryEvent } from "@/lib/huntry/events/types";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
-
-const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
-
-function formatDateRange(startsAt: Date | null, endsAt: Date | null): string {
-  if (!startsAt) {
-    return "Not scheduled";
-  }
-
-  if (!endsAt) {
-    return dateFormatter.format(startsAt);
-  }
-
-  return `${dateFormatter.format(startsAt)} — ${dateFormatter.format(endsAt)}`;
-}
 
 // Row-card layout, ported from huntry/EVMS's EventCard
 // (huntry/EVMS/lib/feature/event_setting/event_page/view/event_card_view.dart)

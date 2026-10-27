@@ -45,3 +45,14 @@ export async function fetchLeaderboard(
 
   return getHuntryRepository().claims.getLeaderboard(resolvedStoreHash, eventId, limit);
 }
+
+// Overview "Players" card: everyone who ranks, not just the top LEADERBOARD_LIMIT.
+export async function fetchPlayerCount(eventId: number, storeHash: string | undefined): Promise<number> {
+  if (getDataMode() === "MOCK") {
+    return new Set(MOCK_CLAIMS.filter((claim) => claim.eventId === eventId && !claim.isForced).map((claim) => claim.bcCustomerId)).size;
+  }
+
+  const resolvedStoreHash = resolveStoreHash(storeHash);
+
+  return resolvedStoreHash ? getHuntryRepository().claims.countPlayers(resolvedStoreHash, eventId) : 0;
+}

@@ -44,5 +44,17 @@ export function createFirestoreLeaderboardRepository(getDb: () => Firestore = ge
         )
         .slice(0, limit);
     },
+
+    // Same filters as getLeaderboard, so the count always matches the ranking.
+    async countPlayers(storeHash, eventId) {
+      const snapshot = await storeCollection(getDb(), storeHash, "claims")
+        .where("eventId", "==", eventId)
+        .where("status", "==", "issued")
+        .where("isForced", "==", false)
+        .select("bcCustomerId")
+        .get();
+
+      return new Set(snapshot.docs.map((doc) => doc.get("bcCustomerId") as number)).size;
+    },
   };
 }

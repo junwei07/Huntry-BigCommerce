@@ -3,15 +3,19 @@ import { RewardCard } from "@/components/huntry/rewards/list/reward-card";
 import { RewardListHeader } from "@/components/huntry/rewards/list/reward-list-header";
 import { NewRewardButton } from "@/components/huntry/rewards/list/new-reward-button";
 import { SortSelect } from "@/components/huntry/rewards/list/sort-select";
+import { StatCard, StatRow } from "@/components/huntry/stat-card";
+import { fetchRewardEggCounts } from "@/lib/huntry/eggs/eggs-api";
 import { fetchRewards } from "@/lib/huntry/rewards/rewards-api";
 import { MAX_REWARDS } from "@/lib/huntry/rewards/limits";
 import { parseRewardsQuery } from "@/lib/huntry/rewards/query";
+import { summarizeRewards } from "@/lib/huntry/rewards/summary";
 import { fetchSponsors } from "@/lib/huntry/sponsors/sponsors-api";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 
 // @cache-components-only:start
 import { cacheLife, cacheTag } from "next/cache";
 import { cacheProfile, CACHE_PROFILE_STANDARD } from "@/lib/cache/cache-profiles";
+import { EGGS_LIST_TAG } from "@/lib/huntry/eggs/cache-tags";
 import { rewardTag, REWARDS_LIST_TAG } from "@/lib/huntry/rewards/cache-tags";
 // @cache-components-only:end
 
@@ -25,11 +29,12 @@ export async function RewardListView({
   // @cache-components-only:start
   "use cache: remote";
   cacheLife(cacheProfile(CACHE_PROFILE_STANDARD));
-  cacheTag(REWARDS_LIST_TAG);
+  cacheTag(REWARDS_LIST_TAG, EGGS_LIST_TAG);
   // @cache-components-only:end
 
   const query = parseRewardsQuery(searchParams);
-  const rewards = await fetchRewards(query, storeHash);
+  const [rewards, eggCounts] = await Promise.all([fetchRewards(query, storeHash), fetchRewardEggCounts(storeHash)]);
+  const summary = summarizeRewards(rewards, eggCounts);
   // HuntryReward only stores sponsorId, never a denormalized sponsor
   // name/logo — resolved once here rather than each card doing its own
   // per-row fetch.
@@ -58,6 +63,14 @@ export async function RewardListView({
             />
           </Box>
         ) : null}
+
+        {/* Layout mirrors huntry_render_reward_summary() (huntry/includes/rewards/cpt.php). */}
+        <StatRow>
+          <StatCard label="Total Rewards" value={summary.totalRewards} />
+          <StatCard label="Total Capacity" value={summary.totalCapacity} />
+          <StatCard label="Placed" value={summary.placed} />
+          <StatCard label="Remaining" value={summary.remaining} />
+        </StatRow>
 
         <Flex alignItems="center" justifyContent="space-between" marginBottom="medium">
           <SortSelect query={query} />
