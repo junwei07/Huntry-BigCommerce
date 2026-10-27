@@ -72,6 +72,31 @@ export async function isLoggedIn(config: StorefrontConfig): Promise<boolean> {
   }
 }
 
+// Whether the hunt is closed to this customer (player cap reached, no claim
+// yet). Fails open — { full: false } on any error — because the claims route
+// still enforces the cap, so a flaky probe must not lock players out.
+export async function fetchPlayerStatus(config: StorefrontConfig, eventId: number): Promise<{ full: boolean }> {
+  try {
+    const jwt = await fetchCustomerJwt(config);
+
+    if (!jwt) return { full: false };
+
+    const response = await fetch(publicUrl(config, "player-status"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jwt, eventId }),
+    });
+
+    if (!response.ok) return { full: false };
+
+    const body = (await response.json().catch(() => null)) as { full?: unknown } | null;
+
+    return { full: body?.full === true };
+  } catch {
+    return { full: false };
+  }
+}
+
 // BC-HUN-050: which of these cart coupon codes are reward codes claimed by
 // someone else. Fails open — [] on any error — because the cart guard is
 // advisory (the cart webhook is the enforcing layer). A guest sends no JWT.

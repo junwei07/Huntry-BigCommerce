@@ -67,6 +67,34 @@ export function showJoinPrompt(successColor: string | null = null): void {
   document.body.appendChild(overlay);
 }
 
+// The player-cap gate for a live event's map: a new customer arriving at a full
+// hunt gets this instead of the map. Same no-dismiss modal as showJoinPrompt,
+// with a way back to the hunts list.
+export function showHuntFullPrompt(backHref: string, successColor: string | null = null): void {
+  injectStyles();
+
+  const overlay = el("div", "huntry-claim-overlay");
+  const card = el("div", "huntry-claim-dialog");
+  const wrap = el("div", "huntry-claim-dialog__content");
+  const back = el("a", "huntry-claim-dialog__button huntry-claim-dialog__button--claim", STRINGS.backToEvents);
+  const color = safeColor(successColor);
+
+  if (color) overlay.style.setProperty("--huntry-claim-success", color);
+
+  back.href = backHref;
+  card.setAttribute("role", "dialog");
+  card.setAttribute("aria-modal", "true");
+  wrap.append(
+    el("div", "huntry-claim-dialog__icon", "🙁"),
+    el("h2", "huntry-claim-dialog__title", STRINGS.huntFullTitle),
+    el("p", "huntry-claim-dialog__message", STRINGS.huntFull),
+    back,
+  );
+  card.appendChild(wrap);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+}
+
 export interface DomUiOptions {
   container: HTMLElement;
   successColor: string | null;

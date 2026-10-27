@@ -45,12 +45,12 @@ export function createFirestoreLeaderboardRepository(getDb: () => Firestore = ge
         .slice(0, limit);
     },
 
-    // Same filters as getLeaderboard, so the count always matches the ranking.
+    // Forced claims included, unlike the ranking: this matches the player cap's
+    // count (repository/firestore/player-claim.ts).
     async countPlayers(storeHash, eventId) {
       const snapshot = await storeCollection(getDb(), storeHash, "claims")
         .where("eventId", "==", eventId)
         .where("status", "==", "issued")
-        .where("isForced", "==", false)
         .select("bcCustomerId")
         .get();
 

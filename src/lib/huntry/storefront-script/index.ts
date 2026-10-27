@@ -1,10 +1,10 @@
-import { fetchMapData, fetchMyRewards, isLoggedIn, submitClaim } from "./api";
+import { fetchMapData, fetchMyRewards, fetchPlayerStatus, isLoggedIn, submitClaim } from "./api";
 import { isCartPage, startCartGuard } from "./cart-guard";
 import { isCheckoutArea, isCheckoutPage, startCheckoutGuard } from "./checkout-guard";
 import { listingUrl, renderListing, renderNotFound } from "./cards-view";
 import { startClaimUi } from "./claim-ui";
 import { startCtas } from "./cta";
-import { showJoinPrompt } from "./claim-ui/dom-ui";
+import { showHuntFullPrompt, showJoinPrompt } from "./claim-ui/dom-ui";
 import { loadEggFlags } from "./local-state";
 import { enterFullscreen } from "./map/chrome";
 import type { HuntryMapApi } from "./map/mount-map";
@@ -140,6 +140,19 @@ async function start(): Promise<void> {
           primaryColor: mode.event.colors?.primaryColor ?? null,
         });
         showJoinPrompt(mode.event.colors?.successColor ?? null);
+        break;
+      }
+
+      // A full hunt is closed to customers who hold no claim yet (the claims
+      // route enforces the same cap). Block before the map downloads.
+      if ((await fetchPlayerStatus(config, mode.event.id)).full) {
+        enterFullscreen(container, {
+          title: mode.event.name,
+          backHref: listingUrl(),
+          endsAt: mode.event.endsAt,
+          primaryColor: mode.event.colors?.primaryColor ?? null,
+        });
+        showHuntFullPrompt(listingUrl(), mode.event.colors?.successColor ?? null);
         break;
       }
 

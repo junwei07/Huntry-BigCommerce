@@ -46,10 +46,11 @@ export async function fetchLeaderboard(
   return getHuntryRepository().claims.getLeaderboard(resolvedStoreHash, eventId, limit);
 }
 
-// Overview "Players" card: everyone who ranks, not just the top LEADERBOARD_LIMIT.
+// Overview "Players" card: every customer counted toward MAX_PLAYERS_PER_EVENT
+// (forced claims included), not just the top LEADERBOARD_LIMIT.
 export async function fetchPlayerCount(eventId: number, storeHash: string | undefined): Promise<number> {
   if (getDataMode() === "MOCK") {
-    return new Set(MOCK_CLAIMS.filter((claim) => claim.eventId === eventId && !claim.isForced).map((claim) => claim.bcCustomerId)).size;
+    return new Set(MOCK_CLAIMS.filter((claim) => claim.eventId === eventId).map((claim) => claim.bcCustomerId)).size;
   }
 
   const resolvedStoreHash = resolveStoreHash(storeHash);

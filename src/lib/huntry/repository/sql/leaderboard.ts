@@ -51,6 +51,8 @@ async function selectLeaderboard(storeHash: string, eventId: number, limit: numb
   }));
 }
 
+// Forced claims included, unlike the ranking: this matches the player cap's
+// count (repository/sql/player-claim.ts).
 async function countLeaderboardPlayers(storeHash: string, eventId: number): Promise<number> {
   const db = getHuntryDb();
   let row: { player_count: number | string } | undefined;
@@ -60,7 +62,7 @@ async function countLeaderboardPlayers(storeHash: string, eventId: number): Prom
       .prepare(
         `SELECT COUNT(DISTINCT bc_customer_id) AS player_count
          FROM huntry_claims
-         WHERE store_hash = ? AND event_id = ? AND is_forced = 0`,
+         WHERE store_hash = ? AND event_id = ?`,
       )
       .get(storeHash, eventId) as unknown as typeof row;
   } else {
@@ -68,7 +70,7 @@ async function countLeaderboardPlayers(storeHash: string, eventId: number): Prom
       await db.query<{ player_count: number | string }>(
         `SELECT COUNT(DISTINCT bc_customer_id) AS player_count
          FROM huntry_claims
-         WHERE store_hash = $1 AND event_id = $2 AND is_forced = FALSE`,
+         WHERE store_hash = $1 AND event_id = $2`,
         [storeHash, eventId],
       )
     ).rows[0];

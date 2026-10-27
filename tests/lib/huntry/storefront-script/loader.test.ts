@@ -75,7 +75,8 @@ const JWT_URL = "/customer/current.jwt?app_client_id=client-1";
 
 // `guest` makes BigCommerce's current.jwt answer 404, as it does when no
 // customer is signed in.
-function setUp(search: string, events: unknown[], guest = false) {
+// `huntFull` is the player-status answer for a signed-in customer.
+function setUp(search: string, events: unknown[], guest = false, huntFull = false) {
   container = fakeNode("div");
   body = fakeNode("body");
   headChildren = [];
@@ -108,6 +109,10 @@ function setUp(search: string, events: unknown[], guest = false) {
 
       if (url === JWT_URL) {
         return guest ? new Response("", { status: 404 }) : new Response("a.jwt.token", { status: 200 });
+      }
+
+      if (url.endsWith("/player-status")) {
+        return new Response(JSON.stringify({ full: huntFull }), { status: 200 });
       }
 
       return new Response(JSON.stringify({ events }), { status: 200 });
@@ -160,6 +165,52 @@ describe("storefront loader", () => {
     expect(overlay?.className).toBe("huntry-claim-overlay");
     expect(message?.textContent).toBe("Log in or create an account to join the hunt.");
     expect(login?.href).toBe("/login.php?from=huntry%2F%3Fevent%3Dhunt");
+  });
+
+  it("blocks a full hunt for a new player: no map script, a back-to-events button", async () => {
+    setUp("?event=hunt", [EVENT], false, true);
+    await runLoader();
+
+    expect(headChildren.some((node) => node.src?.endsWith("/storefront-map.js"))).toBe(false);
+
+    const [header] = container.children;
+
+    expect(header?.className).toBe("huntry-fullscreen__header");
+    expect(header?.children[0]?.href).toBe("/huntry/");
+
+    const overlay = body.children[1];
+    const [icon, title, message, back] = overlay?.children[0]?.children[0]?.children ?? [];
+
+    expect(overlay?.className).toBe("huntry-claim-overlay");
+    expect(icon?.textContent).toBe("🙁");
+    expect(title?.textContent).toBe("This hunt is full");
+    expect(message?.textContent).toContain("maximum number of players");
+    expect(back?.textContent).toBe("Back to events");
+    expect(back?.href).toBe("/huntry/");
+  });
+
+  it("asks player-status with the JWT and the event id", async () => {
+    setUp("?event=hunt", [EVENT]);
+    await runLoader();
+
+    expect(fetchedUrls).toContain("https://app.example.com/api/public/huntry/abc123/player-status");
+    expect(headChildren.some((node) => node.src?.endsWith("/storefront-map.js"))).toBe(true);
+  });
+
+  it("still loads the map when the player-status check fails", async () => {
+    setUp("?event=hunt", [EVENT]);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (url === JWT_URL) return new Response("a.jwt.token", { status: 200 });
+        if (url.endsWith("/player-status")) return new Response("boom", { status: 500 });
+
+        return new Response(JSON.stringify({ events: [EVENT] }), { status: 200 });
+      }),
+    );
+    await runLoader();
+
+    expect(headChildren.some((node) => node.src?.endsWith("/storefront-map.js"))).toBe(true);
   });
 
   it("still loads the map when the login check itself fails", async () => {

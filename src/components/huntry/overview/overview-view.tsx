@@ -6,6 +6,7 @@ import { OverviewMap } from "@/components/huntry/overview/overview-map";
 import { StatCard, StatRow } from "@/components/huntry/stat-card";
 import { decorateClaimsWithCustomers, decorateLeaderboardWithCustomers } from "@/lib/huntry/claims/decorate-with-customers";
 import { fetchEggClaimCounts } from "@/lib/huntry/claims/claims-api";
+import { MAX_PLAYERS_PER_EVENT } from "@/lib/huntry/claims/limits";
 import { fetchGameActivity, GAME_ACTIVITY_LIMIT } from "@/lib/huntry/claims/game-activity";
 import { fetchLeaderboard, fetchPlayerCount } from "@/lib/huntry/claims/leaderboard";
 import { fetchEggs } from "@/lib/huntry/eggs/eggs-api";
@@ -143,7 +144,12 @@ export async function OverviewView({
           <StatCard label="Items Placed" value={totalPlaced} valueMuted={totalCapacity} />
           <StatCard label="Claims" value={totalClaims} valueMuted={totalPlaced * selectedEvent.eggClaimCapacity} />
           <StatCard label="Rewards" value={rewardCount} />
-          <StatCard label="Players" value={playerCount} />
+          <StatCard
+            label="Players"
+            sub={playerCount >= MAX_PLAYERS_PER_EVENT ? "Player limit reached" : undefined}
+            value={playerCount}
+            valueMuted={MAX_PLAYERS_PER_EVENT}
+          />
         </StatRow>
         {/* Plain flex rows (not BigDesign Panels) so the leaderboard stretches to the left column's height, as in WP. */}
         <div style={{ display: "flex", flexWrap: "wrap", alignItems: "stretch", gap: 16 }}>

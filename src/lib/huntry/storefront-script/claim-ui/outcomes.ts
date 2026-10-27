@@ -28,6 +28,9 @@ export const STRINGS = {
   limitTitle: "You're Out Of Claims!",
   limitMessage: "You've reached your claim limit for this hunt.  Use your rewards before they expire!",
   backToHunts: "Back to all hunts",
+  backToEvents: "Back to events",
+  huntFullTitle: "This hunt is full",
+  huntFull: "This hunt has reached its maximum number of players.",
   genericError: "Couldn't claim this right now. Please try again.",
   skippedItems: "Skipped items",
   myRewards: "My Rewards",
@@ -81,8 +84,8 @@ export function describeOutcome(outcome: ClaimOutcome): OutcomeAction {
         type: "blocked",
         reason: "players-full",
         icon: "🙁",
-        title: "This hunt is full",
-        message: "This hunt has reached its maximum number of players, so no new players can join.",
+        title: STRINGS.huntFullTitle,
+        message: STRINGS.huntFull,
       };
     case "unavailable":
       return {

@@ -75,7 +75,7 @@ describe("fetchLeaderboard (SQLite)", () => {
 });
 
 describe("fetchPlayerCount (SQLite)", () => {
-  it("counts distinct non-forced claimants in the event, beyond the leaderboard limit", async () => {
+  it("counts distinct claimants in the event (forced included, as the player cap does), beyond the leaderboard limit", async () => {
     await seed("egg-a", 1, { forced: false });
     await seed("egg-b", 1, { forced: false });
     await seed("egg-a", 2, { forced: false });
@@ -83,7 +83,7 @@ describe("fetchPlayerCount (SQLite)", () => {
     await seed("egg-z", 4, { forced: false, eventId: 2 });
     await seed("egg-y", 5, { forced: false });
 
-    expect(await fetchPlayerCount(1, "store1")).toBe(3);
+    expect(await fetchPlayerCount(1, "store1")).toBe(4);
     expect(await fetchLeaderboard(1, "store1", 1)).toHaveLength(1);
     expect(await fetchPlayerCount(99, "store1")).toBe(0);
   });
