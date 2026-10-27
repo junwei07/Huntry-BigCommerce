@@ -4,7 +4,7 @@ import { addMockPlayerClaim } from "@/lib/huntry/claims/mock/mock-claims";
 import { MAX_PLAYERS_PER_EVENT } from "@/lib/huntry/claims/limits";
 import { CreatePlayerClaimInput, CreatePlayerClaimResult } from "@/lib/huntry/claims/types";
 import { getHuntryRepository } from "@/lib/huntry/repository/get-huntry-repository";
-import { computeRewardUsageLimit } from "@/lib/huntry/rewards/coupon-sync";
+import { computeRewardUsageLimit } from "@/lib/huntry/rewards/usage-limit";
 import { issueClaimCode } from "@/lib/huntry/rewards/claim-codes";
 import { isRewardWindowOpen } from "@/lib/huntry/rewards/reward-display";
 import { computeEventStatus } from "@/lib/huntry/events/events-api";
