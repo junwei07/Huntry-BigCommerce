@@ -41,7 +41,7 @@ function decrement(): void {
 // button-level spinner.
 //
 // autoResolve: true (default) increments on the way up and decrements from
-// the effect's own cleanup — covers a same-page transition like SortToggle,
+// the effect's own cleanup — covers a same-page transition like SortSelect,
 // where the calling component stays mounted for isPending's whole lifecycle
 // (including on unmount, since a startTransition navigation can also unmount
 // the caller in the very commit that finishes the transition, e.g.

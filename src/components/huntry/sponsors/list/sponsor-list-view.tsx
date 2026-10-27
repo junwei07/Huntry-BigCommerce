@@ -2,7 +2,7 @@ import { Box, Flex, Panel, Text } from "@bigcommerce/big-design";
 import { SponsorCard } from "@/components/huntry/sponsors/list/sponsor-card";
 import { SponsorListHeader } from "@/components/huntry/sponsors/list/sponsor-list-header";
 import { NewSponsorButton } from "@/components/huntry/sponsors/list/new-sponsor-button";
-import { SortToggle } from "@/components/huntry/sponsors/list/sort-toggle";
+import { SortSelect } from "@/components/huntry/sponsors/list/sort-select";
 import { fetchSponsors } from "@/lib/huntry/sponsors/sponsors-api";
 import { parseSponsorsQuery } from "@/lib/huntry/sponsors/query";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
@@ -39,7 +39,7 @@ export async function SponsorListView({
     <Box padding="medium">
       <Panel header="Sponsors" style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
         <Flex alignItems="center" justifyContent="space-between" marginBottom="medium">
-          <SortToggle query={query} />
+          <SortSelect query={query} />
           <NewSponsorButton />
         </Flex>
 

@@ -4,6 +4,10 @@ export const DEFAULT_QUERY: SponsorsQuery = {
   direction: "ASC",
 };
 
+export const SPONSOR_SORT_OPTIONS: { value: SortDirection; content: string }[] = [
+  { value: "ASC", content: "A-Z" },
+];
+
 type RawSearchParams = Record<string, string | string[] | undefined>;
 
 function getParam(searchParams: RawSearchParams, key: string): string | undefined {
