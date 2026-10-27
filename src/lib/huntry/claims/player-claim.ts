@@ -9,6 +9,7 @@ import { issueClaimCode } from "@/lib/huntry/rewards/claim-codes";
 import { isRewardWindowOpen } from "@/lib/huntry/rewards/reward-display";
 import { computeEventStatus } from "@/lib/huntry/events/events-api";
 import { haversineMeters } from "@/lib/huntry/eggs/geo";
+import { withTimeout } from "@/lib/with-timeout";
 
 // BC-HUN-032: the atomic, capacity-validated player claim. Locking, loading
 // and the write live in the repository (repository/sql/player-claim.ts);
@@ -114,23 +115,6 @@ export function evaluateClaim(
   }
 
   return { ok: true };
-}
-
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms);
-
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
 }
 
 export async function createPlayerClaim(

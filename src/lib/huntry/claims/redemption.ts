@@ -1,6 +1,7 @@
 import { getDataMode } from "@/lib/bc-api-client/resolve-store-credentials";
 import { BcRestApiClient } from "@/lib/bc-api-client/rest-client/types";
 import { normalizeCouponCode } from "@/lib/huntry/claims/coupon-code";
+import { groupClaimsByNormalizedCode } from "@/lib/huntry/claims/group-claims-by-code";
 import { ClaimId, RedemptionStatus } from "@/lib/huntry/claims/types";
 import { getHuntryRepository } from "@/lib/huntry/repository/get-huntry-repository";
 
@@ -33,17 +34,9 @@ export { normalizeCouponCode };
 // `redeemed`; with no matching row every row for that code is flagged.
 // Guest orders (customer_id 0) never match a claim's customer, so they flag.
 export function evaluateRedemption(orderCustomerId: number, claims: RedemptionCandidate[]): RedemptionUpdate[] {
-  const claimsByCode = new Map<string, RedemptionCandidate[]>();
-
-  for (const claim of claims) {
-    const code = normalizeCouponCode(claim.couponCode);
-
-    claimsByCode.set(code, [...(claimsByCode.get(code) ?? []), claim]);
-  }
-
   const updates: RedemptionUpdate[] = [];
 
-  for (const group of claimsByCode.values()) {
+  for (const group of groupClaimsByNormalizedCode(claims).values()) {
     const owner = group.find((claim) => claim.bcCustomerId === orderCustomerId);
 
     if (owner) {

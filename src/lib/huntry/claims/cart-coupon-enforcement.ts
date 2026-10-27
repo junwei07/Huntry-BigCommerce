@@ -2,6 +2,7 @@ import { getDataMode } from "@/lib/bc-api-client/resolve-store-credentials";
 import { BcRestApiClient } from "@/lib/bc-api-client/rest-client/types";
 import { isNotFoundError } from "@/lib/errors/app-error";
 import { logError } from "@/lib/errors/logger";
+import { groupClaimsByNormalizedCode } from "@/lib/huntry/claims/group-claims-by-code";
 import { findClaimsByCouponCodes, normalizeCouponCode, RedemptionCandidate } from "@/lib/huntry/claims/redemption";
 
 // A reward's per-claim code (BC-HUN-032) belongs to the customer who claimed
@@ -40,13 +41,7 @@ export function evaluateCartCoupons(
     return [];
   }
 
-  const claimsByCode = new Map<string, RedemptionCandidate[]>();
-
-  for (const claim of claims) {
-    const code = normalizeCouponCode(claim.couponCode);
-
-    claimsByCode.set(code, [...(claimsByCode.get(code) ?? []), claim]);
-  }
+  const claimsByCode = groupClaimsByNormalizedCode(claims);
 
   return cartCodes.filter((cartCode) => {
     const owners = claimsByCode.get(normalizeCouponCode(cartCode));
