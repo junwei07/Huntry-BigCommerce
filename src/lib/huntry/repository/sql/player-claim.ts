@@ -28,24 +28,68 @@ interface EggRow {
   reward_id: number;
 }
 
-// Loads everything evaluateClaim needs. Locks are taken by the caller first.
-async function loadContext(
+// Driver-dependent column types (pg returns bigint/numeric as strings, SQLite
+// returns dates as text), so the raw rows stay `unknown` until toClaimContext.
+interface EventRow {
+  starts_at: unknown;
+  ends_at: unknown;
+  marker_radius_meters: unknown;
+  max_grab_count: unknown;
+  egg_claim_capacity: unknown;
+}
+
+interface RewardRow {
+  id: unknown;
+  name: unknown;
+  status: unknown;
+  coupon_code: string | null;
+  bc_promotion_id: string | null;
+  egg_capacity: unknown;
+  reward_starts_at: unknown;
+  reward_expires_at: unknown;
+}
+
+interface CountsRow {
+  egg: unknown;
+  reward: unknown;
+  customer_in_event: unknown;
+  players_in_event: unknown;
+}
+
+interface LastClaimRow {
+  claim_lat: number | null;
+  claim_lng: number | null;
+  elapsed: number | string;
+}
+
+interface ClaimRows {
+  event: EventRow;
+  reward: RewardRow;
+  placed: { egg_claim_capacity: number | null }[];
+  counts: CountsRow;
+  existing: { coupon_code: string } | undefined;
+  last: LastClaimRow | undefined;
+}
+
+// Runs the six reads evaluateClaim's context needs. Locks are taken by the
+// caller first. Undefined when the event or reward row is gone.
+async function queryClaimRows(
   tx: ClaimTx,
   storeHash: string,
   egg: EggRow,
   eggId: string,
   customerId: number,
-): Promise<ClaimContext | undefined> {
+): Promise<ClaimRows | undefined> {
   const elapsed =
     tx.dialect === "pg"
       ? "EXTRACT(EPOCH FROM (clock_timestamp() - claimed_at))"
       : "(CAST(strftime('%s', 'now') AS INTEGER) - CAST(strftime('%s', claimed_at) AS INTEGER))";
 
-  const [event] = await tx.query<Record<string, unknown>>(
+  const [event] = await tx.query<EventRow>(
     "SELECT starts_at, ends_at, marker_radius_meters, max_grab_count, egg_claim_capacity FROM huntry_events WHERE id = $1 AND store_hash = $2",
     [egg.event_id, storeHash],
   );
-  const [reward] = await tx.query<Record<string, unknown>>(
+  const [reward] = await tx.query<RewardRow>(
     `SELECT id, name, status, coupon_code, bc_promotion_id, egg_capacity, reward_starts_at, reward_expires_at
      FROM huntry_rewards WHERE id = $1 AND store_hash = $2`,
     [egg.reward_id, storeHash],
@@ -61,7 +105,7 @@ async function loadContext(
      WHERE g.reward_id = $1 AND g.store_hash = $2`,
     [egg.reward_id, storeHash],
   );
-  const [counts] = await tx.query<Record<string, unknown>>(
+  const [counts] = await tx.query<CountsRow>(
     `SELECT
        (SELECT COUNT(*) FROM huntry_claims WHERE store_hash = $1 AND egg_id = $2) AS egg,
        (SELECT COUNT(*) FROM huntry_claims WHERE store_hash = $1 AND reward_id = $3) AS reward,
@@ -73,12 +117,17 @@ async function loadContext(
     "SELECT coupon_code FROM huntry_claims WHERE store_hash = $1 AND egg_id = $2 AND bc_customer_id = $3",
     [storeHash, eggId, customerId],
   );
-  const [last] = await tx.query<{ claim_lat: number | null; claim_lng: number | null; elapsed: number | string }>(
+  const [last] = await tx.query<LastClaimRow>(
     `SELECT claim_lat, claim_lng, ${elapsed} AS elapsed FROM huntry_claims
      WHERE store_hash = $1 AND bc_customer_id = $2 ORDER BY claimed_at DESC, id DESC LIMIT 1`,
     [storeHash, customerId],
   );
 
+  return { event, reward, placed, counts, existing, last };
+}
+
+// Pure mapping from driver rows to the facade's ClaimContext.
+function toClaimContext({ event, reward, placed, counts, existing, last }: ClaimRows, egg: EggRow): ClaimContext {
   return {
     egg: { lat: egg.lat, lng: egg.lng },
     event: {
@@ -92,8 +141,8 @@ async function loadContext(
       id: Number(reward.id),
       name: String(reward.name),
       status: String(reward.status),
-      couponCode: (reward.coupon_code as string | null) ?? null,
-      bcPromotionId: (reward.bc_promotion_id as string | null) ?? null,
+      couponCode: reward.coupon_code ?? null,
+      bcPromotionId: reward.bc_promotion_id ?? null,
       eggCapacity: Number(reward.egg_capacity),
       startsAt: toDate(reward.reward_starts_at),
       expiresAt: toDate(reward.reward_expires_at),
@@ -112,6 +161,33 @@ async function loadContext(
   };
 }
 
+// Loads everything evaluateClaim needs. Locks are taken by the caller first.
+async function loadContext(
+  tx: ClaimTx,
+  storeHash: string,
+  egg: EggRow,
+  eggId: string,
+  customerId: number,
+): Promise<ClaimContext | undefined> {
+  const rows = await queryClaimRows(tx, storeHash, egg, eggId, customerId);
+
+  return rows && toClaimContext(rows, egg);
+}
+
+// Postgres-only: SQLite's BEGIN IMMEDIATE already serialises writers. Takes
+// the customer, event and reward locks in the order documented in runClaim;
+// the egg row is re-locked by the caller afterwards.
+async function acquirePgLocks(tx: ClaimTx, storeHash: string, egg: EggRow, customerId: number): Promise<void> {
+  if (tx.dialect !== "pg") {
+    return;
+  }
+
+  await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`${storeHash}:${customerId}`]);
+  // Serialises different new customers racing for the last player slots.
+  await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`${storeHash}:event:${egg.event_id}`]);
+  await tx.query("SELECT id FROM huntry_rewards WHERE id = $1 AND store_hash = $2 FOR UPDATE", [egg.reward_id, storeHash]);
+}
+
 // The shared body, run between BEGIN and COMMIT. Returns the result plus
 // whether the transaction should commit.
 async function runClaim(
@@ -120,6 +196,9 @@ async function runClaim(
   input: CreatePlayerClaimInput,
   hooks: PlayerClaimHooks,
 ): Promise<{ result: CreatePlayerClaimResult; commit: boolean }> {
+  const forUpdate = tx.dialect === "pg" ? " FOR UPDATE" : "";
+  const falseLiteral = tx.dialect === "pg" ? "FALSE" : "0";
+
   // Lock order (all callers): customer, event, reward, egg — see the ticket plan.
   const [egg] = await tx.query<EggRow & { reward_id: number }>(
     // The reward row is locked next, so first read the egg unlocked just to
@@ -132,15 +211,10 @@ async function runClaim(
     return { result: { status: "egg_not_found" }, commit: false };
   }
 
-  if (tx.dialect === "pg") {
-    await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`${storeHash}:${input.bcCustomerId}`]);
-    // Serialises different new customers racing for the last player slots.
-    await tx.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [`${storeHash}:event:${egg.event_id}`]);
-    await tx.query("SELECT id FROM huntry_rewards WHERE id = $1 AND store_hash = $2 FOR UPDATE", [egg.reward_id, storeHash]);
-  }
+  await acquirePgLocks(tx, storeHash, egg, input.bcCustomerId);
 
   const locked = await tx.query<EggRow>(
-    `SELECT lat, lng, event_id, reward_id FROM huntry_eggs WHERE id = $1 AND store_hash = $2${tx.dialect === "pg" ? " FOR UPDATE" : ""}`,
+    `SELECT lat, lng, event_id, reward_id FROM huntry_eggs WHERE id = $1 AND store_hash = $2${forUpdate}`,
     [input.eggId, storeHash],
   );
 
@@ -172,7 +246,7 @@ async function runClaim(
   const [row] = await tx.query<Record<string, unknown>>(
     `INSERT INTO huntry_claims
        (store_hash, egg_id, reward_id, event_id, reward_name_snapshot, bc_customer_id, coupon_code, claim_lat, claim_lng, is_forced)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ${tx.dialect === "pg" ? "FALSE" : "0"}) RETURNING *`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, ${falseLiteral}) RETURNING *`,
     [
       storeHash,
       input.eggId,

@@ -1,5 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { DocumentData, FieldValue, Firestore } from "firebase-admin/firestore";
+import {
+  DocumentData,
+  DocumentReference,
+  DocumentSnapshot,
+  FieldValue,
+  Firestore,
+  QueryDocumentSnapshot,
+  Transaction,
+} from "firebase-admin/firestore";
 import { getFirestoreDb } from "@/lib/firebase/admin";
 import type { ClaimContext } from "@/lib/huntry/claims/player-claim";
 import { normalizeCouponCode } from "@/lib/huntry/claims/coupon-code";
@@ -44,6 +52,17 @@ export const PENDING_TTL_MS = 60_000;
 
 const EGG_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 
+// gRPC status codes a Firestore transaction gives up with when it keeps
+// conflicting: the equivalent of the SQL lock timeout.
+const GRPC_DEADLINE_EXCEEDED = 4;
+const GRPC_ABORTED = 10;
+
+function isLockTimeout(error: unknown): boolean {
+  const code = (error as { code?: unknown }).code;
+
+  return code === GRPC_ABORTED || code === GRPC_DEADLINE_EXCEEDED;
+}
+
 type ReserveOutcome =
   | { kind: "done"; result: CreatePlayerClaimResult; rewardId?: number }
   | { kind: "reserved"; reservationId: string; reward: ClaimContext["reward"]; eventId: number; rewardId: number };
@@ -86,6 +105,122 @@ function isExpired(pending: DocumentData, now: Date): boolean {
   const reservedAt = readDate(pending.reservedAt);
 
   return reservedAt === null || now.getTime() - reservedAt.getTime() > PENDING_TTL_MS;
+}
+
+interface ClaimContextSource {
+  egg: DocumentData;
+  event: DocumentData;
+  reward: DocumentData;
+  placedEggs: QueryDocumentSnapshot[];
+  placedEventIds: number[];
+  placedEvents: DocumentSnapshot[];
+  counts: Counts;
+  customer: CustomerState;
+  existing: DocumentData | undefined;
+  now: Date;
+}
+
+// Pure mapping from what the transaction read to the facade's ClaimContext.
+// Reads nothing and writes nothing, so it is safe inside a retried transaction.
+function buildClaimContext({
+  egg,
+  event,
+  reward,
+  placedEggs,
+  placedEventIds,
+  placedEvents,
+  counts,
+  customer,
+  existing,
+  now,
+}: ClaimContextSource): ClaimContext {
+  const eventKey = String(egg.eventId);
+
+  return {
+    egg: { lat: egg.lat, lng: egg.lng },
+    event: {
+      startsAt: readDate(event.startsAt),
+      endsAt: readDate(event.endsAt),
+      markerRadiusMeters: Number(event.markerRadiusMeters),
+      maxGrabCount: Number(event.maxGrabCount),
+      eggClaimCapacity: Number(event.eggClaimCapacity),
+    },
+    reward: {
+      id: egg.rewardId,
+      name: String(reward.name),
+      status: String(reward.status),
+      couponCode: reward.couponCode ?? null,
+      bcPromotionId: reward.bcPromotionId ?? null,
+      eggCapacity: Number(reward.eggCapacity),
+      startsAt: readDate(reward.rewardStartsAt),
+      expiresAt: readDate(reward.rewardExpiresAt),
+      placedEggClaimCapacities: placedEggs.map((doc) => {
+        const parent = placedEvents[placedEventIds.indexOf(doc.get("eventId") as number)];
+
+        return parent?.exists ? (parent.get("eggClaimCapacity") as number) : null;
+      }),
+    },
+    counts: {
+      egg: counts.egg,
+      reward: counts.reward,
+      customerInEvent: customer.eventCounts[eventKey] ?? 0,
+      playersInEvent: counts.players,
+    },
+    existingCouponCode: existing?.status === "issued" ? (existing.couponCode ?? null) : null,
+    lastClaim: customer.lastClaimAt
+      ? {
+          lat: customer.lastLat,
+          lng: customer.lastLng,
+          elapsedSeconds: Math.max((now.getTime() - customer.lastClaimAt.getTime()) / 1000, 0.001),
+        }
+      : null,
+  };
+}
+
+interface ReservationWrite {
+  refs: {
+    claim: DocumentReference;
+    customerDoc: DocumentReference;
+    eggCounter: DocumentReference;
+    rewardCounter: DocumentReference;
+    playersCounter: DocumentReference;
+  };
+  pending: DocumentData;
+  takeover: boolean;
+  eventId: number;
+  eventKey: string;
+  counts: Counts;
+  customer: CustomerState;
+  isNewPlayer: boolean;
+  position: { lat: number; lng: number };
+  now: Date;
+}
+
+// The write half of reserve: the pending claim doc, both counters, the
+// players counter for a customer's first claim in the event, and the customer
+// doc. Must run after every read in the transaction.
+function writeReservation(tx: Transaction, w: ReservationWrite): void {
+  const { claim, customerDoc, eggCounter, rewardCounter, playersCounter } = w.refs;
+
+  if (w.takeover) {
+    tx.set(claim, w.pending);
+  } else {
+    tx.create(claim, w.pending);
+  }
+
+  tx.set(eggCounter, { eventId: w.eventId, count: w.counts.egg + 1 }, { merge: true });
+  tx.set(rewardCounter, { count: w.counts.reward + 1 }, { merge: true });
+
+  if (w.isNewPlayer) {
+    tx.set(playersCounter, { count: w.counts.players + 1 }, { merge: true });
+  }
+
+  tx.set(customerDoc, {
+    lastClaimAt: w.now,
+    lastLat: w.position.lat,
+    lastLng: w.position.lng,
+    eventCounts: { ...w.customer.eventCounts, [w.eventKey]: (w.customer.eventCounts[w.eventKey] ?? 0) + 1 },
+  });
 }
 
 export function createFirestorePlayerClaimRepository(getDb: () => Firestore = getFirestoreDb): PlayerClaimRepository {
@@ -160,48 +295,19 @@ export function createFirestorePlayerClaimRepository(getDb: () => Firestore = ge
         takeover = true;
       }
 
-      const event = eventSnapshot.data() as DocumentData;
-      const reward = rewardSnapshot.data() as DocumentData;
       const eventKey = String(egg.eventId);
-      const context: ClaimContext = {
-        egg: { lat: egg.lat, lng: egg.lng },
-        event: {
-          startsAt: readDate(event.startsAt),
-          endsAt: readDate(event.endsAt),
-          markerRadiusMeters: Number(event.markerRadiusMeters),
-          maxGrabCount: Number(event.maxGrabCount),
-          eggClaimCapacity: Number(event.eggClaimCapacity),
-        },
-        reward: {
-          id: egg.rewardId,
-          name: String(reward.name),
-          status: String(reward.status),
-          couponCode: reward.couponCode ?? null,
-          bcPromotionId: reward.bcPromotionId ?? null,
-          eggCapacity: Number(reward.eggCapacity),
-          startsAt: readDate(reward.rewardStartsAt),
-          expiresAt: readDate(reward.rewardExpiresAt),
-          placedEggClaimCapacities: placed.docs.map((doc) => {
-            const parent = placedEvents[placedEventIds.indexOf(doc.get("eventId") as number)];
-
-            return parent?.exists ? (parent.get("eggClaimCapacity") as number) : null;
-          }),
-        },
-        counts: {
-          egg: counts.egg,
-          reward: counts.reward,
-          customerInEvent: customer.eventCounts[eventKey] ?? 0,
-          playersInEvent: counts.players,
-        },
-        existingCouponCode: existing?.status === "issued" ? (existing.couponCode ?? null) : null,
-        lastClaim: customer.lastClaimAt
-          ? {
-              lat: customer.lastLat,
-              lng: customer.lastLng,
-              elapsedSeconds: Math.max((now.getTime() - customer.lastClaimAt.getTime()) / 1000, 0.001),
-            }
-          : null,
-      };
+      const context = buildClaimContext({
+        egg,
+        event: eventSnapshot.data() as DocumentData,
+        reward: rewardSnapshot.data() as DocumentData,
+        placedEggs: placed.docs,
+        placedEventIds,
+        placedEvents,
+        counts,
+        customer,
+        existing,
+        now,
+      });
       const evaluation = hooks.evaluate(context);
 
       if (!("ok" in evaluation)) {
@@ -228,24 +334,17 @@ export function createFirestorePlayerClaimRepository(getDb: () => Firestore = ge
         previousCustomer: { lastClaimAt: customer.lastClaimAt, lastLat: customer.lastLat, lastLng: customer.lastLng },
       };
 
-      if (takeover) {
-        tx.set(claim, pending);
-      } else {
-        tx.create(claim, pending);
-      }
-
-      tx.set(eggCounter, { eventId: egg.eventId, count: counts.egg + 1 }, { merge: true });
-      tx.set(rewardCounter, { count: counts.reward + 1 }, { merge: true });
-
-      if (context.counts.customerInEvent === 0) {
-        tx.set(playersCounter, { count: counts.players + 1 }, { merge: true });
-      }
-
-      tx.set(customerDoc, {
-        lastClaimAt: now,
-        lastLat: input.lat,
-        lastLng: input.lng,
-        eventCounts: { ...customer.eventCounts, [eventKey]: (customer.eventCounts[eventKey] ?? 0) + 1 },
+      writeReservation(tx, {
+        refs: { claim, customerDoc, eggCounter, rewardCounter, playersCounter },
+        pending,
+        takeover,
+        eventId: egg.eventId,
+        eventKey,
+        counts,
+        customer,
+        isNewPlayer: context.counts.customerInEvent === 0,
+        position: { lat: input.lat, lng: input.lng },
+        now,
       });
 
       return { kind: "reserved", reservationId, reward: context.reward, eventId: egg.eventId, rewardId: egg.rewardId };
@@ -391,11 +490,7 @@ export function createFirestorePlayerClaimRepository(getDb: () => Firestore = ge
           throw error;
         }
       } catch (error) {
-        // A transaction that keeps conflicting gives up with ABORTED (10) or
-        // DEADLINE_EXCEEDED (4): the equivalent of the SQL lock timeout.
-        const code = (error as { code?: unknown }).code;
-
-        if (code === 10 || code === 4) {
+        if (isLockTimeout(error)) {
           return { status: "lock_timeout" };
         }
 
