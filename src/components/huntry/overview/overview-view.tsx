@@ -3,6 +3,7 @@ import { EventPicker } from "@/components/huntry/overview/event-picker";
 import { ActivityItem, GameActivityPanel } from "@/components/huntry/overview/game-activity-panel";
 import { LeaderboardPanel } from "@/components/huntry/overview/leaderboard-panel";
 import { OverviewMap } from "@/components/huntry/overview/overview-map";
+import { PageTitle } from "@/components/huntry/page-title";
 import { StatCard, StatRow } from "@/components/huntry/stat-card";
 import { decorateClaimsWithCustomers, decorateLeaderboardWithCustomers } from "@/lib/huntry/claims/decorate-with-customers";
 import { fetchEggClaimCounts } from "@/lib/huntry/claims/claims-api";
@@ -77,7 +78,8 @@ export async function OverviewView({
   if (!selectedEvent) {
     return (
       <Box padding="medium" style={{ backgroundColor: HUNTRY_COLORS.background }}>
-        <Panel header="Overview">
+        <Panel>
+          <PageTitle>Overview</PageTitle>
           <EventPicker events={pickerEvents} selectedEventId={null} />
           <Text style={{ color: HUNTRY_COLORS.textMuted }}>Create an event first to see its overview.</Text>
         </Panel>
@@ -132,7 +134,8 @@ export async function OverviewView({
 
   return (
     <Box padding="medium" style={{ backgroundColor: HUNTRY_COLORS.background }}>
-      <Panel header="Overview">
+      <Panel>
+        <PageTitle>Overview</PageTitle>
         <EventPicker events={pickerEvents} selectedEventId={selectedEvent.id} />
         <StatRow>
           <StatCard

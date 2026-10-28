@@ -1,6 +1,7 @@
 import Image from "next/image";
-import { Box, Flex, H1, H4, Link, Panel, Small, Text } from "@bigcommerce/big-design";
+import { Box, Flex, H4, Link, Panel, Small, Text } from "@bigcommerce/big-design";
 import { BaselineHelpIcon } from "@bigcommerce/big-design-icons";
+import { PageTitle } from "@/components/huntry/page-title";
 
 const DEVELOPER_LOGO_FILENAME = process.env.DEVELOPER_LOGO_FILENAME || "huntry-logo.png";
 const DEVELOPER_NAME = process.env.DEVELOPER_NAME || "Huntry";
@@ -10,7 +11,7 @@ const SUPPORT_URL = process.env.SUPPORT_URL || "https://huntry.io";
 export function HelpPage() {
   return (
     <Box style={{ maxWidth: "480px" }}>
-      <H1>Help</H1>
+      <PageTitle>Help</PageTitle>
       <Panel>
       <Flex flexDirection="column" alignItems="center" marginBottom="large">
         <Image

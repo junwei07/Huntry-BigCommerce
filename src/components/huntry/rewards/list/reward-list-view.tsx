@@ -3,6 +3,7 @@ import { RewardCard } from "@/components/huntry/rewards/list/reward-card";
 import { RewardListHeader } from "@/components/huntry/rewards/list/reward-list-header";
 import { NewRewardButton } from "@/components/huntry/rewards/list/new-reward-button";
 import { SortSelect } from "@/components/huntry/rewards/list/sort-select";
+import { PageTitle } from "@/components/huntry/page-title";
 import { StatCard, StatRow } from "@/components/huntry/stat-card";
 import { fetchRewardEggCounts } from "@/lib/huntry/eggs/eggs-api";
 import { fetchRewards } from "@/lib/huntry/rewards/rewards-api";
@@ -53,7 +54,8 @@ export async function RewardListView({
 
   return (
     <Box padding="medium" style={{ backgroundColor: HUNTRY_COLORS.background }}>
-      <Panel header="Rewards" style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
+      <Panel style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
+        <PageTitle>Rewards</PageTitle>
         {limitReached ? (
           <Box marginBottom="medium">
             <InlineMessage

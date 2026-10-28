@@ -1,5 +1,6 @@
 import { Box, Panel, Text } from "@bigcommerce/big-design";
 import { MapPlacementView } from "@/components/huntry/map/map-placement-view";
+import { PageTitle } from "@/components/huntry/page-title";
 import { DEFAULT_QUERY } from "@/lib/huntry/events/query";
 import { fetchEvents } from "@/lib/huntry/events/events-api";
 import { fetchEggClaimCounts } from "@/lib/huntry/claims/claims-api";
@@ -77,7 +78,8 @@ export async function MapView({
 
   return (
     <Box padding="medium" style={{ backgroundColor: HUNTRY_COLORS.background }}>
-      <Panel header="Map" style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
+      <Panel style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
+        <PageTitle>Map</PageTitle>
         {events.length === 0 ? (
           <Text style={{ color: HUNTRY_COLORS.textMuted }}>No events yet.</Text>
         ) : rewards.length === 0 ? (

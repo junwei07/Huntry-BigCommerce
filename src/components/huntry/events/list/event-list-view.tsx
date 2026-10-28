@@ -3,6 +3,7 @@ import { EventCard } from "@/components/huntry/events/list/event-card";
 import { EventListHeader } from "@/components/huntry/events/list/event-list-header";
 import { NewEventButton } from "@/components/huntry/events/list/new-event-button";
 import { SortSelect } from "@/components/huntry/events/list/sort-select";
+import { PageTitle } from "@/components/huntry/page-title";
 import { fetchEvents } from "@/lib/huntry/events/events-api";
 import { MAX_EVENTS } from "@/lib/huntry/events/limits";
 import { parseEventsQuery } from "@/lib/huntry/events/query";
@@ -42,7 +43,8 @@ export async function EventListView({
 
   return (
     <Box padding="medium">
-      <Panel header="Events" style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
+      <Panel style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
+        <PageTitle>Events</PageTitle>
         {limitReached ? (
           <Box marginBottom="medium">
             <InlineMessage

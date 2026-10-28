@@ -3,6 +3,7 @@ import { SponsorCard } from "@/components/huntry/sponsors/list/sponsor-card";
 import { SponsorListHeader } from "@/components/huntry/sponsors/list/sponsor-list-header";
 import { NewSponsorButton } from "@/components/huntry/sponsors/list/new-sponsor-button";
 import { SortSelect } from "@/components/huntry/sponsors/list/sort-select";
+import { PageTitle } from "@/components/huntry/page-title";
 import { fetchSponsors } from "@/lib/huntry/sponsors/sponsors-api";
 import { parseSponsorsQuery } from "@/lib/huntry/sponsors/query";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
@@ -37,7 +38,8 @@ export async function SponsorListView({
 
   return (
     <Box padding="medium">
-      <Panel header="Sponsors" style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
+      <Panel style={{ backgroundColor: "transparent", border: "none", boxShadow: "none" }}>
+        <PageTitle>Sponsors</PageTitle>
         <Flex alignItems="center" justifyContent="space-between" marginBottom="medium">
           <SortSelect query={query} />
           <NewSponsorButton />

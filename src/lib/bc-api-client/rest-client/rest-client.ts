@@ -59,6 +59,16 @@ function logApiRequest(method: string, url: string, status: number, durationMs: 
   console.log(`[BigCommerce API] ${method} ${toLoggableUrl(url)} -> ${status} (${durationMs.toFixed(0)}ms)`);
 }
 
+type HttpMethod = "GET" | "POST" | "PUT" | "DELETE";
+
+// What differs between a read and a write; everything else is shared in request().
+interface RequestSpec {
+  params?: ApiRequestOptions["params"];
+  cache?: ApiRequestOptions["cache"];
+  body?: unknown;
+  withTimeout?: boolean;
+}
+
 // Talks to the real BigCommerce Admin REST API. Used by both STATIC and
 // (eventually) MULTITENANT modes — they differ only in how storeHash/apiToken
 // are resolved (see get-rest-api-client.ts), not in how requests are made, so
@@ -76,53 +86,12 @@ export class RestApiClient implements BcRestApiClient {
     return { storeHash, apiToken };
   }
 
-  async get<TResponse>(path: string, options: ApiRequestOptions = {}): Promise<ApiResponse<TResponse>> {
+  // The one request path behind get/post/put/delete. `spec` carries only what
+  // differs between reads and writes.
+  private async request<TResponse>(method: HttpMethod, path: string, spec: RequestSpec): Promise<ApiResponse<TResponse>> {
     const { storeHash, apiToken } = this.getCredentialsOrThrow();
-    const url = buildUrl(storeHash, path, options.params);
-
-    const startedAt = performance.now();
-    let response: Response;
-
-    try {
-      response = await retryOnRateLimit(() =>
-        fetch(url, {
-          headers: {
-            "X-Auth-Token": apiToken,
-            Accept: "application/json",
-          },
-          signal: AbortSignal.timeout(API_REQUEST_TIMEOUT_MS),
-          ...toFetchCacheOptions(options.cache),
-        }),
-      );
-    } catch (error) {
-      throw new AppError("UPSTREAM_API", "Could not reach BigCommerce.", { cause: error });
-    }
-
-    logApiRequest("GET", url, response.status, performance.now() - startedAt);
-
-    if (!response.ok) {
-      const bodyText = await response.text();
-
-      throw new AppError("UPSTREAM_API", `A BigCommerce API request failed.`, {
-        cause: `GET "${path}" failed with status ${response.status}: ${bodyText.slice(0, 1000)}`,
-        status: response.status,
-      });
-    }
-
-    // Some GET endpoints (e.g. v2 gift certificates with no matches) respond
-    // 204 rather than 200 with an empty array.
-    const data = response.status === 204 ? undefined : await parseJsonResponse<TResponse>(response, path);
-
-    return { data: data as TResponse, headers: response.headers };
-  }
-
-  private async mutate<TResponse>(
-    method: "POST" | "PUT" | "DELETE",
-    path: string,
-    options: ApiMutationOptions = {},
-  ): Promise<ApiResponse<TResponse>> {
-    const { storeHash, apiToken } = this.getCredentialsOrThrow();
-    const url = buildUrl(storeHash, path, undefined);
+    const url = buildUrl(storeHash, path, spec.params);
+    const hasBody = spec.body !== undefined;
 
     const startedAt = performance.now();
     let response: Response;
@@ -134,15 +103,17 @@ export class RestApiClient implements BcRestApiClient {
           headers: {
             "X-Auth-Token": apiToken,
             Accept: "application/json",
-            ...(options.body !== undefined ? { "Content-Type": "application/json" } : {}),
+            ...(hasBody ? { "Content-Type": "application/json" } : {}),
           },
-          body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-          // No timeout, unlike get() — aborting doesn't cancel the write on
-          // BigCommerce's side, so a timeout here risks reporting failure for
-          // a mutation that actually succeeded. Retrying on 429 is still
-          // safe here (see rate-limit.ts): BigCommerce rejects the request
-          // before doing any work, so there's no ambiguity about whether
-          // the mutation already took effect.
+          body: hasBody ? JSON.stringify(spec.body) : undefined,
+          // Reads time out; writes deliberately do not — aborting doesn't
+          // cancel the write on BigCommerce's side, so a timeout here risks
+          // reporting failure for a mutation that actually succeeded.
+          // Retrying on 429 is still safe here (see rate-limit.ts):
+          // BigCommerce rejects the request before doing any work, so there's
+          // no ambiguity about whether the mutation already took effect.
+          ...(spec.withTimeout ? { signal: AbortSignal.timeout(API_REQUEST_TIMEOUT_MS) } : {}),
+          ...toFetchCacheOptions(spec.cache),
         }),
       );
     } catch (error) {
@@ -160,10 +131,24 @@ export class RestApiClient implements BcRestApiClient {
       });
     }
 
-    // DELETE responses are typically 204 No Content.
+    // Some GET endpoints (e.g. v2 gift certificates with no matches) respond
+    // 204 rather than 200 with an empty array, and DELETE responses are
+    // typically 204 No Content.
     const data = response.status === 204 ? undefined : await parseJsonResponse<TResponse>(response, path);
 
     return { data: data as TResponse, headers: response.headers };
+  }
+
+  async get<TResponse>(path: string, options: ApiRequestOptions = {}): Promise<ApiResponse<TResponse>> {
+    return this.request<TResponse>("GET", path, { params: options.params, cache: options.cache, withTimeout: true });
+  }
+
+  private async mutate<TResponse>(
+    method: "POST" | "PUT" | "DELETE",
+    path: string,
+    options: ApiMutationOptions = {},
+  ): Promise<ApiResponse<TResponse>> {
+    return this.request<TResponse>(method, path, { body: options.body });
   }
 
   async post<TResponse>(path: string, options: ApiMutationOptions = {}): Promise<ApiResponse<TResponse>> {
