@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
-import { getDataMode } from "@/lib/bc-api-client/resolve-store-credentials";
-import { getCredentialsStore } from "@/lib/credentials-store/get-credentials-store";
 import { logError } from "@/lib/errors/logger";
 import { buildCorsHeaders } from "@/lib/huntry/public-api/cors";
+import { isKnownStore } from "@/lib/huntry/public-api/known-store";
 import { buildPublicMapData } from "@/lib/huntry/public-api/map-data";
 
-// BigCommerce store hashes are short lowercase alphanumerics; rejecting
-// anything else up front keeps junk out of every downstream lookup.
-const STORE_HASH_PATTERN = /^[a-z0-9]{1,32}$/;
 const MAX_SLUG_LENGTH = 200;
 
 // Short shared-cache lifetime: the map tolerates a few seconds of staleness
@@ -30,12 +26,7 @@ export async function GET(
   let cors: Record<string, string> = { Vary: "Origin" };
 
   try {
-    // MOCK/STATIC have no per-store credentials row to check.
-    const isKnownStore =
-      STORE_HASH_PATTERN.test(storeHash) &&
-      (getDataMode() !== "MULTITENANT" || Boolean(await getCredentialsStore().getStoreToken(storeHash)));
-
-    if (!isKnownStore) {
+    if (!(await isKnownStore(storeHash))) {
       return NextResponse.json({ error: "Not found." }, { status: 404, headers: { ...cors, "Cache-Control": "no-store" } });
     }
 

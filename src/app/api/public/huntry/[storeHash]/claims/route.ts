@@ -1,17 +1,14 @@
 import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getDataMode } from "@/lib/bc-api-client/resolve-store-credentials";
-import { getCredentialsStore } from "@/lib/credentials-store/get-credentials-store";
 import { logError } from "@/lib/errors/logger";
 import { eventClaimsTag } from "@/lib/huntry/claims/cache-tags";
 import { checkClaimRateLimit } from "@/lib/huntry/claims/claim-rate-limit";
 import { createPlayerClaim } from "@/lib/huntry/claims/player-claim";
 import { CreatePlayerClaimResult } from "@/lib/huntry/claims/types";
-import { buildCorsHeaders, buildPreflightHeaders } from "@/lib/huntry/public-api/cors";
+import { buildCorsHeaders } from "@/lib/huntry/public-api/cors";
+import { handlePublicPreflight, isKnownStore } from "@/lib/huntry/public-api/known-store";
 import { isAuthorizedForStorefrontCustomer } from "@/lib/huntry/storefront-auth/is-authorized-for-storefront-customer";
-
-const STORE_HASH_PATTERN = /^[a-z0-9]{1,32}$/;
 
 const claimBodySchema = z.object({
   jwt: z.string().min(1),
@@ -43,25 +40,13 @@ const STATUS_BY_RESULT: Record<Exclude<CreatePlayerClaimResult["status"], "creat
 // Public, unauthenticated-by-cookie route (docs/MIGRATION.md §4): never reads
 // bc_app_session and never calls isAuthorizedForStore. Trust comes from the
 // signed customer JWT; CORS is defense-in-depth only.
-async function isKnownStore(storeHash: string): Promise<boolean> {
-  return (
-    STORE_HASH_PATTERN.test(storeHash) &&
-    (getDataMode() !== "MULTITENANT" || Boolean(await getCredentialsStore().getStoreToken(storeHash)))
-  );
-}
-
 export async function OPTIONS(
   request: Request,
   { params }: { params: Promise<{ storeHash: string }> },
 ): Promise<NextResponse> {
   const { storeHash } = await params;
 
-  // CORS resolution calls BigCommerce, so it only runs for a known store.
-  const headers = (await isKnownStore(storeHash))
-    ? await buildPreflightHeaders(request.headers.get("origin"), storeHash)
-    : { Vary: "Origin" };
-
-  return new NextResponse(null, { status: 204, headers });
+  return handlePublicPreflight(request, storeHash);
 }
 
 export async function POST(

@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getDataMode } from "@/lib/bc-api-client/resolve-store-credentials";
-import { getCredentialsStore } from "@/lib/credentials-store/get-credentials-store";
 import { logError } from "@/lib/errors/logger";
 import { getPlayerStatus } from "@/lib/huntry/claims/player-status";
-import { buildCorsHeaders, buildPreflightHeaders } from "@/lib/huntry/public-api/cors";
+import { buildCorsHeaders } from "@/lib/huntry/public-api/cors";
+import { handlePublicPreflight, isKnownStore } from "@/lib/huntry/public-api/known-store";
 import { isAuthorizedForStorefrontCustomer } from "@/lib/huntry/storefront-auth/is-authorized-for-storefront-customer";
-
-const STORE_HASH_PATTERN = /^[a-z0-9]{1,32}$/;
 
 const bodySchema = z.object({
   jwt: z.string().min(1),
@@ -18,24 +15,13 @@ const bodySchema = z.object({
 // JWT is the access control and CORS is defense-in-depth only. Read-only: tells
 // the map page whether the hunt is closed to this customer (player cap reached
 // and no claim yet), so a full hunt is blocked before the map loads.
-async function isKnownStore(storeHash: string): Promise<boolean> {
-  return (
-    STORE_HASH_PATTERN.test(storeHash) &&
-    (getDataMode() !== "MULTITENANT" || Boolean(await getCredentialsStore().getStoreToken(storeHash)))
-  );
-}
-
 export async function OPTIONS(
   request: Request,
   { params }: { params: Promise<{ storeHash: string }> },
 ): Promise<NextResponse> {
   const { storeHash } = await params;
 
-  const headers = (await isKnownStore(storeHash))
-    ? await buildPreflightHeaders(request.headers.get("origin"), storeHash)
-    : { Vary: "Origin" };
-
-  return new NextResponse(null, { status: 204, headers });
+  return handlePublicPreflight(request, storeHash);
 }
 
 export async function POST(

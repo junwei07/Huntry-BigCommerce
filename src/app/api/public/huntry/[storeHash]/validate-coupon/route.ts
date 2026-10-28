@@ -1,14 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getDataMode } from "@/lib/bc-api-client/resolve-store-credentials";
-import { getCredentialsStore } from "@/lib/credentials-store/get-credentials-store";
 import { logError } from "@/lib/errors/logger";
 import { evaluateCartCoupons } from "@/lib/huntry/claims/cart-coupon-enforcement";
 import { findClaimsByCouponCodes } from "@/lib/huntry/claims/redemption";
-import { buildCorsHeaders, buildPreflightHeaders } from "@/lib/huntry/public-api/cors";
+import { buildCorsHeaders } from "@/lib/huntry/public-api/cors";
+import { handlePublicPreflight, isKnownStore } from "@/lib/huntry/public-api/known-store";
 import { isAuthorizedForStorefrontCustomer } from "@/lib/huntry/storefront-auth/is-authorized-for-storefront-customer";
-
-const STORE_HASH_PATTERN = /^[a-z0-9]{1,32}$/;
 
 // A cart holds a handful of coupons; the cap keeps one request's lookup small.
 const MAX_CODES = 20;
@@ -22,24 +19,13 @@ const validateBodySchema = z.object({
 
 // Public, cookie-less route (docs/MIGRATION.md §4), same trust model as the
 // claims route: the customer comes from the signed JWT, never the body.
-async function isKnownStore(storeHash: string): Promise<boolean> {
-  return (
-    STORE_HASH_PATTERN.test(storeHash) &&
-    (getDataMode() !== "MULTITENANT" || Boolean(await getCredentialsStore().getStoreToken(storeHash)))
-  );
-}
-
 export async function OPTIONS(
   request: Request,
   { params }: { params: Promise<{ storeHash: string }> },
 ): Promise<NextResponse> {
   const { storeHash } = await params;
 
-  const headers = (await isKnownStore(storeHash))
-    ? await buildPreflightHeaders(request.headers.get("origin"), storeHash)
-    : { Vary: "Origin" };
-
-  return new NextResponse(null, { status: 204, headers });
+  return handlePublicPreflight(request, storeHash);
 }
 
 // BC-HUN-050: the storefront cart guard's question — "which of these codes in

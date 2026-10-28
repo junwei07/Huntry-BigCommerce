@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDataMode } from "@/lib/bc-api-client/resolve-store-credentials";
-import { getCredentialsStore } from "@/lib/credentials-store/get-credentials-store";
-
-const STORE_HASH_PATTERN = /^[a-z0-9]{1,32}$/;
+import { isKnownStore } from "@/lib/huntry/public-api/known-store";
 
 // The loader's prelude embeds env-derived values, so keep the shared-cache
 // lifetime short enough that a config change reaches storefronts quickly. The
@@ -21,12 +18,7 @@ export async function serveStorefrontScript(
   storeHash: string,
   buildSource: (storeHash: string) => string,
 ): Promise<NextResponse> {
-  // MOCK/STATIC have no per-store credentials row to check.
-  const isKnownStore =
-    STORE_HASH_PATTERN.test(storeHash) &&
-    (getDataMode() !== "MULTITENANT" || Boolean(await getCredentialsStore().getStoreToken(storeHash)));
-
-  if (!isKnownStore) {
+  if (!(await isKnownStore(storeHash))) {
     return new NextResponse("// Not found.\n", {
       status: 404,
       headers: { "Content-Type": JS_TYPE, "Cache-Control": "no-store" },

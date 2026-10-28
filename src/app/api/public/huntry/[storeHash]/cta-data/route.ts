@@ -1,12 +1,8 @@
 import { NextResponse } from "next/server";
-import { getDataMode } from "@/lib/bc-api-client/resolve-store-credentials";
-import { getCredentialsStore } from "@/lib/credentials-store/get-credentials-store";
 import { logError } from "@/lib/errors/logger";
 import { buildPublicCtaData } from "@/lib/huntry/public-api/cta-data";
 import { buildCorsHeaders } from "@/lib/huntry/public-api/cors";
-
-// Same store-hash rule as map-data/route.ts.
-const STORE_HASH_PATTERN = /^[a-z0-9]{1,32}$/;
+import { isKnownStore } from "@/lib/huntry/public-api/known-store";
 
 // Same short shared-cache lifetime as map-data: the banner tolerates a few
 // seconds of staleness, and this bounds the per-store queries when a CDN sits
@@ -28,11 +24,7 @@ export async function GET(
   let cors: Record<string, string> = { Vary: "Origin" };
 
   try {
-    const isKnownStore =
-      STORE_HASH_PATTERN.test(storeHash) &&
-      (getDataMode() !== "MULTITENANT" || Boolean(await getCredentialsStore().getStoreToken(storeHash)));
-
-    if (!isKnownStore) {
+    if (!(await isKnownStore(storeHash))) {
       return NextResponse.json({ error: "Not found." }, { status: 404, headers: { ...cors, "Cache-Control": "no-store" } });
     }
 
