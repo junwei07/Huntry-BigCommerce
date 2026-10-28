@@ -3,17 +3,8 @@
 import { useState } from "react";
 import { Box, Flex, Input, Modal, Small, Text } from "@bigcommerce/big-design";
 import { MAX_EGG_NAME_LENGTH } from "@/lib/huntry/eggs/egg-form-schema";
-import { HuntryReward } from "@/lib/huntry/rewards/types";
+import type { RewardChoice } from "@/lib/huntry/map/reward-choices";
 import { eggMarkerColor, HUNTRY_COLORS } from "@/lib/huntry/theme";
-
-export interface RewardChoice {
-  reward: HuntryReward;
-  sponsorName: string | null;
-  remaining: number;
-  // False when the reward has no room left (an edited egg's own reward stays
-  // selectable — it already holds one of the slots).
-  selectable: boolean;
-}
 
 // Port of huntry_render_map_place_modal (huntry/includes/map/page.php) and
 // renderRewardCards (huntry-admin-map.js): name, searchable reward cards with
