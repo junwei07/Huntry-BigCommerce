@@ -2,28 +2,27 @@
 
 import { updateTag } from "next/cache";
 import { ActionResult } from "@/lib/actions/action-result";
+import { denyUnlessAuthorized, parseActionInput } from "@/lib/actions/guards";
 import { eventTag, EVENTS_LIST_TAG } from "@/lib/huntry/events/cache-tags";
 import { countEvents, createEvent, isUniqueSlugConstraintError } from "@/lib/huntry/events/events-api";
 import { EVENT_LIMIT_MESSAGE, MAX_EVENTS } from "@/lib/huntry/events/limits";
 import { eventFormSchema, EventFormInput } from "@/lib/huntry/events/event-form-schema";
 import { DEFAULT_EVENT_BANNER_URL } from "@/lib/huntry/events/types";
 import { INVALID_IMAGE_MESSAGE, resolveImageField } from "@/lib/huntry/storage/resolve-image-field";
-import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
 import { toSafeMessage } from "@/lib/errors/app-error";
 import { logError } from "@/lib/errors/logger";
 
 export async function createHuntryEvent(input: EventFormInput, storeHash: string | undefined): Promise<ActionResult> {
-  // A page/layout-level auth check does not extend to Server Actions, since
-  // they're directly POST-able independent of any page render — see
-  // isAuthorizedForStore.
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
-  const parsed = eventFormSchema.safeParse(input);
+  const parsed = parseActionInput(eventFormSchema, input, "Invalid event details.");
 
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid event details." };
+  if (!parsed.ok) {
+    return parsed.result;
   }
 
   const {

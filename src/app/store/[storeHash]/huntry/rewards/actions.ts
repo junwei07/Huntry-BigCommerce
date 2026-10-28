@@ -2,6 +2,7 @@
 
 import { updateTag } from "next/cache";
 import { ActionResult } from "@/lib/actions/action-result";
+import { actionFailure, denyUnlessAuthorized, parseActionInput } from "@/lib/actions/guards";
 import { rewardTag, REWARDS_LIST_TAG } from "@/lib/huntry/rewards/cache-tags";
 import { syncRewardCoupon } from "@/lib/huntry/rewards/coupon-sync";
 import { MAX_REWARDS, REWARD_LIMIT_MESSAGE } from "@/lib/huntry/rewards/limits";
@@ -14,22 +15,21 @@ import {
 } from "@/lib/huntry/rewards/rewards-api";
 import { rewardFormSchema, RewardFormInput } from "@/lib/huntry/rewards/reward-form-schema";
 import { BcProductSummary } from "@/lib/huntry/rewards/types";
-import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
+import { isAuthorizedForStore } from "@/lib/session/is-authorized-for-store";
 import { toSafeMessage } from "@/lib/errors/app-error";
 import { logError } from "@/lib/errors/logger";
 
 export async function createHuntryReward(input: RewardFormInput, storeHash: string | undefined): Promise<ActionResult> {
-  // A page/layout-level auth check does not extend to Server Actions, since
-  // they're directly POST-able independent of any page render — see
-  // isAuthorizedForStore.
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
-  const parsed = rewardFormSchema.safeParse(input);
+  const parsed = parseActionInput(rewardFormSchema, input, "Invalid reward details.");
 
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid reward details." };
+  if (!parsed.ok) {
+    return parsed.result;
   }
 
   const {
@@ -112,9 +112,7 @@ export async function createHuntryReward(input: RewardFormInput, storeHash: stri
 
     return { success: true, message: `Reward "${reward.name}" created.` };
   } catch (error) {
-    logError(`createHuntryReward: store "${storeHash}"`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to create the reward.") };
+    return actionFailure(`createHuntryReward: store "${storeHash}"`, error, "Failed to create the reward.");
   }
 }
 

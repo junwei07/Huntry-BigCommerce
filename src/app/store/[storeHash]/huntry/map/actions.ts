@@ -3,6 +3,7 @@
 import { updateTag } from "next/cache";
 import { z } from "zod";
 import { ActionResult } from "@/lib/actions/action-result";
+import { actionFailure, denyUnlessAuthorized, parseActionInput } from "@/lib/actions/guards";
 import {
   eggPlacementSchema,
   eggUpdateSchema,
@@ -30,9 +31,6 @@ import { planEggPlacements } from "@/lib/huntry/eggs/placement";
 import { fetchEventUncached } from "@/lib/huntry/events/events-api";
 import { recomputeRewardsUsageLimits, withUsageLimitWarning } from "@/lib/huntry/rewards/coupon-sync";
 import { fetchRewardUncached } from "@/lib/huntry/rewards/rewards-api";
-import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
-import { toSafeMessage } from "@/lib/errors/app-error";
-import { logError } from "@/lib/errors/logger";
 
 const EVENT_NOT_FOUND_MESSAGE = "That event no longer exists. Reload the page to see the current list.";
 const EGG_NOT_FOUND_MESSAGE =
@@ -57,14 +55,16 @@ export async function saveHuntryEggPlacements(
   adds: EggPlacementInput[],
   storeHash: string | undefined,
 ): Promise<ActionResult> {
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
-  const parsed = z.array(eggPlacementSchema).safeParse(adds);
+  const parsed = parseActionInput(z.array(eggPlacementSchema), adds, "Invalid egg placement.");
 
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid egg placement." };
+  if (!parsed.ok) {
+    return parsed.result;
   }
 
   try {
@@ -131,9 +131,7 @@ export async function saveHuntryEggPlacements(
       message: `${placedMessage} ${skipped} skipped — ${reasons.join(", ")}.`,
     };
   } catch (error) {
-    logError(`saveHuntryEggPlacements: event ${eventId}`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to save the egg placements.") };
+    return actionFailure(`saveHuntryEggPlacements: event ${eventId}`, error, "Failed to save the egg placements.");
   }
 }
 
@@ -147,14 +145,16 @@ export async function updateHuntryEgg(
   input: EggUpdateInput,
   storeHash: string | undefined,
 ): Promise<ActionResult> {
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
-  const parsed = eggUpdateSchema.safeParse(input);
+  const parsed = parseActionInput(eggUpdateSchema, input, "Invalid egg details.");
 
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid egg details." };
+  if (!parsed.ok) {
+    return parsed.result;
   }
 
   try {
@@ -224,9 +224,7 @@ export async function updateHuntryEgg(
 
     return { success: true, message: withUsageLimitWarning("Egg updated.", recompute) };
   } catch (error) {
-    logError(`updateHuntryEgg: egg ${id}`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to update the egg.") };
+    return actionFailure(`updateHuntryEgg: egg ${id}`, error, "Failed to update the egg.");
   }
 }
 
@@ -239,14 +237,16 @@ export async function forceClaimHuntryEgg(
   customerEmail: string,
   storeHash: string | undefined,
 ): Promise<ActionResult> {
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
-  const email = forceClaimEmailSchema.safeParse(customerEmail);
+  const email = parseActionInput(forceClaimEmailSchema, customerEmail, "Enter a valid customer email.");
 
-  if (!email.success) {
-    return { success: false, message: email.error.issues[0]?.message ?? "Enter a valid customer email." };
+  if (!email.ok) {
+    return email.result;
   }
 
   try {
@@ -293,17 +293,17 @@ export async function forceClaimHuntryEgg(
 
     return { success: true, message: `Egg force-claimed for ${customer.email}.` };
   } catch (error) {
-    logError(`forceClaimHuntryEgg: egg ${eggId}`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to force claim the egg.") };
+    return actionFailure(`forceClaimHuntryEgg: egg ${eggId}`, error, "Failed to force claim the egg.");
   }
 }
 
 // A genuine hard delete — eggs have no archive state. Never touches
 // huntry_claims, so a claimed egg's player keeps their reward.
 export async function deleteHuntryEgg(id: string, storeHash: string | undefined): Promise<ActionResult> {
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
   try {
@@ -319,8 +319,6 @@ export async function deleteHuntryEgg(id: string, storeHash: string | undefined)
 
     return { success: true, message: withUsageLimitWarning("Egg deleted.", recompute) };
   } catch (error) {
-    logError(`deleteHuntryEgg: egg ${id}`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to delete the egg.") };
+    return actionFailure(`deleteHuntryEgg: egg ${id}`, error, "Failed to delete the egg.");
   }
 }

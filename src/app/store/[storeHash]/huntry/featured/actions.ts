@@ -2,15 +2,13 @@
 
 import { updateTag } from "next/cache";
 import { ActionResult } from "@/lib/actions/action-result";
+import { actionFailure, denyUnlessAuthorized, parseActionInput } from "@/lib/actions/guards";
 import { resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
 import { storefrontSettingsTag } from "@/lib/huntry/featured/cache-tags";
 import { fetchStorefrontSettingsUncached, saveStorefrontSettings } from "@/lib/huntry/featured/featured-api";
 import { featuredFormSchema, FeaturedFormInput } from "@/lib/huntry/featured/featured-form-schema";
 import { deleteImageByUrl } from "@/lib/huntry/storage/image-storage";
 import { INVALID_IMAGE_MESSAGE, resolveImageField } from "@/lib/huntry/storage/resolve-image-field";
-import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
-import { toSafeMessage } from "@/lib/errors/app-error";
-import { logError } from "@/lib/errors/logger";
 
 // Saves the storefront banner / product CTA copy and the two banner images.
 // Image URLs come from the client, so each is accepted only if it is blank,
@@ -20,17 +18,16 @@ export async function saveHuntryFeaturedSettings(
   input: FeaturedFormInput,
   storeHash: string | undefined,
 ): Promise<ActionResult> {
-  // A page/layout-level auth check does not extend to Server Actions, since
-  // they're directly POST-able independent of any page render — see
-  // isAuthorizedForStore.
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
-  const parsed = featuredFormSchema.safeParse(input);
+  const parsed = parseActionInput(featuredFormSchema, input, "Invalid storefront settings.");
 
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid storefront settings." };
+  if (!parsed.ok) {
+    return parsed.result;
   }
 
   try {
@@ -69,8 +66,6 @@ export async function saveHuntryFeaturedSettings(
 
     return { success: true, message: "Storefront banner settings saved." };
   } catch (error) {
-    logError(`saveHuntryFeaturedSettings: store "${storeHash}"`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to save the storefront banner settings.") };
+    return actionFailure(`saveHuntryFeaturedSettings: store "${storeHash}"`, error, "Failed to save the storefront banner settings.");
   }
 }

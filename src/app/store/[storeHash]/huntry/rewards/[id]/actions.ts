@@ -2,6 +2,7 @@
 
 import { updateTag } from "next/cache";
 import { ActionResult } from "@/lib/actions/action-result";
+import { actionFailure, denyUnlessAuthorized, parseActionInput } from "@/lib/actions/guards";
 import { rewardTag, REWARDS_LIST_TAG } from "@/lib/huntry/rewards/cache-tags";
 import { syncRewardCoupon } from "@/lib/huntry/rewards/coupon-sync";
 import {
@@ -12,7 +13,6 @@ import {
   updateRewardCouponFields,
 } from "@/lib/huntry/rewards/rewards-api";
 import { rewardFormSchema, RewardFormInput } from "@/lib/huntry/rewards/reward-form-schema";
-import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
 import { toSafeMessage } from "@/lib/errors/app-error";
 import { logError } from "@/lib/errors/logger";
 
@@ -34,14 +34,16 @@ export async function updateHuntryReward(
   input: RewardFormInput,
   storeHash: string | undefined,
 ): Promise<ActionResult> {
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
-  const parsed = rewardFormSchema.safeParse(input);
+  const parsed = parseActionInput(rewardFormSchema, input, "Invalid reward details.");
 
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid reward details." };
+  if (!parsed.ok) {
+    return parsed.result;
   }
 
   const {
@@ -122,9 +124,7 @@ export async function updateHuntryReward(
 
     return { success: true, message: `Reward "${updated.name}" updated.` };
   } catch (error) {
-    logError(`updateHuntryReward: reward ${id}`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to update the reward.") };
+    return actionFailure(`updateHuntryReward: reward ${id}`, error, "Failed to update the reward.");
   }
 }
 
@@ -135,8 +135,10 @@ export async function updateHuntryReward(
 // huntry_eggs via FK; never touches huntry_claims (denormalized, by
 // schema design).
 export async function deleteHuntryReward(id: number, storeHash: string | undefined): Promise<ActionResult> {
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
   try {
@@ -146,9 +148,7 @@ export async function deleteHuntryReward(id: number, storeHash: string | undefin
       return { success: false, message: REWARD_NOT_FOUND_MESSAGE };
     }
   } catch (error) {
-    logError(`deleteHuntryReward: reward ${id}`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to delete the reward.") };
+    return actionFailure(`deleteHuntryReward: reward ${id}`, error, "Failed to delete the reward.");
   }
 
   updateTag(REWARDS_LIST_TAG);

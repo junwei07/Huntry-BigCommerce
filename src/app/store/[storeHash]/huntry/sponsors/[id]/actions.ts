@@ -2,6 +2,7 @@
 
 import { updateTag } from "next/cache";
 import { ActionResult } from "@/lib/actions/action-result";
+import { actionFailure, denyUnlessAuthorized, parseActionInput } from "@/lib/actions/guards";
 import { sponsorTag, SPONSORS_LIST_TAG } from "@/lib/huntry/sponsors/cache-tags";
 import { deleteSponsor, fetchSponsorUncached, updateSponsor } from "@/lib/huntry/sponsors/sponsors-api";
 import { sponsorFormSchema, SponsorFormInput } from "@/lib/huntry/sponsors/sponsor-form-schema";
@@ -9,9 +10,6 @@ import { DEFAULT_SPONSOR_LOGO_URL } from "@/lib/huntry/sponsors/types";
 import { resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
 import { deleteImageByUrl } from "@/lib/huntry/storage/image-storage";
 import { INVALID_IMAGE_MESSAGE, resolveImageField } from "@/lib/huntry/storage/resolve-image-field";
-import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
-import { toSafeMessage } from "@/lib/errors/app-error";
-import { logError } from "@/lib/errors/logger";
 
 const SPONSOR_NOT_FOUND_MESSAGE =
   "That sponsor no longer exists. It may have been deleted — reload the page to see the current list.";
@@ -25,14 +23,16 @@ export async function updateHuntrySponsor(
   input: SponsorFormInput,
   storeHash: string | undefined,
 ): Promise<ActionResult> {
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
-  const parsed = sponsorFormSchema.safeParse(input);
+  const parsed = parseActionInput(sponsorFormSchema, input, "Invalid sponsor details.");
 
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid sponsor details." };
+  if (!parsed.ok) {
+    return parsed.result;
   }
 
   const { name, instagramUrl, facebookUrl, websiteUrl, location } = parsed.data;
@@ -81,9 +81,7 @@ export async function updateHuntrySponsor(
 
     return { success: true, message: `Sponsor "${updated.name}" updated.` };
   } catch (error) {
-    logError(`updateHuntrySponsor: sponsor ${id}`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to update the sponsor.") };
+    return actionFailure(`updateHuntrySponsor: sponsor ${id}`, error, "Failed to update the sponsor.");
   }
 }
 
@@ -91,8 +89,10 @@ export async function updateHuntrySponsor(
 // sponsors-api.ts's deleteSponsor for why), matching deleteHuntryEvent's
 // precedent.
 export async function deleteHuntrySponsor(id: number, storeHash: string | undefined): Promise<ActionResult> {
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
   try {
@@ -105,9 +105,7 @@ export async function deleteHuntrySponsor(id: number, storeHash: string | undefi
 
     await deleteImageByUrl(existing?.logoUrl, resolveStoreHash(storeHash));
   } catch (error) {
-    logError(`deleteHuntrySponsor: sponsor ${id}`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to delete the sponsor.") };
+    return actionFailure(`deleteHuntrySponsor: sponsor ${id}`, error, "Failed to delete the sponsor.");
   }
 
   updateTag(SPONSORS_LIST_TAG);

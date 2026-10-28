@@ -2,6 +2,7 @@
 
 import { updateTag } from "next/cache";
 import { ActionResult } from "@/lib/actions/action-result";
+import { actionFailure, denyUnlessAuthorized, parseActionInput } from "@/lib/actions/guards";
 import { eventTag, EVENTS_LIST_TAG } from "@/lib/huntry/events/cache-tags";
 import { fetchRewardIdsForEventUncached } from "@/lib/huntry/eggs/eggs-api";
 import { deleteEvent, fetchEventUncached, updateEvent } from "@/lib/huntry/events/events-api";
@@ -11,9 +12,6 @@ import { resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials"
 import { DEFAULT_EVENT_BANNER_URL } from "@/lib/huntry/events/types";
 import { deleteImageByUrl } from "@/lib/huntry/storage/image-storage";
 import { INVALID_IMAGE_MESSAGE, resolveImageField } from "@/lib/huntry/storage/resolve-image-field";
-import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
-import { toSafeMessage } from "@/lib/errors/app-error";
-import { logError } from "@/lib/errors/logger";
 
 const EVENT_NOT_FOUND_MESSAGE =
   "That event no longer exists. It may have been deleted — reload the page to see the current list.";
@@ -23,14 +21,16 @@ const EVENT_NOT_FOUND_MESSAGE =
 // current banner — re-fetching fresh (not fetchEvent's cached read) before
 // writing preserves them instead of resetting them to defaults.
 export async function updateHuntryEvent(id: number, input: EventFormInput, storeHash: string | undefined): Promise<ActionResult> {
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
-  const parsed = eventFormSchema.safeParse(input);
+  const parsed = parseActionInput(eventFormSchema, input, "Invalid event details.");
 
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid event details." };
+  if (!parsed.ok) {
+    return parsed.result;
   }
 
   const {
@@ -104,9 +104,7 @@ export async function updateHuntryEvent(id: number, input: EventFormInput, store
 
     return { success: true, message: withUsageLimitWarning(`Event "${updated.name}" updated.`, recompute) };
   } catch (error) {
-    logError(`updateHuntryEvent: event ${id}`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to update the event.") };
+    return actionFailure(`updateHuntryEvent: event ${id}`, error, "Failed to update the event.");
   }
 }
 
@@ -114,8 +112,10 @@ export async function updateHuntryEvent(id: number, input: EventFormInput, store
 // (unlike huntry_rewards' status), per the user's explicit direction. See
 // events-api.ts's deleteEvent for the cascade note.
 export async function deleteHuntryEvent(id: number, storeHash: string | undefined): Promise<ActionResult> {
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
   let rewardIds: number[] = [];
@@ -135,9 +135,7 @@ export async function deleteHuntryEvent(id: number, storeHash: string | undefine
 
     await deleteImageByUrl(existing?.headerBannerUrl, resolveStoreHash(storeHash));
   } catch (error) {
-    logError(`deleteHuntryEvent: event ${id}`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to delete the event.") };
+    return actionFailure(`deleteHuntryEvent: event ${id}`, error, "Failed to delete the event.");
   }
 
   updateTag(EVENTS_LIST_TAG);

@@ -2,27 +2,24 @@
 
 import { updateTag } from "next/cache";
 import { ActionResult } from "@/lib/actions/action-result";
+import { actionFailure, denyUnlessAuthorized, parseActionInput } from "@/lib/actions/guards";
 import { sponsorTag, SPONSORS_LIST_TAG } from "@/lib/huntry/sponsors/cache-tags";
 import { createSponsor } from "@/lib/huntry/sponsors/sponsors-api";
 import { sponsorFormSchema, SponsorFormInput } from "@/lib/huntry/sponsors/sponsor-form-schema";
 import { DEFAULT_SPONSOR_LOGO_URL } from "@/lib/huntry/sponsors/types";
 import { INVALID_IMAGE_MESSAGE, resolveImageField } from "@/lib/huntry/storage/resolve-image-field";
-import { isAuthorizedForStore, NOT_AUTHORIZED_FOR_STORE_MESSAGE } from "@/lib/session/is-authorized-for-store";
-import { toSafeMessage } from "@/lib/errors/app-error";
-import { logError } from "@/lib/errors/logger";
 
 export async function createHuntrySponsor(input: SponsorFormInput, storeHash: string | undefined): Promise<ActionResult> {
-  // A page/layout-level auth check does not extend to Server Actions, since
-  // they're directly POST-able independent of any page render — see
-  // isAuthorizedForStore.
-  if (!(await isAuthorizedForStore(storeHash))) {
-    return { success: false, message: NOT_AUTHORIZED_FOR_STORE_MESSAGE };
+  const denied = await denyUnlessAuthorized(storeHash);
+
+  if (denied) {
+    return denied;
   }
 
-  const parsed = sponsorFormSchema.safeParse(input);
+  const parsed = parseActionInput(sponsorFormSchema, input, "Invalid sponsor details.");
 
-  if (!parsed.success) {
-    return { success: false, message: parsed.error.issues[0]?.message ?? "Invalid sponsor details." };
+  if (!parsed.ok) {
+    return parsed.result;
   }
 
   const { name, instagramUrl, facebookUrl, websiteUrl, location } = parsed.data;
@@ -55,8 +52,6 @@ export async function createHuntrySponsor(input: SponsorFormInput, storeHash: st
 
     return { success: true, message: `Sponsor "${sponsor.name}" created.` };
   } catch (error) {
-    logError(`createHuntrySponsor: store "${storeHash}"`, error);
-
-    return { success: false, message: toSafeMessage(error, "Failed to create the sponsor.") };
+    return actionFailure(`createHuntrySponsor: store "${storeHash}"`, error, "Failed to create the sponsor.");
   }
 }
