@@ -7,6 +7,7 @@ import { createHuntryReward } from "@/app/store/[storeHash]/huntry/rewards/actio
 import { runServerAction } from "@/components/ui/action-alerts";
 import { useClearGlobalLoading } from "@/components/ui/global-loading";
 import { useStoreHash } from "@/components/ui/store-hash-context";
+import { Breadcrumb } from "@/components/huntry/breadcrumb";
 import { RewardFormFields } from "@/components/huntry/rewards/reward-form-fields";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 import { RewardFormInput } from "@/lib/huntry/rewards/reward-form-schema";
@@ -67,23 +68,28 @@ export function NewRewardForm({ sponsors }: { sponsors: HuntrySponsor[] }) {
   };
 
   return (
-    <Panel header="Create Reward" style={{ backgroundColor: "#FFFFFF", borderRadius: "16px" }}>
-      <RewardFormFields onChange={handleChange} sponsors={sponsors} state={state} />
+    <>
+      <Breadcrumb
+        crumbs={[{ label: "Rewards", href: getAppUrl(storeHash, "/huntry/rewards") }, { label: "Add New Reward" }]}
+      />
+      <Panel header="Create Reward" style={{ backgroundColor: "#FFFFFF", borderRadius: "16px" }}>
+        <RewardFormFields onChange={handleChange} sponsors={sponsors} state={state} />
 
-      <Flex flexGap="0.5rem" justifyContent="flex-end">
-        <Button onClick={() => router.push(getAppUrl(storeHash, "/huntry/rewards"))} variant="subtle">
-          Cancel
-        </Button>
-        <Button
-          disabled={!canSubmit}
-          isLoading={isPending}
-          onClick={handleSubmit}
-          style={{ backgroundColor: HUNTRY_COLORS.primary, borderColor: HUNTRY_COLORS.primary }}
-          variant="primary"
-        >
-          Create Reward
-        </Button>
-      </Flex>
-    </Panel>
+        <Flex flexGap="0.5rem" justifyContent="flex-end">
+          <Button onClick={() => router.push(getAppUrl(storeHash, "/huntry/rewards"))} variant="subtle">
+            Cancel
+          </Button>
+          <Button
+            disabled={!canSubmit}
+            isLoading={isPending}
+            onClick={handleSubmit}
+            style={{ backgroundColor: HUNTRY_COLORS.primary, borderColor: HUNTRY_COLORS.primary }}
+            variant="primary"
+          >
+            Create Reward
+          </Button>
+        </Flex>
+      </Panel>
+    </>
   );
 }

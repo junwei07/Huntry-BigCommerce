@@ -6,6 +6,7 @@ import { updateHuntrySponsor } from "@/app/store/[storeHash]/huntry/sponsors/[id
 import { runServerAction } from "@/components/ui/action-alerts";
 import { useClearGlobalLoading } from "@/components/ui/global-loading";
 import { useStoreHash } from "@/components/ui/store-hash-context";
+import { Breadcrumb } from "@/components/huntry/breadcrumb";
 import { SponsorFormFields } from "@/components/huntry/sponsors/sponsor-form-fields";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 import { SponsorFormInput } from "@/lib/huntry/sponsors/sponsor-form-schema";
@@ -56,34 +57,44 @@ export function EditSponsorForm({ sponsor }: { sponsor: HuntrySponsor }) {
   };
 
   return (
-    <Panel header={`Edit Sponsor: ${sponsor.name}`} style={{ backgroundColor: "#FFFFFF", borderRadius: "16px" }}>
-      <SponsorFormFields
-        logoPreviewUrl={sponsor.logoUrl ?? DEFAULT_SPONSOR_LOGO_URL}
-        onChange={handleChange}
-        state={state}
+    <>
+      <Breadcrumb
+        crumbs={[
+          { label: "Sponsors", href: getAppUrl(storeHash, "/huntry/sponsors") },
+          { label: "Edit Sponsor" },
+          { label: sponsor.name },
+        ]}
+        hardNavigation
       />
+      <Panel header={`Edit Sponsor: ${sponsor.name}`} style={{ backgroundColor: "#FFFFFF", borderRadius: "16px" }}>
+        <SponsorFormFields
+          logoPreviewUrl={sponsor.logoUrl ?? DEFAULT_SPONSOR_LOGO_URL}
+          onChange={handleChange}
+          state={state}
+        />
 
-      <Flex flexGap="0.5rem" justifyContent="flex-end">
-        <Button
-          onClick={() => {
-            // See handleSubmit's identical comment on why this is a hard
-            // navigation rather than router.push.
-            window.location.href = getAppUrl(storeHash, "/huntry/sponsors");
-          }}
-          variant="subtle"
-        >
-          Cancel
-        </Button>
-        <Button
-          disabled={!canSubmit}
-          isLoading={isPending}
-          onClick={handleSubmit}
-          style={{ backgroundColor: HUNTRY_COLORS.primary, borderColor: HUNTRY_COLORS.primary }}
-          variant="primary"
-        >
-          Save Changes
-        </Button>
-      </Flex>
-    </Panel>
+        <Flex flexGap="0.5rem" justifyContent="flex-end">
+          <Button
+            onClick={() => {
+              // See handleSubmit's identical comment on why this is a hard
+              // navigation rather than router.push.
+              window.location.href = getAppUrl(storeHash, "/huntry/sponsors");
+            }}
+            variant="subtle"
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={!canSubmit}
+            isLoading={isPending}
+            onClick={handleSubmit}
+            style={{ backgroundColor: HUNTRY_COLORS.primary, borderColor: HUNTRY_COLORS.primary }}
+            variant="primary"
+          >
+            Save Changes
+          </Button>
+        </Flex>
+      </Panel>
+    </>
   );
 }

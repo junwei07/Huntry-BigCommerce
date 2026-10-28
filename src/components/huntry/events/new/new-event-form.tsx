@@ -7,6 +7,7 @@ import { createHuntryEvent } from "@/app/store/[storeHash]/huntry/events/actions
 import { runServerAction } from "@/components/ui/action-alerts";
 import { useClearGlobalLoading } from "@/components/ui/global-loading";
 import { useStoreHash } from "@/components/ui/store-hash-context";
+import { Breadcrumb } from "@/components/huntry/breadcrumb";
 import { EventFormFields } from "@/components/huntry/events/event-form-fields";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 import { EventFormInput } from "@/lib/huntry/events/event-form-schema";
@@ -56,23 +57,28 @@ export function NewEventForm() {
   };
 
   return (
-    <Panel header="Create Event" style={{ backgroundColor: "#FFFFFF", borderRadius: "16px" }}>
-      <EventFormFields onChange={handleChange} state={state} />
+    <>
+      <Breadcrumb
+        crumbs={[{ label: "Events", href: getAppUrl(storeHash, "/huntry/events") }, { label: "Add New Event" }]}
+      />
+      <Panel header="Create Event" style={{ backgroundColor: "#FFFFFF", borderRadius: "16px" }}>
+        <EventFormFields onChange={handleChange} state={state} />
 
-      <Flex flexGap="0.5rem" justifyContent="flex-end">
-        <Button onClick={() => router.push(getAppUrl(storeHash, "/huntry/events"))} variant="subtle">
-          Cancel
-        </Button>
-        <Button
-          disabled={!canSubmit}
-          isLoading={isPending}
-          onClick={handleSubmit}
-          style={{ backgroundColor: HUNTRY_COLORS.primary, borderColor: HUNTRY_COLORS.primary }}
-          variant="primary"
-        >
-          Create Event
-        </Button>
-      </Flex>
-    </Panel>
+        <Flex flexGap="0.5rem" justifyContent="flex-end">
+          <Button onClick={() => router.push(getAppUrl(storeHash, "/huntry/events"))} variant="subtle">
+            Cancel
+          </Button>
+          <Button
+            disabled={!canSubmit}
+            isLoading={isPending}
+            onClick={handleSubmit}
+            style={{ backgroundColor: HUNTRY_COLORS.primary, borderColor: HUNTRY_COLORS.primary }}
+            variant="primary"
+          >
+            Create Event
+          </Button>
+        </Flex>
+      </Panel>
+    </>
   );
 }

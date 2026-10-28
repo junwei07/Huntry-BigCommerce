@@ -7,6 +7,7 @@ import { createHuntrySponsor } from "@/app/store/[storeHash]/huntry/sponsors/act
 import { runServerAction } from "@/components/ui/action-alerts";
 import { useClearGlobalLoading } from "@/components/ui/global-loading";
 import { useStoreHash } from "@/components/ui/store-hash-context";
+import { Breadcrumb } from "@/components/huntry/breadcrumb";
 import { SponsorFormFields } from "@/components/huntry/sponsors/sponsor-form-fields";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 import { SponsorFormInput } from "@/lib/huntry/sponsors/sponsor-form-schema";
@@ -50,23 +51,28 @@ export function NewSponsorForm() {
   };
 
   return (
-    <Panel header="Create Sponsor" style={{ backgroundColor: "#FFFFFF", borderRadius: "16px" }}>
-      <SponsorFormFields logoPreviewUrl={DEFAULT_SPONSOR_LOGO_URL} onChange={handleChange} state={state} />
+    <>
+      <Breadcrumb
+        crumbs={[{ label: "Sponsors", href: getAppUrl(storeHash, "/huntry/sponsors") }, { label: "Add New Sponsor" }]}
+      />
+      <Panel header="Create Sponsor" style={{ backgroundColor: "#FFFFFF", borderRadius: "16px" }}>
+        <SponsorFormFields logoPreviewUrl={DEFAULT_SPONSOR_LOGO_URL} onChange={handleChange} state={state} />
 
-      <Flex flexGap="0.5rem" justifyContent="flex-end">
-        <Button onClick={() => router.push(getAppUrl(storeHash, "/huntry/sponsors"))} variant="subtle">
-          Cancel
-        </Button>
-        <Button
-          disabled={!canSubmit}
-          isLoading={isPending}
-          onClick={handleSubmit}
-          style={{ backgroundColor: HUNTRY_COLORS.primary, borderColor: HUNTRY_COLORS.primary }}
-          variant="primary"
-        >
-          Create Sponsor
-        </Button>
-      </Flex>
-    </Panel>
+        <Flex flexGap="0.5rem" justifyContent="flex-end">
+          <Button onClick={() => router.push(getAppUrl(storeHash, "/huntry/sponsors"))} variant="subtle">
+            Cancel
+          </Button>
+          <Button
+            disabled={!canSubmit}
+            isLoading={isPending}
+            onClick={handleSubmit}
+            style={{ backgroundColor: HUNTRY_COLORS.primary, borderColor: HUNTRY_COLORS.primary }}
+            variant="primary"
+          >
+            Create Sponsor
+          </Button>
+        </Flex>
+      </Panel>
+    </>
   );
 }

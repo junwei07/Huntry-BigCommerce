@@ -99,6 +99,11 @@ documented route tree and this app's existing full-page navigation model
 route to visually echo EVMS's card sectioning and palette; don't adopt
 its modal mechanism.
 
+Every new/edit form renders `Breadcrumb` (`src/components/huntry/breadcrumb.tsx`)
+above its `Panel`, ported from the WP plugin's
+`huntry_get_event_screen_breadcrumb` (`huntry/includes/events/index.php`):
+`Events > Add New Event`, `Events > Edit Event > <name>`. List pages have none.
+
 `runServerAction` (`src/components/ui/action-alerts.tsx`) returns the
 resolved `ActionResult` (not `Promise<void>`) specifically so a creation
 form can navigate to the list on success:

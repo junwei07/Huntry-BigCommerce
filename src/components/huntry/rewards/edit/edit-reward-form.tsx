@@ -6,6 +6,7 @@ import { updateHuntryReward } from "@/app/store/[storeHash]/huntry/rewards/[id]/
 import { runServerAction } from "@/components/ui/action-alerts";
 import { useClearGlobalLoading } from "@/components/ui/global-loading";
 import { useStoreHash } from "@/components/ui/store-hash-context";
+import { Breadcrumb } from "@/components/huntry/breadcrumb";
 import { RewardFormFields } from "@/components/huntry/rewards/reward-form-fields";
 import { toDatetimeLocalValue } from "@/lib/huntry/events/datetime-local";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
@@ -75,30 +76,40 @@ export function EditRewardForm({ reward, sponsors }: { reward: HuntryReward; spo
   };
 
   return (
-    <Panel header={`Edit Reward: ${reward.name}`} style={{ backgroundColor: "#FFFFFF", borderRadius: "16px" }}>
-      <RewardFormFields onChange={handleChange} sponsors={sponsors} state={state} />
+    <>
+      <Breadcrumb
+        crumbs={[
+          { label: "Rewards", href: getAppUrl(storeHash, "/huntry/rewards") },
+          { label: "Edit Reward" },
+          { label: reward.name },
+        ]}
+        hardNavigation
+      />
+      <Panel header={`Edit Reward: ${reward.name}`} style={{ backgroundColor: "#FFFFFF", borderRadius: "16px" }}>
+        <RewardFormFields onChange={handleChange} sponsors={sponsors} state={state} />
 
-      <Flex flexGap="0.5rem" justifyContent="flex-end">
-        <Button
-          onClick={() => {
-            // See handleSubmit's identical comment on why this is a hard
-            // navigation rather than router.push.
-            window.location.href = getAppUrl(storeHash, "/huntry/rewards");
-          }}
-          variant="subtle"
-        >
-          Cancel
-        </Button>
-        <Button
-          disabled={!canSubmit}
-          isLoading={isPending}
-          onClick={handleSubmit}
-          style={{ backgroundColor: HUNTRY_COLORS.primary, borderColor: HUNTRY_COLORS.primary }}
-          variant="primary"
-        >
-          Save Changes
-        </Button>
-      </Flex>
-    </Panel>
+        <Flex flexGap="0.5rem" justifyContent="flex-end">
+          <Button
+            onClick={() => {
+              // See handleSubmit's identical comment on why this is a hard
+              // navigation rather than router.push.
+              window.location.href = getAppUrl(storeHash, "/huntry/rewards");
+            }}
+            variant="subtle"
+          >
+            Cancel
+          </Button>
+          <Button
+            disabled={!canSubmit}
+            isLoading={isPending}
+            onClick={handleSubmit}
+            style={{ backgroundColor: HUNTRY_COLORS.primary, borderColor: HUNTRY_COLORS.primary }}
+            variant="primary"
+          >
+            Save Changes
+          </Button>
+        </Flex>
+      </Panel>
+    </>
   );
 }
