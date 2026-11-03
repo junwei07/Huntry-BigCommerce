@@ -70,6 +70,8 @@ export type MutableEggFlags = { [K in keyof EggFlags]: Set<string> };
 // Client-side view of GET .../cta-data (BC-HUN-038), mirroring PublicCtaData in
 // src/lib/huntry/public-api/cta-data.ts (dates arrive as ISO strings).
 export interface StorefrontCtaEvent {
+  // Missing on a payload cached before upcoming events were sent: means live.
+  status?: "live" | "upcoming";
   name: string;
   slug: string;
   startsAt: string | null;

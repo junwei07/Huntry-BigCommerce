@@ -337,7 +337,7 @@ Name instead of a leading thumbnail cell — Name / Discount / Scope / kebab.
 - **Admin Featured tab** ports the text/image fields of the plugin's Featured page
   (`huntry/includes/featured/index.php`: banner description, button logo, product CTA title and
   description) to `src/components/huntry/featured/`. The featured-event picker is not ported
-  (live events get a banner slide each; the featured flag is the unshipped part of BC-HUN-015).
+  (live and upcoming events get a banner slide each; the featured flag is the unshipped part of BC-HUN-015).
   The two image fields reuse `LogoUploadField` and are preview-only like the sponsor logo above.
 - **Storefront banner and product CTA** are ports of `huntry/includes/frontend/cta.php`,
   `assets/js/huntry.js` and `assets/css/huntry.css` (header/product sections): see

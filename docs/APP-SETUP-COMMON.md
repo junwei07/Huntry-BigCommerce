@@ -27,34 +27,16 @@ BigCommerce rejects a mismatch.
 
 On the **Scopes** tab, enable at minimum:
 
-* **Marketing**: modify (gates the Promotions v3 + coupon-code APIs —
-  there is no separate "Promotions" scope)
-* **Customers**: modify (the Customer Group eligibility mechanism — see
-  `docs/MIGRATION.md` §2)
+* **Marketing**: modify
+* **Customers**: modify 
 * **Content**: modify
-* **Products**: read-only (gates `GET /v3/catalog/products`, used by the
-  reward product picker — a distinct scope from Customers; conflating the
-  two caused a live 403 the first time the picker was exercised, see
-  `HBC-CHANGELOG.md`'s BC-HUN-019 entry)
-* **Information & Settings**: read-only (`store_v2_information_read_only`; gates
-  `GET /v2/store`, the CORS origin source in
-  `src/lib/huntry/public-api/cors.ts`. Missing it gives a live 403 "You don't
-  have a required scope" and the Huntry tab shows "couldn't load")
-* **Storefront API Customer Impersonation Tokens**: required for
-  `customer/current.jwt`
-* **Orders**: read-only (gates webhook registration for
-  `store/order/created` and the order re-fetch it triggers — there is no
-  separate "Webhooks" scope)
+* **Products**: read-only 
+* **Information & Settings**: read-only 
+* **Orders**: read-only
 * **App Extensions**: manage
-* **Checkout Content**: modify (`store_content_checkout`; BC-HUN-051 — lets
-  the storefront script load on `/checkout`, where it shows "Invalid coupon
-  usage"). Needed **in addition to** Checkout below, not instead of it.
-* **Checkout**: modify (`store_checkout` — **not** "Checkout Content", a
-  different scope that does not unlock `/v3/checkouts`; BC-HUN-049: removes a reward code from a cart that
-  isn't its claimer's, and re-reads the checkout; also confirm whether
-  **Carts**: read-only is needed for the `store/cart/couponApplied` webhook —
-  see the scope table under "Required OAuth Scopes" in `docs/MIGRATION.md`). Stores installed before this scope
-  was added must reauthorize.
+* **Checkout Content**: modify 
+* **Checkout**: modify 
+* **Carts**: read-only
 
 Scope changes only take effect for a store on the next install, so if you
 change them later, uninstall and reinstall the app.

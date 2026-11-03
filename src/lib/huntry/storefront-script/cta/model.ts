@@ -19,12 +19,17 @@ const HEX_COLOR = /^#([0-9a-f]{6})$/i;
 
 export interface HeaderSlide {
   name: string;
+  // The event's own page: where a live slide links.
   href: string;
+  // Where an upcoming slide links: the map only serves live events, so the
+  // event's page would be empty until the start.
+  upcomingHref: string;
   // A pure hex colour or null, for the orange brand word.
   accent: string | null;
   // A mix of the event colour into the banner's dark base, or null.
   background: string | null;
   imageUrl: string | null;
+  startsAt: number | null;
   endsAt: number | null;
 }
 
@@ -60,12 +65,17 @@ export function darkenAccent(accent: string | null): string | null {
   return `#${mixed.map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
 }
 
-// One slide per live event that has not ended yet (the data is up to 30 s
-// stale, and the shopper's clock may differ). Server order is kept.
+// One slide per live or upcoming event that has not ended yet (the data is up
+// to 30 s stale, and the shopper's clock may differ). Server order is kept. An
+// upcoming event whose start has passed stays: slideState derives live from the
+// clock, so the slide flips in place instead of vanishing at zero.
 export function buildSlides(data: StorefrontCtaData, now: number): HeaderSlide[] {
   return data.events
     .filter((event) => {
       const end = toTime(event.endsAt);
+
+      // Nothing to count down to.
+      if (event.status === "upcoming" && toTime(event.startsAt) === null) return false;
 
       return end === null || end > now;
     })
@@ -75,25 +85,35 @@ export function buildSlides(data: StorefrontCtaData, now: number): HeaderSlide[]
       return {
         name: event.name,
         href: eventHref(event.slug),
+        upcomingHref: HUNTRY_PAGE_PATH,
         accent,
         background: darkenAccent(accent),
         imageUrl: event.headerBannerUrl || data.banner.imageUrl,
+        startsAt: event.status === "upcoming" ? toTime(event.startsAt) : null,
         endsAt: toTime(event.endsAt),
       };
     });
 }
 
 export interface SlideState {
-  // Text of the "Ends in" countdown, or null when the event has no end date.
+  // Text of the "Starting soon" countdown, or null once the event has started.
+  startsText: string | null;
+  // Text of the "Ends in" countdown, or null when the event has no end date or
+  // has not started.
   endsText: string | null;
   ended: boolean;
 }
 
+// `startsAt` is only set for slides that were upcoming when the data was read.
 export function slideState(slide: HeaderSlide, now: number, format: (ms: number) => string): SlideState {
-  if (slide.endsAt === null) return { endsText: null, ended: false };
-  if (slide.endsAt <= now) return { endsText: null, ended: true };
+  if (slide.startsAt !== null && slide.startsAt > now) {
+    return { startsText: format(slide.startsAt - now), endsText: null, ended: false };
+  }
 
-  return { endsText: format(slide.endsAt - now), ended: false };
+  if (slide.endsAt === null) return { startsText: null, endsText: null, ended: false };
+  if (slide.endsAt <= now) return { startsText: null, endsText: null, ended: true };
+
+  return { startsText: null, endsText: format(slide.endsAt - now), ended: false };
 }
 
 // A positive integer product id, or null (a malformed value must show nothing).
@@ -108,7 +128,7 @@ export function parseProductId(value: string | null | undefined): number | null 
 // The plugin's huntry_product_has_active_reward: the store-wide reward case or
 // the product being named by a reward on a live hunt.
 export function productHasActiveReward(data: StorefrontCtaData, productId: number): boolean {
-  if (data.events.length === 0) return false;
+  if (!data.events.some((event) => event.status !== "upcoming")) return false;
 
   return data.allProducts || data.productIds.includes(productId);
 }

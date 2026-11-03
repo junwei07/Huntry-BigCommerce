@@ -22,13 +22,17 @@ afterEach(() => {
 });
 
 describe("GET cta-data (MOCK mode)", () => {
-  it("returns only live events, without eggs", async () => {
+  it("returns live and upcoming events only, without eggs", async () => {
     const body = await (await call()).json();
 
-    // MOCK_EVENTS id 3 is the one live event (see mock-events.ts).
-    expect(body.events).toHaveLength(1);
+    // MOCK_EVENTS: id 3 is live, id 2 upcoming; id 1 is unscheduled and id 4
+    // ended (see mock-events.ts).
+    expect(body.events.map((event: { slug: string; status: string }) => [event.slug, event.status]).sort()).toEqual([
+      ["anniversary-hunt", "live"],
+      ["summer-kickoff-hunt", "upcoming"],
+    ]);
     expect(Object.keys(body.events[0]).sort()).toEqual(
-      ["endsAt", "headerBannerUrl", "name", "primaryColor", "slug", "startsAt"].sort(),
+      ["endsAt", "headerBannerUrl", "name", "primaryColor", "slug", "startsAt", "status"].sort(),
     );
   });
 

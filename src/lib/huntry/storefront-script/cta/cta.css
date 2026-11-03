@@ -141,6 +141,31 @@ prefix for that, which BigCommerce themes don't have).
   font-size: 16px;
   line-height: 1;
 }
+.huntry-header__button-text[hidden],
+.huntry-header__button-arrow[hidden],
+.huntry-header__live-indicator[hidden] {
+  display: none;
+}
+.huntry-header__countdown-start-container {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  white-space: nowrap;
+}
+.huntry-header__countdown-start-container[hidden] {
+  display: none;
+}
+.huntry-header__countdown-start-container .huntry-header__countdown-label {
+  font-size: 14px;
+  font-weight: 500;
+  white-space: pre;
+}
+.huntry-countdown-start {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .huntry-header__countdown-end-container {
   grid-column: 3;
   justify-self: end;

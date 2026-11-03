@@ -12,7 +12,7 @@ import {
 
 // The storefront header banner (BC-HUN-038): a port of the WordPress plugin's
 // header carousel (huntry/includes/frontend/cta.php huntry_render_header_cta,
-// assets/js/huntry.js), with one slide per live event. Everything from the API
+// assets/js/huntry.js), with one slide per live or upcoming event. Everything from the API
 // is set with textContent or a property, never innerHTML.
 const SLIDE_INTERVAL_MS = 6000;
 const TRANSITION_RESET_MS = 520;
@@ -52,6 +52,10 @@ function buildSlide(slide: HeaderSlide, data: StorefrontCtaData, duplicate: bool
   const textContainer = element("div", "huntry-header__text-container");
   const button = element("a", "huntry-header__button");
   const liveDot = element("span", "huntry-header__live-indicator");
+  const buttonText = element("span", "huntry-header__button-text", "LIVE · JOIN NOW");
+  const buttonArrow = element("span", "huntry-header__button-arrow", "→");
+  const startsContainer = element("div", "huntry-header__countdown-start-container");
+  const startsValue = element("span", "huntry-countdown-start");
   const endsContainer = element("div", "huntry-header__countdown-end-container");
   const endsValue = element("span", "huntry-countdown-end");
 
@@ -79,9 +83,6 @@ function buildSlide(slide: HeaderSlide, data: StorefrontCtaData, duplicate: bool
     textContainer.appendChild(element("span", "huntry-header__text-orange", BRAND_WORD));
   }
 
-  button.href = slide.href;
-  button.setAttribute("aria-label", `Join the hunt: ${slide.name}`);
-
   if (duplicate) {
     node.setAttribute("aria-hidden", "true");
     button.setAttribute("tabindex", "-1");
@@ -98,10 +99,14 @@ function buildSlide(slide: HeaderSlide, data: StorefrontCtaData, duplicate: bool
     button.appendChild(logo);
   }
 
+  // Upcoming and live share the button; update() shows one set and hides the other.
+  startsContainer.appendChild(element("span", "huntry-header__countdown-label", "STARTING SOON · "));
+  startsContainer.appendChild(startsValue);
+  button.appendChild(startsContainer);
   liveDot.appendChild(element("span", "huntry-header__live-dot"));
   button.appendChild(liveDot);
-  button.appendChild(element("span", "huntry-header__button-text", "LIVE · JOIN NOW"));
-  button.appendChild(element("span", "huntry-header__button-arrow", "→"));
+  button.appendChild(buttonText);
+  button.appendChild(buttonArrow);
 
   center.appendChild(textContainer);
   center.appendChild(button);
@@ -116,6 +121,16 @@ function buildSlide(slide: HeaderSlide, data: StorefrontCtaData, duplicate: bool
     node,
     update(now) {
       const state = slideState(slide, now, formatCountdown);
+      const upcoming = state.startsText !== null;
+
+      startsContainer.hidden = !upcoming;
+      liveDot.hidden = upcoming;
+      buttonText.hidden = upcoming;
+      buttonArrow.hidden = upcoming;
+      button.href = upcoming ? slide.upcomingHref : slide.href;
+      button.setAttribute("aria-label", upcoming ? `${slide.name} starts soon` : `Join the hunt: ${slide.name}`);
+
+      if (state.startsText !== null) startsValue.textContent = state.startsText;
 
       endsContainer.hidden = state.endsText === null;
 
@@ -125,7 +140,7 @@ function buildSlide(slide: HeaderSlide, data: StorefrontCtaData, duplicate: bool
 }
 
 // Mounts the banner and keeps it running for the life of the page. Returns
-// without mounting when no event is live (nothing worth advertising).
+// without mounting when no event is live or upcoming (nothing worth advertising).
 export function mountHeaderBanner(data: StorefrontCtaData): void {
   if (!document.body || document.querySelector('[data-huntry-cta="header"]')) return;
 

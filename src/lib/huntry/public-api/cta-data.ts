@@ -12,8 +12,11 @@ import { fetchReward } from "@/lib/huntry/rewards/rewards-api";
 // payload carries every egg and deliberately withholds product ids, while this
 // one is small enough to fetch on every page and exposes only the ids of
 // products a live hunt discounts (public on the storefront anyway) — never
-// coupon codes or discount details.
+// coupon codes or discount details. The header banner also advertises upcoming
+// events (a countdown to the start); the product CTA only counts live ones.
 export interface PublicCtaEvent {
+  // As of the read; the banner re-derives live vs upcoming from the dates.
+  status: "live" | "upcoming";
   name: string;
   slug: string;
   startsAt: Date | null;
@@ -38,6 +41,9 @@ export async function buildPublicCtaData(storeHash: string): Promise<PublicCtaDa
     fetchStorefrontSettingsOrDefaults(storeHash),
   ]);
   const live = allEvents.filter((event) => event.status === "live");
+  const advertised = allEvents.flatMap((event) =>
+    event.status === "live" || event.status === "upcoming" ? [{ event, status: event.status }] : [],
+  );
 
   const eggLists = await Promise.all(live.map((event) => fetchEggs(event.id, storeHash)));
   const rewardIds = [...new Set(eggLists.flat().map((egg) => egg.rewardId))];
@@ -53,7 +59,8 @@ export async function buildPublicCtaData(storeHash: string): Promise<PublicCtaDa
   ];
 
   return {
-    events: live.map((event) => ({
+    events: advertised.map(({ event, status }) => ({
+      status,
       name: event.name,
       slug: event.slug,
       startsAt: event.startsAt,

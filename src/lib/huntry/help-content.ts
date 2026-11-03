@@ -66,7 +66,7 @@ export const HELP_CONTENT: Record<string, HelpContent> = {
     steps: [
       "Set the banner description, button logo, and banner image.",
       "Set the title and description of the product page CTA.",
-      "Save — live events appear in the storefront header banner.",
+      "Save — live and upcoming events appear in the storefront header banner.",
     ],
   },
 };

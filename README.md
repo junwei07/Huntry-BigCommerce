@@ -4,24 +4,22 @@ Huntry is a single-click BigCommerce app for running map-based treasure hunts
 in a store. A merchant installs it from the control panel and manages events,
 rewards, sponsors, featured placements and player claims in an admin UI inside
 BigCommerce. Shoppers see a map on a storefront page, find eggs and claim
-rewards as BigCommerce coupon codes. It is a migration of the Huntry WordPress
-plugin (`huntry/`), see [docs/MIGRATION.md](docs/MIGRATION.md).
+rewards as BigCommerce coupon codes.
 
-## How it fits together
+## Overview
 
 - **App:** Next.js (App Router) with the BigDesign UI, running as the app the
   merchant sees in the control panel iframe, and serving the public storefront
   APIs under `/api/public/huntry/{storeHash}/*`.
 - **Data:** Firestore holds store credentials (tokens encrypted at rest) and all
   Huntry data. Uploaded images go to a dedicated Cloud Storage bucket.
-- **Hosting:** Firebase App Hosting. Served from the default Firebase URL today; `https://app.huntry.io` is the production target (not applied yet).
+- **Hosting:** Firebase App Hosting. Served from the default Firebase URL for now
 - **BigCommerce:** the app is registered in the
   [Developer Portal](https://developer.bigcommerce.com/) and talks to each store
   through its OAuth access token, webhooks and a storefront script.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the install and session
-flow, authorization, credentials storage, the API clients and caching, and
-[docs/MIGRATION.md](docs/MIGRATION.md) for the Huntry feature design.
+flow, authorization, credentials storage, the API clients and caching.
 
 ## Prerequisites
 
@@ -36,7 +34,7 @@ flow, authorization, credentials storage, the API clients and caching, and
 
 The app's origin (`APP_ORIGIN`) depends on where it runs:
 
-| Where | Origin |
+| Where | `APP_ORIGIN` |
 | --- | --- |
 | Local server | your tunnel URL (e.g. cloudflared tunnel) |
 | Firebase App Hosting backend | `https://huntry-bc--evms-demo-d1477.europe-west4.hosted.app/` (default  URL) |
@@ -48,7 +46,7 @@ Development uses its own BigCommerce app, Firestore database and storage bucket.
 server behind a tunnel, or the live Firebase App Hosting backend. Both need a
 dev app and the same variables, which differ by where they are set:
 
-1. **Register a dev app** in the Developer Portal and note its client ID and
+1. **Register a dev app** in the [Developer Portal](https://developer.bigcommerce.com/) and note its client ID and
    secret. Enable the scopes and Multiple Users as listed in
    [docs/APP-SETUP-COMMON.md](docs/APP-SETUP-COMMON.md). Its callback URLs
    (`/api/app/auth`, `/load`, `/uninstall`, `/remove_user`) point at one origin
@@ -101,18 +99,10 @@ impersonation step. Values come from `apphosting.yaml` and Secret Manager.
 
 1. Set `APP_ORIGIN` in `apphosting.yaml` to the backend's URL and make sure the
    secrets exist and are readable by the backend (Production setup, steps 3 and 5).
-2. Set the portal callbacks to that URL.
-3. **Deploy** by pushing to `main`, or without a commit:
-
-   ```powershell
-   firebase apphosting:rollouts:create <backend-id> --git-branch main --project <project>
-   firebase apphosting:rollouts:list --backend <backend-id> --project <project>
-   ```
+2. Set the developer portal callbacks to that URL.
+3. **Deploy** by pushing to `main`, or by creating a new rollout
 
 4. Install or re-open the dev app on the sandbox store.
-
-> **The hosted backend currently serves from the default Firebase URL**
-> (`https://huntry-bc--evms-demo-d1477.europe-west4.hosted.app/`)
 
 
 ## Production setup

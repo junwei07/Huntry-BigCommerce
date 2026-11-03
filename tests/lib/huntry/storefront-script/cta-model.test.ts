@@ -65,6 +65,22 @@ describe("buildSlides", () => {
     expect(buildSlides(data({ events: [event({ endsAt: null })] }), NOW)).toHaveLength(1);
   });
 
+  it("keeps an upcoming event, with its start, and links it to the listing", () => {
+    const [slide] = buildSlides(data({ events: [event({ status: "upcoming", startsAt: "2026-06-20T00:00:00Z" })] }), NOW);
+
+    expect(slide.startsAt).toBe(new Date("2026-06-20T00:00:00Z").getTime());
+    expect(slide.upcomingHref).toBe(HUNTRY_PAGE_PATH);
+    expect(slide.href).toBe("/huntry/?event=hunt");
+  });
+
+  it("drops an upcoming event with no start date", () => {
+    expect(buildSlides(data({ events: [event({ status: "upcoming", startsAt: null })] }), NOW)).toHaveLength(0);
+  });
+
+  it("keeps an upcoming event whose start has passed since the data was cached", () => {
+    expect(buildSlides(data({ events: [event({ status: "upcoming", startsAt: "2026-06-15T11:59:59Z" })] }), NOW)).toHaveLength(1);
+  });
+
   it("uses the event's own banner, else the default image", () => {
     const [own, fallback] = buildSlides(
       data({ events: [event({ headerBannerUrl: "https://cdn.example.com/e.png" }), event({ slug: "x" })] }),
@@ -89,12 +105,20 @@ describe("slideState", () => {
   const [slide] = buildSlides(data(), NOW);
 
   it("shows the ends-in countdown while the event runs", () => {
-    expect(slideState(slide, NOW, format)).toEqual({ endsText: `${slide.endsAt! - NOW}ms`, ended: false });
+    expect(slideState(slide, NOW, format)).toEqual({ startsText: null, endsText: `${slide.endsAt! - NOW}ms`, ended: false });
   });
 
   it("hides it with no end date and flags an ended slide", () => {
-    expect(slideState({ ...slide, endsAt: null }, NOW, format)).toEqual({ endsText: null, ended: false });
-    expect(slideState({ ...slide, endsAt: NOW }, NOW, format)).toEqual({ endsText: null, ended: true });
+    expect(slideState({ ...slide, endsAt: null }, NOW, format)).toEqual({ startsText: null, endsText: null, ended: false });
+    expect(slideState({ ...slide, endsAt: NOW }, NOW, format)).toEqual({ startsText: null, endsText: null, ended: true });
+  });
+
+  it("counts down to the start of an upcoming slide, then flips to live by the clock", () => {
+    const [upcoming] = buildSlides(data({ events: [event({ status: "upcoming", startsAt: "2026-06-16T12:00:00Z" })] }), NOW);
+    const start = upcoming.startsAt!;
+
+    expect(slideState(upcoming, NOW, format)).toEqual({ startsText: `${start - NOW}ms`, endsText: null, ended: false });
+    expect(slideState(upcoming, start, format)).toEqual({ startsText: null, endsText: `${upcoming.endsAt! - start}ms`, ended: false });
   });
 });
 
@@ -113,6 +137,10 @@ describe("product CTA rules", () => {
     expect(productHasActiveReward(data({ productIds: [5] }), 5)).toBe(true);
     expect(productHasActiveReward(data({ productIds: [6] }), 5)).toBe(false);
     expect(productHasActiveReward(data({ allProducts: true, events: [] }), 5)).toBe(false);
+    expect(productHasActiveReward(data({ allProducts: true, events: [event({ status: "upcoming" })] }), 5)).toBe(false);
+    expect(
+      productHasActiveReward(data({ allProducts: true, events: [event({ status: "upcoming" }), event({ status: "live" })] }), 5),
+    ).toBe(true);
   });
 });
 
