@@ -45,8 +45,22 @@ export interface PublicMapEvent {
   eggs: PublicMapEgg[];
 }
 
+// What the /huntry/ listing shows for a hunt that has not started: a card with a
+// countdown, nothing more. Deliberately no id, eggs, rewards or locations — the
+// hunt is not open yet, so none of that may be public.
+export interface PublicUpcomingEvent {
+  name: string;
+  slug: string;
+  description: string;
+  startsAt: Date;
+  endsAt: Date | null;
+  headerBannerUrl: string | null;
+}
+
 export interface PublicMapData {
   events: PublicMapEvent[];
+  // Never narrowed into `events`, so no map, claim or ?event= path can open one.
+  upcoming: PublicUpcomingEvent[];
 }
 
 // The script runs on the merchant's domain, so a root-relative asset path
@@ -105,11 +119,29 @@ async function buildPublicEvent(event: HuntryEvent, storeHash: string): Promise<
   };
 }
 
-// Live events only (derived status — upcoming/ended events and their eggs are
-// withheld), optionally narrowed to one event by slug.
+// `events` is live events only (derived status; ended events and any eggs of a
+// hunt that is not live are withheld), optionally narrowed to one event by slug.
+// `upcoming` lists the not-yet-started events as eggless card data, and is empty
+// when narrowed by slug.
 export async function buildPublicMapData(storeHash: string, eventSlug?: string): Promise<PublicMapData> {
   const events = await fetchEvents({ sort: "time" }, storeHash);
   const live = events.filter((event) => event.status === "live" && (!eventSlug || event.slug === eventSlug));
+  const upcoming = eventSlug
+    ? []
+    : events.flatMap((event) =>
+        event.status === "upcoming" && event.startsAt
+          ? [
+              {
+                name: event.name,
+                slug: event.slug,
+                description: event.description,
+                startsAt: event.startsAt,
+                endsAt: event.endsAt,
+                headerBannerUrl: toPublicAssetUrl(event.headerBannerUrl),
+              },
+            ]
+          : [],
+      );
 
-  return { events: await Promise.all(live.map((event) => buildPublicEvent(event, storeHash))) };
+  return { events: await Promise.all(live.map((event) => buildPublicEvent(event, storeHash))), upcoming };
 }

@@ -1,7 +1,7 @@
 import { fetchMapData, fetchMyRewards, fetchPlayerStatus, isLoggedIn, submitClaim } from "./api";
 import { isCartPage, startCartGuard } from "./cart-guard";
 import { isCheckoutArea, isCheckoutPage, startCheckoutGuard } from "./checkout-guard";
-import { listingUrl, renderListing, renderNotFound } from "./cards-view";
+import { listingUrl, renderListing, renderNotFound, renderNotStarted } from "./cards-view";
 import { startClaimUi } from "./claim-ui";
 import { startCtas } from "./cta";
 import { showHuntFullPrompt, showJoinPrompt } from "./claim-ui/dom-ui";
@@ -109,7 +109,7 @@ async function start(): Promise<void> {
   // return just that one event (or none), so the listing could not be built and
   // a mistyped slug would look like "no hunts are live". The mode is decided
   // here from the whole list instead.
-  const { events } = await fetchMapData(config);
+  const { events, upcoming } = await fetchMapData(config);
   const mode = decideMode(events, slug, view);
 
   window.HuntryStorefront = {
@@ -125,7 +125,7 @@ async function start(): Promise<void> {
 
   switch (mode.kind) {
     case "listing":
-      renderListing(container, mode.events);
+      renderListing(container, mode.events, upcoming, () => fetchMapData(config));
       break;
     case "map":
       // A live event's map is for signed-in customers only. Guests get the
@@ -171,7 +171,14 @@ async function start(): Promise<void> {
       renderRewards(container, await fetchMyRewards(config));
       break;
     case "not-found":
-      renderNotFound(container);
+      // A hunt that exists but is not open yet (upcoming events are card data
+      // only, never part of `events`): say so rather than "couldn't find".
+      if (slug && upcoming.some((event) => event.slug === slug)) {
+        renderNotStarted(container);
+      } else {
+        renderNotFound(container);
+      }
+
       break;
   }
 

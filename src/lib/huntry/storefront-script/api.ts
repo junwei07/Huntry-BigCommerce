@@ -14,7 +14,10 @@ export async function fetchMapData(config: StorefrontConfig, eventSlug?: string)
 
   const body = (await response.json()) as Partial<StorefrontMapData>;
 
-  return { events: Array.isArray(body.events) ? body.events : [] };
+  return {
+    events: Array.isArray(body.events) ? body.events : [],
+    upcoming: Array.isArray(body.upcoming) ? body.upcoming : [],
+  };
 }
 
 // The small, cached payload behind the header banner and product CTA. Returns

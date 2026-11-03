@@ -30,8 +30,20 @@ export interface StorefrontEvent {
   eggs: StorefrontEgg[];
 }
 
+// A hunt that has not started: card data only, no eggs (see PublicUpcomingEvent).
+export interface StorefrontUpcomingEvent {
+  name: string;
+  slug: string;
+  description: string;
+  startsAt: string;
+  endsAt: string | null;
+  headerBannerUrl: string | null;
+}
+
 export interface StorefrontMapData {
   events: StorefrontEvent[];
+  // Missing on a payload cached before upcoming cards existed: means none.
+  upcoming: StorefrontUpcomingEvent[];
 }
 
 // Injected by storefront-script.js/route.ts as window.__HUNTRY_STOREFRONT__.

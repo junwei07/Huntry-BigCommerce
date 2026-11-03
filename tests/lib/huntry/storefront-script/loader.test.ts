@@ -24,6 +24,15 @@ const EVENT = {
   eggs: [],
 };
 
+const UPCOMING = {
+  name: "Soon",
+  slug: "soon",
+  description: "",
+  startsAt: "2999-01-01T00:00:00.000Z",
+  endsAt: null,
+  headerBannerUrl: null,
+};
+
 interface FakeNode {
   tag: string;
   className: string;
@@ -70,24 +79,27 @@ let container: FakeNode;
 let headChildren: FakeNode[];
 let fetchedUrls: string[];
 let body: FakeNode;
+let intervals: { callback: () => void; delay: number }[];
 
 const JWT_URL = "/customer/current.jwt?app_client_id=client-1";
 
 // `guest` makes BigCommerce's current.jwt answer 404, as it does when no
 // customer is signed in.
 // `huntFull` is the player-status answer for a signed-in customer.
-function setUp(search: string, events: unknown[], guest = false, huntFull = false) {
+// `upcoming` is the eggless card data for hunts that have not started.
+function setUp(search: string, events: unknown[], guest = false, huntFull = false, upcoming: unknown[] = []) {
   container = fakeNode("div");
   body = fakeNode("body");
   headChildren = [];
   fetchedUrls = [];
+  intervals = [];
 
   vi.stubGlobal("window", {
     __HUNTRY_STOREFRONT__: { appOrigin: "https://app.example.com", storeHash: "abc123", clientId: "client-1" },
     location: { search, hash: "", pathname: "/huntry/" },
     addEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
-    setInterval: () => 1,
+    setInterval: (callback: () => void, delay: number) => intervals.push({ callback, delay }),
     clearInterval: vi.fn(),
   });
   vi.stubGlobal("CustomEvent", class {
@@ -115,7 +127,7 @@ function setUp(search: string, events: unknown[], guest = false, huntFull = fals
         return new Response(JSON.stringify({ full: huntFull }), { status: 200 });
       }
 
-      return new Response(JSON.stringify({ events }), { status: 200 });
+      return new Response(JSON.stringify({ events, upcoming }), { status: 200 });
     }),
   );
 }
@@ -253,6 +265,80 @@ describe("storefront loader", () => {
     );
     // The Hunts / My Rewards tabs sit above it.
     expect(container.children[0]?.className).toBe("huntry-page-nav");
+  });
+
+  it("lists an upcoming hunt after the live ones, as a card that is not a link", async () => {
+    setUp("", [EVENT], false, false, [UPCOMING]);
+    await runLoader();
+
+    const grid = container.children.find((child) => child.className === "huntry-cards");
+    const [live, soon] = grid?.children ?? [];
+
+    expect(live?.tag).toBe("a");
+    expect(live?.href).toBe("/huntry/?event=hunt");
+    expect(soon?.tag).toBe("div");
+    expect(soon?.href).toBeUndefined();
+    expect(soon?.className).toContain("huntry-card--upcoming");
+
+    const [pill, title, countdown] = soon?.children[0]?.children ?? [];
+
+    expect(pill?.textContent).toBe("Upcoming");
+    expect(title?.textContent).toBe("Soon");
+    expect(countdown?.textContent).toMatch(/^Starts in /);
+    expect(soon?.children[0]?.children.at(-1)?.textContent).toBe("Coming Soon");
+  });
+
+  it("shows only an upcoming card, not the empty message, when nothing is live", async () => {
+    setUp("", [], false, false, [UPCOMING]);
+    await runLoader();
+
+    expect(container.children.some((child) => child.className === "huntry-cards")).toBe(true);
+    expect(container.children.some((child) => child.className === "huntry-cards-message")).toBe(false);
+  });
+
+  it("says an upcoming hunt has not started when its link is opened, and loads no map", async () => {
+    setUp("?event=soon", [EVENT], false, false, [UPCOMING]);
+    await runLoader();
+
+    expect(container.children[0]?.textContent).toContain("This hunt hasn't started yet.");
+    expect(container.children[0]?.textContent).not.toContain("couldn't find");
+    expect(headChildren.some((node) => node.src?.endsWith("/storefront-map.js"))).toBe(false);
+    expect(fetchedUrls).not.toContain(JWT_URL);
+  });
+
+  it("turns an upcoming card into a live link once its start has passed and the data is refetched", async () => {
+    const started = { ...UPCOMING, slug: "soon", startsAt: new Date(Date.now() - 5_000).toISOString() };
+
+    setUp("", [], false, false, [started]);
+
+    const mapDataBodies = [
+      { events: [], upcoming: [started] },
+      { events: [{ ...EVENT, slug: "soon", name: "Soon" }], upcoming: [] },
+    ];
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        fetchedUrls.push(url);
+
+        return new Response(JSON.stringify(url.endsWith("/map-data") ? (mapDataBodies.shift() ?? mapDataBodies[0]) : {}), {
+          status: 200,
+        });
+      }),
+    );
+    await runLoader();
+
+    // The stand-in node does not clear its children on `textContent = ""`, so a redraw leaves the old grid first.
+    const grid = () => container.children.filter((child) => child.className === "huntry-cards").at(-1);
+
+    expect(grid()?.children[0]?.tag).toBe("div");
+
+    // The 10 s refresh; the 1 s countdown tick is the other interval.
+    intervals.find((interval) => interval.delay === 10_000)?.callback();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(grid()?.children[0]?.tag).toBe("a");
+    expect(grid()?.children[0]?.href).toBe("/huntry/?event=soon");
   });
 
   it("reports an unknown slug instead of showing the first event, and loads no map", async () => {

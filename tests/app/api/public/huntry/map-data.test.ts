@@ -36,6 +36,31 @@ describe("GET map-data (MOCK mode)", () => {
     expect(body.events.map((event: { id: number }) => event.id).sort()).toEqual(liveIds.sort());
   });
 
+  it("lists upcoming events as eggless card data, never in events", async () => {
+    const body = await (await call()).json();
+    const upcomingIds = MOCK_EVENTS.filter(
+      (event) => computeEventStatus(event.startsAt, event.endsAt) === "upcoming",
+    ).map((event) => event.slug);
+
+    // Hard assertion: the fixtures must keep an upcoming event (id 2).
+    expect(upcomingIds.length).toBeGreaterThan(0);
+    expect(body.upcoming.map((event: { slug: string }) => event.slug).sort()).toEqual(upcomingIds.sort());
+
+    for (const event of body.upcoming) {
+      expect(Object.keys(event).sort()).toEqual(
+        ["description", "endsAt", "headerBannerUrl", "name", "slug", "startsAt"].sort(),
+      );
+      expect(body.events.map((live: { slug: string }) => live.slug)).not.toContain(event.slug);
+    }
+  });
+
+  it("returns no upcoming events when narrowed to one event by slug", async () => {
+    const [first] = (await (await call()).json()).events;
+    const body = await (await call(`?event=${first.slug}`)).json();
+
+    expect(body.upcoming).toEqual([]);
+  });
+
   it("narrows to one event by slug and returns nothing for an unknown slug", async () => {
     const all = (await (await call()).json()).events;
 

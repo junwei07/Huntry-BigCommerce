@@ -1,10 +1,11 @@
 import { formatCountdown } from "./map-utils";
-import { StorefrontEvent } from "./types";
+import { StorefrontEvent, StorefrontUpcomingEvent } from "./types";
 
 // View-model for one event card on the /huntry/ listing (the WordPress
-// plugin's huntry_render_event_cards_listing). Only live events reach the
-// storefront: map-data deliberately hides upcoming and ended ones.
+// plugin's huntry_render_event_cards_listing). Live events and upcoming ones
+// (card data only, no eggs) reach the storefront; ended ones never do.
 export interface EventCard {
+  status: "live" | "upcoming";
   slug: string;
   name: string;
   description: string;
@@ -21,31 +22,38 @@ function toTime(value: string | null): number | null {
   return Number.isNaN(time) ? null : time;
 }
 
-// Earliest start first; events with no start date last, then by name so the
-// order is stable.
-export function buildCards(events: StorefrontEvent[]): EventCard[] {
-  return events
-    .map((event) => ({
-      slug: event.slug,
-      name: event.name,
-      description: event.description,
-      bannerUrl: event.headerBannerUrl,
-      startsAt: event.startsAt,
-      endsAt: event.endsAt,
-    }))
-    .sort((a, b) => {
-      const aStart = toTime(a.startsAt);
-      const bStart = toTime(b.startsAt);
+// Within a group: earliest start first; events with no start date last, then
+// by name so the order is stable.
+function byStart(a: EventCard, b: EventCard): number {
+  const aStart = toTime(a.startsAt);
+  const bStart = toTime(b.startsAt);
 
-      if (aStart !== bStart) {
-        if (aStart === null) return 1;
-        if (bStart === null) return -1;
+  if (aStart !== bStart) {
+    if (aStart === null) return 1;
+    if (bStart === null) return -1;
 
-        return aStart - bStart;
-      }
+    return aStart - bStart;
+  }
 
-      return a.name.localeCompare(b.name);
-    });
+  return a.name.localeCompare(b.name);
+}
+
+// Live cards first, then upcoming ones (the plugin's listing order).
+export function buildCards(live: StorefrontEvent[], upcoming: StorefrontUpcomingEvent[] = []): EventCard[] {
+  const toCard = (event: StorefrontEvent | StorefrontUpcomingEvent, status: EventCard["status"]): EventCard => ({
+    status,
+    slug: event.slug,
+    name: event.name,
+    description: event.description,
+    bannerUrl: event.headerBannerUrl,
+    startsAt: event.startsAt,
+    endsAt: event.endsAt,
+  });
+
+  return [
+    ...live.map((event) => toCard(event, "live")).sort(byStart),
+    ...upcoming.map((event) => toCard(event, "upcoming")).sort(byStart),
+  ];
 }
 
 export function formatDateRange(
@@ -74,4 +82,16 @@ export function endsCountdown(endsAt: string | null, now: number): string | null
   if (end <= now) return "Hunt ended";
 
   return `Ends in ${formatCountdown(end - now)}`;
+}
+
+// "Starts in 02d 03h 04m 05s" before the start; "Starting now" once it has
+// passed (the card turns into a live one when the data is refetched), null with
+// no start date.
+export function startsCountdown(startsAt: string | null, now: number): string | null {
+  const start = toTime(startsAt);
+
+  if (start === null) return null;
+  if (start <= now) return "Starting now";
+
+  return `Starts in ${formatCountdown(start - now)}`;
 }

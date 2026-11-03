@@ -26,6 +26,13 @@ scoped under .huntry-cards* so nothing leaks into the merchant's theme.
   text-decoration: none;
   color: inherit;
 }
+/* Upcoming: same layout, but not a link, so no hover lift. */
+.huntry-card--upcoming,
+.huntry-card--upcoming:hover,
+.huntry-card--upcoming:focus {
+  cursor: default;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
 .huntry-card__banner {
   width: 100%;
   height: 140px;
@@ -51,6 +58,9 @@ scoped under .huntry-cards* so nothing leaks into the merchant's theme.
     sans-serif;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+.huntry-card__pill--upcoming {
+  background: #f28602;
 }
 .huntry-card__title {
   margin: 0;
@@ -81,6 +91,10 @@ scoped under .huntry-cards* so nothing leaks into the merchant's theme.
   font:
     700 14px/1.2 system-ui,
     sans-serif;
+}
+.huntry-card__cta--disabled {
+  background: #d4d4dc;
+  color: #55556a;
 }
 .huntry-cards-message {
   margin: 24px 0;

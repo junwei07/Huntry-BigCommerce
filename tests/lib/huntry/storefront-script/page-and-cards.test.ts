@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildCards, endsCountdown, formatDateRange } from "@/lib/huntry/storefront-script/cards";
+import { buildCards, endsCountdown, formatDateRange, startsCountdown } from "@/lib/huntry/storefront-script/cards";
 import { safeColor } from "@/lib/huntry/storefront-script/map/chrome";
 import { pageNavItems } from "@/lib/huntry/storefront-script/page-nav";
 import { decideMode, readView } from "@/lib/huntry/storefront-script/page-mode";
-import { StorefrontEvent } from "@/lib/huntry/storefront-script/types";
+import { StorefrontEvent, StorefrontUpcomingEvent } from "@/lib/huntry/storefront-script/types";
 
 const event = (slug: string, overrides: Partial<StorefrontEvent> = {}): StorefrontEvent => ({
   id: 1,
@@ -23,6 +23,15 @@ const event = (slug: string, overrides: Partial<StorefrontEvent> = {}): Storefro
   locationAnchor: "bottom",
   eggs: [],
   ...overrides,
+});
+
+const upcomingEvent = (slug: string, startsAt: string): StorefrontUpcomingEvent => ({
+  name: slug.toUpperCase(),
+  slug,
+  description: "",
+  startsAt,
+  endsAt: null,
+  headerBannerUrl: null,
 });
 
 describe("decideMode", () => {
@@ -77,6 +86,20 @@ describe("buildCards", () => {
     expect(cards.map((card) => card.slug)).toEqual(["early", "late", "undated-a", "undated-b"]);
   });
 
+  it("puts live cards before upcoming ones, each group by start date", () => {
+    const cards = buildCards(
+      [event("live-b", { startsAt: "2026-10-02T00:00:00.000Z" }), event("live-a", { startsAt: "2026-10-01T00:00:00.000Z" })],
+      [upcomingEvent("soon-b", "2026-11-09T00:00:00.000Z"), upcomingEvent("soon-a", "2026-11-01T00:00:00.000Z")],
+    );
+
+    expect(cards.map((card) => [card.slug, card.status])).toEqual([
+      ["live-a", "live"],
+      ["live-b", "live"],
+      ["soon-a", "upcoming"],
+      ["soon-b", "upcoming"],
+    ]);
+  });
+
   it("carries the text fields through untouched (rendered later with textContent)", () => {
     const [card] = buildCards([event("x", { name: "<b>Hi</b>", description: "<img src=x onerror=1>" })]);
 
@@ -104,6 +127,18 @@ describe("formatDateRange / endsCountdown", () => {
     expect(endsCountdown("2026-10-08T00:00:00.000Z", now)).toBe("Hunt ended");
     expect(endsCountdown(null, now)).toBeNull();
     expect(endsCountdown("garbage", now)).toBeNull();
+  });
+});
+
+describe("startsCountdown", () => {
+  const now = Date.parse("2026-10-09T00:00:00.000Z");
+
+  it("counts down to the start, says so once it has started, and hides with no start date", () => {
+    expect(startsCountdown("2026-10-09T01:01:01.000Z", now)).toBe("Starts in 01h 01m 01s");
+    expect(startsCountdown("2026-10-09T00:00:00.000Z", now)).toBe("Starting now");
+    expect(startsCountdown("2026-10-08T00:00:00.000Z", now)).toBe("Starting now");
+    expect(startsCountdown(null, now)).toBeNull();
+    expect(startsCountdown("garbage", now)).toBeNull();
   });
 });
 
