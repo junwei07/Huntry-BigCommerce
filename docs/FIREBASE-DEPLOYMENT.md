@@ -20,30 +20,43 @@ Pointers, not restated here:
 | GCP / Firebase project | `evms-demo-d1477` (shared with other apps) |
 | Firestore database | `huntry-bc` (never the `(default)` database, it belongs to another app) |
 | Storage bucket | `huntry-bc-images` (deploy rules via target `huntry`, see `.firebaserc`) |
+| Backend (dev, existing) | `huntry-bc`, region `europe-west4`, runtime `nodejs24`, live branch `main` |
 | Runtime service account | `huntry-bc-app@evms-demo-d1477.iam.gserviceaccount.com` |
-| App origin | `https://app.huntry.io` |
+| App origin (dev backend) | `https://huntry-bc--evms-demo-d1477.europe-west4.hosted.app/` (`apphosting.yaml`) |
+| Backend (prod, planned) | `huntry-bc-prod`, live branch `release`, see "Separate dev and prod" |
+| Planned custom domain | `https://app.huntry.io` for prod, not set up |
 | DNS for `huntry.io` | Vultr (`ns1.vultr.com`, `ns2.vultr.com`) |
 
 Auth needs no code change: `src/lib/firebase/admin.ts` passes no credential, so
 it uses Application Default Credentials (gcloud locally, the backend's service
 account on App Hosting).
 
-`huntry.io` itself is the live website. The app uses the subdomain
-`app.huntry.io`; adding it only needs new DNS records, the existing records
-stay untouched.
+`huntry.io` itself is the live website. The planned prod custom domain is the
+subdomain `app.huntry.io`; adding it only needs new DNS records, the existing
+records stay untouched.
 
 ## Decisions
 
 - **Production BigCommerce app is a new app** with its own client ID and secret.
   The existing app stays as the dev app for the local tunnel.
-- **Dev and prod data should be separate.** Today both use `huntry-bc` and
-  `huntry-bc-images`. Plan: keep those as dev (they hold the live dev data)
-  and create new prod resources. See "Separate dev and prod". Not done yet.
+- **One backend serves one BigCommerce app.** The client ID and secret are one
+  pair per backend (`src/lib/bc-auth/verify-signed-payload.ts`,
+  `exchange-code-for-token.ts`), so swapping the pair on the existing backend
+  would break the draft app. Prod gets its own backend.
+- **Two backends, two live branches.** The existing backend `huntry-bc` is dev
+  and tracks `main`. A new backend `huntry-bc-prod` tracks `release`. Prod
+  config differences live in an environment override file on `main`, not on the
+  `release` branch. See "Separate dev and prod".
+- **Dev and prod data are separate.** Today the dev backend and local dev use
+  `huntry-bc` and `huntry-bc-images`; keep those as dev (they hold the live dev
+  data) and create new prod resources. Not done yet.
 - **Runtime `nodejs24`.** `package.json` `engines.node` is `>=24` and the docs
   say the backend runtime must match `engines`. Fallback: `nodejs22` and lower
   `engines` to `>=22.5` (needed for `node:sqlite`). Unversioned `nodejs` turns
   off automatic base-image patching.
-- **No staging backend** for now. A push to `main` rolls out to prod.
+- **Until prod exists, `main` is the only rollout.** Today a push to `main`
+  rolls out the one backend, which is the dev backend. After the split, `main`
+  rolls out dev only and prod changes only when `release` moves.
 - At backend creation, answer **No** to "deploy now": secret access and
   `APP_ORIGIN` are not ready for the first rollout.
 
@@ -64,11 +77,24 @@ but nobody has reported running it. Verify before relying on it.
 | Custom domain `app.huntry.io` and Vultr DNS records | Not done |
 | `APP_ORIGIN` set, committed, pushed, first rollout | Not done |
 | Sandbox store install test | Done per user (app installed on the sandbox store). Smoke test details below not individually recorded. |
-| Separate dev database and bucket | Not done. Runbook written, see "Separate dev and prod". |
+| Prod database, bucket, `huntry-bc-prod-app` and its grants | Done (verified 2026-11-03). `huntry-bc-prod` and `huntry-bc-images-prod` are in `europe-north2`, bucket has uniform access and public access prevention. The account has `datastore.user` (conditioned to `huntry-bc-prod`, stored with single-quoted CEL), unconditioned `computeRunner`, and `objectAdmin` on the prod bucket only. `huntry-bc-app` has no binding on the prod bucket. `serviceAccountUser` for the deployer was run but not re-checked. |
+| Prod rules and indexes deployed | Done (2026-11-03). `firebase.json` has a `huntry-bc-prod` firestore entry and a `huntry-prod` storage target, `.firebaserc` maps `huntry-prod` to `huntry-bc-images-prod`. Both composite indexes on `huntry-bc-prod` are READY. Storage rules release not independently checked. |
+| `release` branch created and pushed | Not done |
+| Prod `_PROD` secrets created and granted to `huntry-bc-prod-app` | Not done |
+| Prod backend `huntry-bc-prod` (live branch `release`) | Not done |
+| `apphosting.<env>.yaml` prod override file on `main` | File written (`apphosting.prod.yaml`, 2026-11-03), not committed or pushed. Needs the backend's environment name set to `prod` in the console, and the override semantics are unverified until the first prod rollout. |
+| Production BigCommerce app installed on the prod backend | Not done |
 | BigCommerce listing and submission | Not done |
 
-Backend details to record: ID `___`, region `___`, runtime `___`, service
-account `___`.
+Dev backend (from `firebase apphosting:backends:list`, 2026-10-30): ID
+`huntry-bc`, region `europe-west4`, runtime `nodejs24`. Its runtime service
+account is not shown by the CLI list; confirm it is `huntry-bc-app` in the
+console (backend settings).
+
+The "Custom domain", "Finalize and roll out" and "Smoke test" runbook sections
+below were written for a single backend. Once prod exists they apply to
+`huntry-bc-prod` (domain `app.huntry.io`, production app), and the dev backend
+keeps its `*.hosted.app` origin.
 
 ## Runbook
 
@@ -138,6 +164,15 @@ the project is shared with other apps. If the storage target is missing, run
 Status: planned, nothing below has been run. Same GCP project
 (`evms-demo-d1477`).
 
+**Why a second backend.** The BigCommerce client ID and secret are one pair per
+backend (`src/lib/bc-auth/verify-signed-payload.ts`,
+`exchange-code-for-token.ts`, `storefront-auth/verify-customer-jwt.ts`). Pointing
+the existing backend at the production app would break the draft app, and the
+stores it installed keep tokens, webhooks and a storefront script that belong to
+the draft app's client ID (`register-storefront-script.ts` matches scripts by
+`api_client_id`). So dev and prod are two backends, each with its own BigCommerce
+app, database, bucket and service account.
+
 **Why not rename.** A Firestore database ID and a Cloud Storage bucket name
 are immutable. Copying the data to new names would also break every stored
 image URL, because the token URLs embed the bucket name. So keep the existing
@@ -146,11 +181,39 @@ resources as dev and create new ones for prod. The names stay misleading
 
 | | Dev (existing) | Prod (new) |
 | --- | --- | --- |
+| App Hosting backend | `huntry-bc` | `huntry-bc-prod` |
+| Live branch | `main` | `release` |
 | Firestore database | `huntry-bc` | `huntry-bc-prod` |
 | Storage bucket | `huntry-bc-images` | `huntry-bc-images-prod` |
 | Service account | `huntry-bc-app` | `huntry-bc-prod-app` |
-| BigCommerce app | existing dev app (tunnel) | production app |
-| Secrets | `.env.local` | Secret Manager, different `SESSION_SECRET` and `CREDENTIALS_ENCRYPTION_KEY` |
+| BigCommerce app | existing draft app (also the local tunnel) | production app |
+| Secrets in Secret Manager | `BIGCOMMERCE_CLIENT_SECRET`, `SESSION_SECRET`, `CREDENTIALS_ENCRYPTION_KEY` | `BIGCOMMERCE_CLIENT_SECRET_PROD`, `SESSION_SECRET_PROD`, `CREDENTIALS_ENCRYPTION_KEY_PROD` |
+| Config | `apphosting.yaml` | `apphosting.<env>.yaml` override on `main` |
+
+Secrets are project-wide in Secret Manager, so prod needs its own names, not a
+second value under the same name. The prod `SESSION_SECRET` and
+`CREDENTIALS_ENCRYPTION_KEY` must differ from dev's.
+
+**Where the prod config lives.** On `main`, not on `release`. If the prod client
+ID and secret names were edited into `apphosting.yaml` on `release`, every
+promotion would conflict on those lines. Instead `apphosting.yaml` stays the dev
+config and `apphosting.<env>.yaml` lists only what differs for prod, where
+`<env>` is the environment name set on the prod backend. Both files are safe to
+commit (secrets are Secret Manager references, the client ID is not secret).
+Unverified: the exact console field or CLI flag that sets the environment name
+and the override semantics. Check the App Hosting docs when creating the backend.
+
+Prod overrides:
+
+| Variable | Prod value |
+| --- | --- |
+| `BIGCOMMERCE_CLIENT_ID` | production app's client ID |
+| `BIGCOMMERCE_CLIENT_SECRET` | `secret: BIGCOMMERCE_CLIENT_SECRET_PROD` |
+| `SESSION_SECRET` | `secret: SESSION_SECRET_PROD` |
+| `CREDENTIALS_ENCRYPTION_KEY` | `secret: CREDENTIALS_ENCRYPTION_KEY_PROD` |
+| `FIRESTORE_DATABASE_ID` | `huntry-bc-prod` |
+| `FIREBASE_STORAGE_BUCKET` | `huntry-bc-images-prod` |
+| `APP_ORIGIN` | the prod backend's URL (or `https://app.huntry.io` once the domain is set up). Known only after the backend exists, so it needs a second rollout. |
 
 Steps (run from PowerShell, after `gcloud config set project evms-demo-d1477`):
 
@@ -161,16 +224,29 @@ Steps (run from PowerShell, after `gcloud config set project evms-demo-d1477`):
    gcloud storage buckets create gs://huntry-bc-images-prod --location=<same as huntry-bc-images> --uniform-bucket-level-access --public-access-prevention
    ```
 
-2. Create `huntry-bc-prod-app` and grant it `roles/firebaseapphosting.computeRunner`,
-   `roles/datastore.user` with the condition
-   `resource.name.endsWith("/databases/huntry-bc-prod")`, and
-   `roles/storage.objectAdmin` on the prod bucket only. Give the deploying
-   user `roles/iam.serviceAccountUser` on it. Mirror how `huntry-bc-app` is
-   set up (see Verify what is already done).
-3. Run the backend as the new service account (backend settings in the console,
-   or `firebase apphosting:backends:update`), then re-run
-   `firebase apphosting:secrets:grantaccess` for the three secrets with the new
-   account.
+2. Create `huntry-bc-prod-app` and give it `roles/datastore.user` with the
+   condition `resource.name == "projects/evms-demo-d1477/databases/huntry-bc-prod"`,
+   `roles/storage.objectAdmin` on the prod bucket only, and
+   `roles/firebaseapphosting.computeRunner`. Give the deploying user
+   `roles/iam.serviceAccountUser` on it. Mirror how `huntry-bc-app` is set up
+   (see "Verify what is already done").
+
+   Bind `computeRunner` without a condition. On 2026-10-30 the project policy
+   showed `huntry-bc-app`'s `computeRunner` binding carrying the same
+   `huntry-bc-only` database condition as its `datastore.user` binding. A
+   database-name condition is unlikely to match what App Hosting checks for that
+   role, so do not copy it. Whether the dev binding actually works is not
+   resolved; the dev backend did roll out on 2026-10-28.
+3. Create the three `_PROD` secrets and grant them to the new account:
+
+   ```powershell
+   firebase apphosting:secrets:set BIGCOMMERCE_CLIENT_SECRET_PROD --project evms-demo-d1477
+   firebase apphosting:secrets:set SESSION_SECRET_PROD --project evms-demo-d1477
+   firebase apphosting:secrets:set CREDENTIALS_ENCRYPTION_KEY_PROD --project evms-demo-d1477
+   ```
+
+   Then run `firebase apphosting:secrets:grantaccess` for each with
+   `huntry-bc-prod-app` as the grantee (`README.md` has the exact command).
 4. Confirm `huntry-bc-app` has no binding on prod resources and
    `huntry-bc-prod-app` none on dev.
 5. Add a `huntry-prod` storage target to `.firebaserc`
@@ -185,24 +261,52 @@ Steps (run from PowerShell, after `gcloud config set project evms-demo-d1477`):
 
    Wait for the composite indexes to show Enabled. Answer no to deleting
    indexes that are not in `firestore.indexes.json`.
-6. In `apphosting.yaml` set `FIRESTORE_DATABASE_ID` to `huntry-bc-prod` and
-   `FIREBASE_STORAGE_BUCKET` to `huntry-bc-images-prod`. Make sure the prod
-   `SESSION_SECRET` and `CREDENTIALS_ENCRYPTION_KEY` differ from the dev
-   `.env.local` values; rotate the prod ones now if they match (the prod
-   database is empty, so nothing needs re-encrypting). Commit and push to
-   `main` to roll out.
-7. Prod starts empty. Install the production app on a store so its credentials,
-   webhooks, storefront script and `/huntry/` page register under prod. If the
-   production app was already installed on the sandbox store, its record is in
-   `huntry-bc` (dev): remove it there and delete duplicate webhooks and scripts
-   on the store.
-8. Verify isolation: a prod write appears only in `huntry-bc-prod`, an upload
-   only in `huntry-bc-images-prod`, and dev ADC against the prod database (and
-   the prod account against the dev one) gets `PERMISSION_DENIED`.
-9. Optional: add a guard in `src/lib/firebase/admin.ts` that refuses the prod
-   names when `NODE_ENV` is not `production`.
+6. Create the `release` branch from `main` and push it:
+
+   ```powershell
+   git push origin main:release
+   ```
+
+7. Create the prod backend with live branch `release`, runtime `nodejs24`,
+   `--service-account huntry-bc-prod-app@evms-demo-d1477.iam.gserviceaccount.com`
+   and the environment name for the override file (backend creation command:
+   `README.md`). Answer **No** to "deploy now".
+8. On `main`, add `apphosting.<env>.yaml` with the prod overrides above, commit
+   and push, then promote (next section). Once the prod URL is known, set
+   `APP_ORIGIN` in the override file and promote again.
+9. In the Developer Portal, point the production app's callbacks at the prod
+   origin (`/api/app/auth`, `/load`, `/uninstall`, `/remove_user`) and enable
+   Multiple Users. Install it on a store and open it once so its credentials,
+   webhooks, storefront script and `/huntry/` page register under prod.
+10. If the production app was already installed on the sandbox store, remove its
+    record from `huntry-bc` (dev) and delete duplicate webhooks and scripts on
+    the store.
+11. Verify isolation: a prod write appears only in `huntry-bc-prod`, an upload
+    only in `huntry-bc-images-prod`, and dev ADC against the prod database (and
+    the prod account against the dev one) gets `PERMISSION_DENIED`. The draft
+    app must still install and load on the dev backend.
+12. Optional: add a guard in `src/lib/firebase/admin.ts` that refuses the prod
+    names when `NODE_ENV` is not `production`.
 
 When done, update Key facts, the Progress table and the README table.
+
+### Promote to prod
+
+`release` is only ever fast-forwarded from `main`, so `main` stays append-only
+(`AGENTS.md`, Git model):
+
+```powershell
+git push origin main:release
+```
+
+The push triggers a rollout on `huntry-bc-prod` only. A push to `main` rolls out
+`huntry-bc` only. Check with
+`firebase apphosting:rollouts:list --backend huntry-bc-prod --project evms-demo-d1477`.
+
+Rollback: unverified. Either roll back from the console's rollout list for the
+backend, or push the previous commit to `release` with `--force-with-lease`
+(the one allowed exception to fast-forward only, because `release` is a
+deployment pointer and not history).
 
 ## Gotchas
 
@@ -213,7 +317,12 @@ When done, update Key facts, the Progress table and the README table.
 - Secrets pin to the latest version at build time. Redeploy after rotating.
 - Never set `FIRESTORE_EMULATOR_HOST` in the deployed backend
   (`src/lib/firebase/admin.ts` throws on Cloud Run).
-- Never defaulted: `FIRESTORE_DATABASE_ID` must be `huntry-bc`.
+- Never defaulted: `FIRESTORE_DATABASE_ID` is set per backend (`huntry-bc` on
+  dev, `huntry-bc-prod` on prod) and never falls back to `(default)`.
+- The BigCommerce client ID and secret are one pair per backend. One backend
+  cannot serve both the draft app and the production app.
+- Secrets are project-wide in Secret Manager. Prod uses its own `_PROD` names,
+  not a second value under a dev name.
 - Risks to check on the first build: Node 24 support in the buildpack, and the
   `@bigcommerce/big-design` pnpm patch (`pnpm-workspace.yaml`) under pnpm 11.
 - The default `build` script runs `vitest run`. `apphosting.yaml` overrides

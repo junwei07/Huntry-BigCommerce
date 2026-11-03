@@ -7,8 +7,12 @@
       "storage": {
         "huntry": [
           "huntry-bc-images"
+        ],
+        "huntry-prod": [
+          "huntry-bc-images-prod"
         ]
       }
     }
-  }
+  },
+  "etags": {}
 }

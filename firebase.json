@@ -4,6 +4,11 @@
       "database": "huntry-bc",
       "rules": "firestore.rules",
       "indexes": "firestore.indexes.json"
+    },
+    {
+      "database": "huntry-bc-prod",
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.json"
     }
   ],
   "emulators": {
@@ -21,6 +26,10 @@
   "storage": [
     {
       "target": "huntry",
+      "rules": "storage.rules"
+    },
+    {
+      "target": "huntry-prod",
       "rules": "storage.rules"
     }
   ]

@@ -1,0 +1,37 @@
+# Prod overrides for the huntry-bc-prod backend (environment name "prod").
+# Merged over apphosting.yaml, so only the values that differ from dev are
+# listed. Plan and rationale: docs/FIREBASE-DEPLOYMENT.md "Separate dev and prod".
+# Secrets are Secret Manager references, so this file is safe to commit.
+
+env:
+  # BUILD and RUNTIME (default availability): next.config.ts reads it at build.
+  - variable: APP_ORIGIN
+    value: https://huntry-bc-prod--evms-demo-d1477.europe-west4.hosted.app/
+
+  # RUNTIME only
+  - variable: BIGCOMMERCE_CLIENT_ID
+    value: pj9bdxix59kpbwfm6820kvfb6dopn6r
+    availability:
+      - RUNTIME
+  - variable: FIRESTORE_DATABASE_ID
+    value: huntry-bc-prod
+    availability:
+      - RUNTIME
+  - variable: FIREBASE_STORAGE_BUCKET
+    value: huntry-bc-images-prod
+    availability:
+      - RUNTIME
+
+  # Secrets (RUNTIME only). Prod has its own secrets, never the dev ones.
+  - variable: BIGCOMMERCE_CLIENT_SECRET
+    secret: BIGCOMMERCE_CLIENT_SECRET_PROD
+    availability:
+      - RUNTIME
+  - variable: SESSION_SECRET
+    secret: SESSION_SECRET_PROD
+    availability:
+      - RUNTIME
+  - variable: CREDENTIALS_ENCRYPTION_KEY
+    secret: CREDENTIALS_ENCRYPTION_KEY_PROD
+    availability:
+      - RUNTIME
