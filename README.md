@@ -37,8 +37,9 @@ The app's origin (`APP_ORIGIN`) depends on where it runs:
 | Where | `APP_ORIGIN` |
 | --- | --- |
 | Local server | your tunnel URL (e.g. cloudflared tunnel) |
-| Firebase App Hosting backend | `https://huntry-bc--evms-demo-d1477.europe-west4.hosted.app/` (default  URL) |
-| Production target (TODO) | e.g. `https://app.huntry.io` |
+| Dev backend `huntry-bc` (Firebase App Hosting, tracks `main`) | `https://huntry-bc--evms-demo-d1477.europe-west4.hosted.app/` (default URL) |
+| Prod backend `huntry-bc-prod` (tracks `release`) | `https://huntry-bc-prod--evms-demo-d1477.europe-west4.hosted.app/` (default URL) |
+| Prod custom domain (TODO) | `https://app.huntry.io`, not set up |
 
 ## Development setup
 
@@ -92,106 +93,103 @@ Callbacks use your tunnel URL, and `APP_ORIGIN` in `.env.local` is the same URL.
 Restart `pnpm dev` after changing `CREDENTIALS_STORE_DRIVER`, because
 `next.config.ts` reads it at startup.
 
-### B. Live Firebase App Hosting backend
+### B. Live dev backend on Firebase App Hosting
 
-The backend runs as its own service account, so there is no `gcloud`
-impersonation step. Values come from `apphosting.yaml` and Secret Manager.
+The dev backend `huntry-bc` runs as its own service account, so there is no
+`gcloud` impersonation step. Values come from `apphosting.yaml` and Secret
+Manager. It tracks `main` and uses the draft app, the `huntry-bc` database and
+the `huntry-bc-images` bucket.
 
 1. Set `APP_ORIGIN` in `apphosting.yaml` to the backend's URL and make sure the
-   secrets exist and are readable by the backend (Production setup, steps 3 and 5).
+   secrets exist and are readable by the backend (see
+   [docs/FIREBASE-DEPLOYMENT.md](docs/FIREBASE-DEPLOYMENT.md)).
 2. Set the developer portal callbacks to that URL.
-3. **Deploy** by pushing to `main`, or by creating a new rollout
+3. **Deploy** by pushing to `main`, or by creating a new rollout without a
+   commit:
+
+   ```powershell
+   git push origin main
+   firebase apphosting:rollouts:create huntry-bc --git-branch main --project evms-demo-d1477
+   ```
 
 4. Install or re-open the dev app on the sandbox store.
 
 
 ## Production setup
 
-Production should be a separate BigCommerce app with its own client ID and secret, its
-own database and bucket, and its own secrets. The full runbook, decisions and
-progress log are in [docs/FIREBASE-DEPLOYMENT.md](docs/FIREBASE-DEPLOYMENT.md).
-Commands are PowerShell; `<project>` is the Google Cloud project and
-`<backend-id>` the App Hosting backend (currently `evms-demo-d1477`).
+Production is its own App Hosting backend, `huntry-bc-prod`, in the same Google
+Cloud project (`evms-demo-d1477`). It has its own BigCommerce app (client ID and
+secret), Firestore database, storage bucket, runtime service account and
+secrets, so it never shares data or credentials with dev. One backend serves
+one BigCommerce app, which is why dev and prod are separate backends.
 
-1. **Sign in and select the project.**
+| | Dev | Prod |
+| --- | --- | --- |
+| Backend | `huntry-bc` | `huntry-bc-prod` |
+| Live branch | `main` | `release` |
+| Config | `apphosting.yaml` | `apphosting.yaml` with `apphosting.prod.yaml` merged over it (backend environment name `prod`) |
+| Database / bucket | `huntry-bc` / `huntry-bc-images` | `huntry-bc-prod` / `huntry-bc-images-prod` |
+| Service account | `huntry-bc-app` | `huntry-bc-prod-app` |
+| Secrets | `BIGCOMMERCE_CLIENT_SECRET`, `SESSION_SECRET`, `CREDENTIALS_ENCRYPTION_KEY` | same names with a `_PROD` suffix |
 
-   ```powershell
-   firebase login
-   gcloud auth login
-   firebase use <project>
-   gcloud config set project <project>
-   ```
+The full runbook, the exact commands that were run, decisions and the progress
+log are in [docs/FIREBASE-DEPLOYMENT.md](docs/FIREBASE-DEPLOYMENT.md) ("Separate
+dev and prod"). In short, the one-time setup was:
 
-2. **Register the production app** in the Developer Portal with callbacks under
-   `https://app.huntry.io` and the scopes in
-   [docs/APP-SETUP-COMMON.md](docs/APP-SETUP-COMMON.md).
-3. **Create the secrets** in Secret Manager (each command prompts for the value):
-
-   ```powershell
-   firebase apphosting:secrets:set BIGCOMMERCE_CLIENT_SECRET
-   firebase apphosting:secrets:set SESSION_SECRET
-   firebase apphosting:secrets:set CREDENTIALS_ENCRYPTION_KEY
-   ```
-
-4. **Create the backend.** Answer No to "deploy now": secret access and
-   `APP_ORIGIN` are not ready yet.
+1. Create the prod database and bucket, the service account `huntry-bc-prod-app`
+   and its grants (Firestore scoped to the prod database, Storage scoped to the
+   prod bucket).
+2. Deploy rules and indexes to prod only:
 
    ```powershell
-   firebase apphosting:backends:create --project <project> --backend <backend-id> --primary-region <region> --runtime nodejs24 --service-account <runtime-sa>@<project>.iam.gserviceaccount.com
+   firebase deploy --only firestore:huntry-bc-prod --project evms-demo-d1477
+   firebase deploy --only storage:huntry-prod --project evms-demo-d1477
    ```
 
-5. **Grant the runtime service account its roles.** Run the first two once; the
-   Firestore and bucket roles are scoped to the production database and bucket
-   only (see "Rules and indexes" and "Separate dev and prod" in the runbook for
-   the conditioned `datastore.user` and bucket `objectAdmin` bindings).
+   Never run an unqualified `--only firestore` or `--only storage`, it would
+   hit both environments.
+3. Register the production app in the Developer Portal with callbacks under the
+   prod origin and the scopes in [docs/APP-SETUP-COMMON.md](docs/APP-SETUP-COMMON.md),
+   then create the `_PROD` secrets with `firebase apphosting:secrets:set`.
+4. Push the `release` branch and create the backend with live branch `release`,
+   **root directory `/`**, the prod service account, and "No" to "deploy now".
+   Then grant the `_PROD` secrets to the backend with
+   `firebase apphosting:secrets:grantaccess` and set the backend's environment
+   name to `prod` in the console.
+5. Commit `apphosting.prod.yaml` on `main` and promote.
+6. Install the production app on a store and smoke test it. The custom domain
+   `app.huntry.io` is not set up yet (console, App Hosting, the backend,
+   Settings, Add custom domain, then the listed records at the DNS provider,
+   Vultr, without touching existing records).
 
-   ```powershell
-   gcloud projects add-iam-policy-binding <project> --member="serviceAccount:<runtime-sa>@<project>.iam.gserviceaccount.com" --role="roles/firebaseapphosting.computeRunner"
-   $me = gcloud config get-value account
-   gcloud iam service-accounts add-iam-policy-binding <runtime-sa>@<project>.iam.gserviceaccount.com --member="user:$me" --role="roles/iam.serviceAccountUser"
-   firebase apphosting:secrets:grantaccess BIGCOMMERCE_CLIENT_SECRET,SESSION_SECRET,CREDENTIALS_ENCRYPTION_KEY --backend <backend-id>
-   ```
+### Deploying
 
-6. **Deploy rules and indexes** to the production database and bucket. Answer no
-   if it offers to delete indexes that are not in `firestore.indexes.json`, and
-   wait until the composite indexes show Enabled in the console.
+`main` is the only maintained history. `release` is never committed to
+directly, it is fast-forwarded from `main` to promote:
 
-   ```powershell
-   firebase deploy --only firestore:<database-id>
-   firebase target:apply storage huntry <bucket-name>
-   firebase deploy --only storage:huntry
-   ```
+```powershell
+git push origin main           # rolls out dev (huntry-bc) only
+git push origin main:release   # rolls out prod (huntry-bc-prod) only
+```
 
-7. **Configure `apphosting.yaml`:** `APP_ORIGIN`, `BIGCOMMERCE_CLIENT_ID`,
-   `FIRESTORE_DATABASE_ID`, `FIREBASE_PROJECT_ID`, `FIREBASE_STORAGE_BUCKET`.
-   `APP_ORIGIN` is baked in at build time, so changing it needs a new rollout.
-8. **Add the custom domain** `app.huntry.io` (not applied yet, see the note under
-   Development setup B). This is console only: App Hosting,
-   the backend, Settings, Add custom domain, then add the listed records in the
-   DNS provider (Vultr) without touching existing records.
-9. **Roll out and check.** A push to `main` starts a rollout; to redeploy
-   without a commit (for example after rotating a secret) create one directly.
+To redeploy prod without a commit (for example after rotating a `_PROD` secret)
+and to check a rollout:
 
-   ```powershell
-   git push origin main
-   firebase apphosting:rollouts:list --backend <backend-id> --project <project>
-   firebase apphosting:rollouts:create <backend-id> --git-branch main --project <project>
-   firebase apphosting:backends:list --project <project>
-   ```
+```powershell
+firebase apphosting:rollouts:create huntry-bc-prod --git-branch release --project evms-demo-d1477
+firebase apphosting:backends:list --project evms-demo-d1477
+```
 
-10. **Smoke test:** install the app on a sandbox store, write an event, upload an
-    image, and confirm the webhooks and storefront script register against the
-    production origin.
-
-Separating the dev and production databases and buckets is planned, see
-"Separate dev and prod" in [docs/FIREBASE-DEPLOYMENT.md](docs/FIREBASE-DEPLOYMENT.md);
-the database and bucket names above change once it is done.
+The CLI has no command to list rollouts. Use the console (App Hosting, the
+backend, Rollouts) or the REST call in the "Check a rollout" section of
+[docs/FIREBASE-DEPLOYMENT.md](docs/FIREBASE-DEPLOYMENT.md), which also shows why a
+build failed.
 
 ## Docs
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the app works
 - [docs/MIGRATION.md](docs/MIGRATION.md): the Huntry feature and migration plan
-- [docs/FIREBASE-DEPLOYMENT.md](docs/FIREBASE-DEPLOYMENT.md): production deploy runbook, dev/prod separation, marketplace checklist
+- [docs/FIREBASE-DEPLOYMENT.md](docs/FIREBASE-DEPLOYMENT.md): dev and prod backends, deploy and promote runbook, progress log, marketplace checklist
 - [docs/APP-SETUP-COMMON.md](docs/APP-SETUP-COMMON.md): callbacks, scopes, secrets
 - [docs/LOCAL-SINGLE-CLICK-APP.md](docs/LOCAL-SINGLE-CLICK-APP.md): tunnel setup
 - [docs/VERCEL-DEPLOYMENT.md](docs/VERCEL-DEPLOYMENT.md): optional Vercel hosting
