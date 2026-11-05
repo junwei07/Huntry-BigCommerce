@@ -35,7 +35,6 @@ function setup(options: { maxGrabCount?: number; outcome?: ClaimOutcome; positio
     rearm: vi.fn(),
     position: vi.fn(() => (options.position === false ? null : { lat: 1, lng: 2 })),
     addControl: vi.fn(),
-    setClaimLimitReached: vi.fn(),
     leave: vi.fn(),
   };
   const submitClaim = vi.fn(async () => options.outcome ?? ({ kind: "claimed", couponCode: "CODE1" } as ClaimOutcome));
@@ -52,6 +51,7 @@ function setup(options: { maxGrabCount?: number; outcome?: ClaimOutcome; positio
     },
   };
   let onLoginBack: () => void = () => {};
+  let onLimitDismiss: () => void = () => {};
   const ui: ClaimUi = {
     isOpen: () => open,
     showFound: (view) => {
@@ -71,9 +71,11 @@ function setup(options: { maxGrabCount?: number; outcome?: ClaimOutcome; positio
       shown.login += 1;
       onLoginBack = back;
     },
-    showLimit: () => {
-      open = false;
+    // The real overlay counts as open until dismissed (dom-ui.ts isOpen).
+    showLimit: (onDismiss) => {
+      open = true;
       shown.limit += 1;
+      onLimitDismiss = onDismiss;
     },
     setBadge: (visible) => {
       shown.badge = visible;
@@ -105,6 +107,10 @@ function setup(options: { maxGrabCount?: number; outcome?: ClaimOutcome; positio
       open = false;
       onLoginBack();
     },
+    dismissLimit: () => {
+      open = false;
+      onLimitDismiss();
+    },
   };
 }
 
@@ -129,7 +135,7 @@ describe("claim controller: My rewards link (BC-HUN-046)", () => {
     expect(t.shown.rewardsLink).toBe(true);
   });
 
-  it("hides once the claim limit is reached, where the limit overlay links instead", async () => {
+  it("stays visible at the claim limit, since the limit overlay is dismissible", async () => {
     const t = setup({ maxGrabCount: 2 });
 
     t.controller.setClaimCounts({ any: 1, thisEvent: 1 });
@@ -142,15 +148,15 @@ describe("claim controller: My rewards link (BC-HUN-046)", () => {
 
     // The server count (1) plus this claim reaches the limit of 2.
     expect(t.shown.limit).toBe(1);
-    expect(t.shown.rewardsLink).toBe(false);
+    expect(t.shown.rewardsLink).toBe(true);
   });
 
-  it("is hidden on load when this event's limit is already reached", () => {
+  it("is visible on load when this event's limit is already reached", () => {
     const t = setup({ maxGrabCount: 2 });
 
     t.controller.setClaimCounts({ any: 2, thisEvent: 2 });
 
-    expect(t.shown.rewardsLink).toBe(false);
+    expect(t.shown.rewardsLink).toBe(true);
   });
 
   it("counts only this event: claims elsewhere show the link without hitting the limit", () => {
@@ -335,17 +341,64 @@ describe("claim controller: claiming", () => {
     expect(t.shown.found).toHaveLength(2);
   });
 
-  it("limit-reached shows the overlay and stops prompting for good", async () => {
+  it("limit-reached shows the overlay, and other eggs still prompt once it is dismissed", async () => {
     const t = setup({ outcome: { kind: "limit-reached" } });
 
     t.controller.handleNearby(t.nearby("claimable", egg("a")));
     t.shown.found[0].onClaim(t.handle);
     await vi.waitFor(() => expect(t.shown.limit).toBe(1));
-    t.close();
+
+    // While the overlay is up nothing stacks on top of it.
+    t.controller.handleNearby(t.nearby("claimable", egg("b")));
+    expect(t.shown.found).toHaveLength(1);
+
+    t.dismissLimit();
+    expect(t.map.rearm).toHaveBeenCalled();
     t.controller.handleNearby(t.nearby("claimable", egg("b")));
 
-    expect(t.map.setClaimLimitReached).toHaveBeenCalled();
+    expect(t.shown.found).toHaveLength(2);
+  });
+
+  it("at the limit, the bell reopens the out-of-claims overlay for an unclaimed egg", async () => {
+    const t = setup({ outcome: { kind: "limit-reached" } });
+    const a = egg("a");
+
+    t.controller.handleNearby(t.nearby("claimable", a));
+    t.shown.found[0].onClaim(t.handle);
+    await vi.waitFor(() => expect(t.shown.limit).toBe(1));
+    t.dismissLimit();
+
+    expect(t.shown.badge).toBe(true);
+    t.controller.openRevisit();
+
+    expect(t.shown.limit).toBe(2);
     expect(t.shown.found).toHaveLength(1);
+  });
+
+  it("at the limit, the bell still reopens the blocked dialog for a claimed or full egg", async () => {
+    const t = setup({ outcome: { kind: "limit-reached" } });
+    const a = egg("a");
+
+    t.controller.handleNearby(t.nearby("claimable", a));
+    t.shown.found[0].onClaim(t.handle);
+    await vi.waitFor(() => expect(t.shown.limit).toBe(1));
+    t.dismissLimit();
+
+    const mine = egg("m");
+
+    t.flags.mine.add("m");
+    t.controller.handleNearby(t.nearby("revisitable", mine, { egg: mine, distance: 3 }));
+    t.controller.openRevisit();
+    expect(t.shown.blocked[0].title).toBe("You've already claimed this reward");
+    expect(t.shown.limit).toBe(1);
+
+    t.close();
+
+    const full = egg("f", true);
+
+    t.controller.handleNearby(t.nearby("revisitable", full, { egg: full, distance: 3 }));
+    t.controller.openRevisit();
+    expect(t.shown.blocked[1].title).toBe("Someone beat you to it!");
   });
 
   it("shows the limit overlay after the claimed dialog when this was the last claim", async () => {

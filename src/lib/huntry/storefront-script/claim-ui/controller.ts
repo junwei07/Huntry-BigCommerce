@@ -46,7 +46,8 @@ export interface ClaimUi {
   showClaimed: (view: ClaimedView) => void;
   showBlocked: (view: BlockedView) => void;
   showLogin: (onBack: () => void) => void;
-  showLimit: () => void;
+  // The out-of-claims overlay; onDismiss runs when the player closes it.
+  showLimit: (onDismiss: () => void) => void;
   setBadge: (visible: boolean) => void;
   // The bottom-right "My rewards" link (BC-HUN-046).
   setRewardsLink: (visible: boolean) => void;
@@ -100,23 +101,26 @@ export function createClaimController(
     ui.setBadge(next !== null);
   };
 
-  // Legacy rule (map.php L336): shown with at least one claim and hidden once
-  // the limit is hit, where the limit overlay carries its own link. Unlike the
-  // plugin it also appears right after the first claim, with no reload.
   // Claims in this event: the server count, or this device's if it knows more
   // (before the rewards list has loaded). The server decides the real limit.
   const atEventLimit = () =>
     event.maxGrabCount > 0 && Math.max(serverEventClaims, api.map?.flags.mine.size ?? 0) >= event.maxGrabCount;
 
+  // Shown with at least one claim, and it stays at the limit: the limit overlay
+  // is dismissible, so it can no longer be the only way to reach the rewards.
   const syncRewardsLink = () => {
-    ui.setRewardsLink((anyClaims || (api.map?.flags.mine.size ?? 0) > 0) && !limitReached && !atEventLimit());
+    ui.setRewardsLink(anyClaims || (api.map?.flags.mine.size ?? 0) > 0);
   };
 
-  const showLimit = () => {
+  // The player stays free to walk to other eggs; the overlay only appears when
+  // a claim is refused, and the bell reopens it (see openRevisit).
+  const showLimit = (egg: StorefrontEgg, distance: number) => {
     limitReached = true;
-    api.map?.setClaimLimitReached();
     syncRewardsLink();
-    ui.showLimit();
+    ui.showLimit(() => {
+      setRevisit({ egg, distance });
+      closed();
+    });
   };
 
   const openBlocked = (egg: StorefrontEgg, distance: number, mine: boolean) => {
@@ -136,7 +140,7 @@ export function createClaimController(
     });
   };
 
-  const showClaimed = (egg: StorefrontEgg, couponCode: string) => {
+  const showClaimed = (egg: StorefrontEgg, distance: number, couponCode: string) => {
     // Same test as legacy (L801): a proactive hint only, from this event's
     // claim count (the rewards list, plus this page's claims); the server's
     // limit_reached reply stays authoritative.
@@ -148,7 +152,7 @@ export function createClaimController(
       applyToCart: () => applyCoupon(couponCode),
       onKeepHunting: () => {
         if (reachedLimit) {
-          showLimit();
+          showLimit(egg, distance);
         } else {
           closed();
         }
@@ -164,7 +168,7 @@ export function createClaimController(
         anyClaims = true;
         serverEventClaims += 1;
         syncRewardsLink();
-        showClaimed(egg, action.couponCode);
+        showClaimed(egg, distance, action.couponCode);
         return;
       case "login":
         handle.setBusy(false);
@@ -172,7 +176,7 @@ export function createClaimController(
         return;
       case "limit":
         addFlag("dismissed", egg.id);
-        showLimit();
+        showLimit(egg, distance);
         return;
       case "blocked":
         if (action.reason === "mine") {
@@ -269,7 +273,7 @@ export function createClaimController(
       setRevisit(detail?.revisitable ?? null);
 
       // While a dialog is open the event is dropped on purpose; closed() re-arms.
-      if (!detail || limitReached || ui.isOpen()) return;
+      if (!detail || ui.isOpen()) return;
 
       if (detail.kind === "claimable") {
         openFound(detail.egg, detail.distance);
@@ -279,7 +283,7 @@ export function createClaimController(
     },
 
     openRevisit() {
-      if (!revisit || ui.isOpen() || limitReached) return;
+      if (!revisit || ui.isOpen()) return;
 
       const { egg, distance } = revisit;
 
@@ -287,6 +291,9 @@ export function createClaimController(
         openBlocked(egg, distance, true);
       } else if (egg.isFull) {
         openBlocked(egg, distance, false);
+      } else if (limitReached) {
+        // Out of claims: the Claim popup would only be refused, so say so up front.
+        showLimit(egg, distance);
       } else {
         openFound(egg, distance);
       }

@@ -17,9 +17,7 @@ export function startClaimUi(api: HuntryStorefrontApi): void {
 
   const controller: { current?: ReturnType<typeof createClaimController> } = {};
   const ui = createDomUi({
-    container: api.container,
     successColor: event.colors?.successColor ?? null,
-    backHref: window.location.pathname,
     rewardsHref: rewardsUrl(),
     onBellClick: () => controller.current?.openRevisit(),
     addMapControl: (element) => api.map?.addControl(element),

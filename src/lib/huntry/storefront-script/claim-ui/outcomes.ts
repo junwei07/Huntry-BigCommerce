@@ -27,14 +27,13 @@ export const STRINGS = {
   claimedByMe: "Keep hunting!",
   limitTitle: "You're Out Of Claims!",
   limitMessage: "You've reached your claim limit for this hunt.  Use your rewards before they expire!",
-  backToHunts: "Back to all hunts",
+  dismiss: "Dismiss",
   backToEvents: "Back to events",
   huntFullTitle: "This hunt is full",
   huntFull: "This hunt has reached its maximum number of players.",
   genericError: "Couldn't claim this right now. Please try again.",
   skippedItems: "Skipped items",
   myRewards: "My Rewards",
-  viewRewards: "View Rewards",
   savedToRewards: "Saved to My Rewards. Find it any time from the View Rewards button.",
 } as const;
 

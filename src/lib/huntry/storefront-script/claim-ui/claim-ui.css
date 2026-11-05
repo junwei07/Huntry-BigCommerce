@@ -29,8 +29,7 @@ class is huntry-prefixed so it can't collide with the merchant's theme.
 }
 /* A fixed font stack, not the theme's: a decorative or condensed theme font turns the uppercase
    "SKIP" button into something that reads "SHIP". */
-.huntry-claim-overlay,
-.huntry-claim-limit {
+.huntry-claim-overlay {
   font-family:
     system-ui,
     -apple-system,
@@ -48,8 +47,7 @@ class is huntry-prefixed so it can't collide with the merchant's theme.
 /* Themes often style every button/link with their own font, sometimes with !important, so the
    dialog's controls pin the stack too. */
 .huntry-claim-overlay button,
-.huntry-claim-overlay a,
-.huntry-claim-limit a {
+.huntry-claim-overlay a {
   font-family:
     system-ui,
     -apple-system,
@@ -60,8 +58,7 @@ class is huntry-prefixed so it can't collide with the merchant's theme.
     sans-serif !important;
   font-feature-settings: normal !important;
 }
-.huntry-claim-overlay *,
-.huntry-claim-limit * {
+.huntry-claim-overlay * {
   box-sizing: border-box;
 }
 .huntry-claim-dialog {
@@ -191,67 +188,6 @@ class is huntry-prefixed so it can't collide with the merchant's theme.
 .huntry-claim-dialog__cart-status a {
   color: #fff;
   text-decoration: underline;
-}
-
-.huntry-claim-limit {
-  --huntry-claim-success: #5dc564;
-  --huntry-claim-success-dark: color-mix(
-    in srgb,
-    var(--huntry-claim-success) 85%,
-    #000
-  );
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
-  text-align: center;
-  background: rgba(15, 19, 34, 0.82);
-}
-.huntry-claim-limit[hidden] {
-  display: none;
-}
-.huntry-claim-limit__content {
-  max-width: 320px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-.huntry-claim-limit__title {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  color: #fff;
-}
-.huntry-claim-limit__message {
-  margin: 0;
-  font-size: 16px;
-  color: #fff;
-}
-.huntry-claim-limit__button {
-  margin-top: 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 18px;
-  border-radius: 10px;
-  background: var(--huntry-claim-success-dark);
-  color: #0f1322;
-  font-size: 14px;
-  font-weight: 700;
-  text-decoration: none;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
-}
-.huntry-claim-limit__button:hover,
-.huntry-claim-limit__button:focus {
-  background: var(--huntry-claim-success);
-  color: #0f1322;
-}
-.huntry-claim-limit__button + .huntry-claim-limit__button {
-  margin-left: 8px;
 }
 
 /* Bottom-right "My rewards" link (BC-HUN-046), ported from the plugin's

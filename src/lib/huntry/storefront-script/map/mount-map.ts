@@ -26,8 +26,6 @@ export interface HuntryMapApi {
   position: () => { lat: number; lng: number } | null;
   // Adds a control to the top-right stack (the claim UI's notification bell).
   addControl: (element: HTMLElement) => void;
-  // Stops the nearest-egg readout once the player has no claims left.
-  setClaimLimitReached: () => void;
   // Tears the map down and puts the container back where the theme had it.
   leave: () => void;
 }
@@ -155,7 +153,6 @@ export function mountMap(api: HuntryStorefrontApi): HuntryMapApi | null {
   };
 
   let lastPosition: { lat: number; lng: number } | null = null;
-  let claimLimitReached = false;
 
   const geolocate = new maplibregl.GeolocateControl({
     positionOptions: { enableHighAccuracy: true },
@@ -180,13 +177,6 @@ export function mountMap(api: HuntryStorefrontApi): HuntryMapApi | null {
 
     lastPosition = { lat: latitude, lng: longitude };
     locationMarker?.setLngLat([longitude, latitude]).addTo(map);
-
-    // Out of claims: no readout and no more prompts (legacy returns early here).
-    if (claimLimitReached) {
-      showStatus(null);
-
-      return;
-    }
 
     const nearest = nearestUnclaimedDistance(event.eggs, latitude, longitude, flags);
 
@@ -226,10 +216,6 @@ export function mountMap(api: HuntryStorefrontApi): HuntryMapApi | null {
     position: () => lastPosition,
     addControl: (element) => {
       map.addControl({ onAdd: () => element, onRemove: () => element.remove() }, "top-right");
-    },
-    setClaimLimitReached: () => {
-      claimLimitReached = true;
-      showStatus(null);
     },
     leave: () => {
       map.remove();

@@ -96,9 +96,7 @@ export function showHuntFullPrompt(backHref: string, successColor: string | null
 }
 
 export interface DomUiOptions {
-  container: HTMLElement;
   successColor: string | null;
-  backHref: string;
   // The "My rewards" page (BC-HUN-046).
   rewardsHref: string;
   onBellClick: () => void;
@@ -117,7 +115,15 @@ export function createDomUi(options: DomUiOptions): DomUi {
   const overlay = el("div", "huntry-claim-overlay");
   const card = el("div", "huntry-claim-dialog");
   let open = false;
-  let limit: HTMLElement | null = null;
+  // The fixed "My rewards" link duplicates the limit dialog's own button, so it
+  // steps aside while that dialog is up.
+  let limitShown = false;
+  let wantRewardsLink = false;
+  let rewardsLink: HTMLAnchorElement | null = null;
+
+  const syncRewardsLinkVisibility = () => {
+    if (rewardsLink) rewardsLink.hidden = !wantRewardsLink || limitShown;
+  };
 
   overlay.hidden = true;
   card.setAttribute("role", "dialog");
@@ -138,6 +144,8 @@ export function createDomUi(options: DomUiOptions): DomUi {
     overlay.hidden = true;
     card.textContent = "";
     open = false;
+    limitShown = false;
+    syncRewardsLinkVisibility();
   };
   const content = () => el("div", "huntry-claim-dialog__content");
   const icon = (symbol: string) => el("div", "huntry-claim-dialog__icon", symbol);
@@ -153,12 +161,13 @@ export function createDomUi(options: DomUiOptions): DomUi {
 
   let badge: HTMLElement | null = null;
   let bellMounted = false;
-  let rewardsLink: HTMLAnchorElement | null = null;
 
   return {
     isOpen: () => open,
 
     setRewardsLink(visible) {
+      wantRewardsLink = visible;
+
       if (!rewardsLink) {
         if (!visible) return;
 
@@ -170,7 +179,7 @@ export function createDomUi(options: DomUiOptions): DomUi {
         document.body.appendChild(rewardsLink);
       }
 
-      rewardsLink.hidden = !visible;
+      syncRewardsLinkVisibility();
     },
 
     showFound(view: FoundView) {
@@ -295,34 +304,32 @@ export function createDomUi(options: DomUiOptions): DomUi {
       show(wrap);
     },
 
-    showLimit() {
-      hide();
+    showLimit(onDismiss) {
+      const wrap = content();
+      const rewards = el(
+        "a",
+        "huntry-claim-dialog__button huntry-claim-dialog__button--claim huntry-claim-dialog__button--full",
+        STRINGS.myRewards,
+      );
+      const dismiss = fullButton(STRINGS.dismiss, () => {
+        hide();
+        onDismiss();
+      });
 
-      if (!limit) {
-        limit = el("div", "huntry-claim-limit");
-
-        const inner = el("div", "huntry-claim-limit__content");
-        const back = el("a", "huntry-claim-limit__button", STRINGS.backToHunts);
-        const rewards = el("a", "huntry-claim-limit__button", STRINGS.viewRewards);
-
-        back.href = options.backHref;
-        rewards.href = options.rewardsHref;
-        inner.append(
-          el("h2", "huntry-claim-limit__title", STRINGS.limitTitle),
-          el("p", "huntry-claim-limit__message", STRINGS.limitMessage),
-          rewards,
-          back,
-        );
-        limit.appendChild(inner);
-
-        const successColor = safeColor(options.successColor);
-
-        if (successColor) limit.style.setProperty("--huntry-claim-success", successColor);
-
-        options.container.appendChild(limit);
-      }
-
-      limit.hidden = false;
+      rewards.href = options.rewardsHref;
+      dismiss.classList.remove("huntry-claim-dialog__button--claim");
+      dismiss.classList.add("huntry-claim-dialog__button--skip");
+      wrap.append(
+        icon("🚧"),
+        title(STRINGS.limitTitle),
+        message(STRINGS.limitMessage),
+        rewards,
+        dismiss,
+      );
+      show(wrap);
+      // After show(): hide() clears the flag, and the link must stay out of the way until dismissed.
+      limitShown = true;
+      syncRewardsLinkVisibility();
     },
 
     setBadge(visible) {
