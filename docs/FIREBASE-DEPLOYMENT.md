@@ -414,6 +414,10 @@ Source: docs.bigcommerce.com `publishing-apps`, `approval-requirements`,
    with test store access, short and full description, category, icon, logos,
    screenshots, up to five features, installation guide, user guide, **privacy
    policy and terms of service URLs**, pricing and billing.
+   The privacy policy must say that uninstalling the app deletes all Huntry
+   data and uploaded images for the store (`src/lib/bc-auth/uninstall-store.ts`).
+   Customer Groups, Promotions and webhooks created in the merchant's store
+   stay (accepted residue, `docs/MIGRATION.md` §4).
 4. Submit: build.bigcommerce.com/apps, action menu, **Publish app...**, then
    **Submit app for Review** (the review fee is paid here).
 5. Respond to reviewer feedback within 30 days, or the submission is rejected

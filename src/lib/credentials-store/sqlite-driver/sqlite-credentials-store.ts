@@ -44,6 +44,14 @@ function openDatabase(path: string): DatabaseSync {
 
   db.exec(CREATE_CREDENTIALS_STORE_SCHEMA);
 
+  // uninstalled_at was added after the table first shipped, and CREATE TABLE IF
+  // NOT EXISTS won't retrofit it onto an existing local file.
+  const columns = db.prepare("PRAGMA table_info(stores)").all() as unknown as { name: string }[];
+
+  if (!columns.some((column) => column.name === "uninstalled_at")) {
+    db.exec("ALTER TABLE stores ADD COLUMN uninstalled_at TEXT");
+  }
+
   return db;
 }
 
@@ -101,7 +109,8 @@ export class SqliteCredentialsStore implements CredentialsStore {
            ON CONFLICT(store_hash) DO UPDATE SET
              access_token = excluded.access_token,
              scope = excluded.scope,
-             admin_user_id = excluded.admin_user_id`,
+             admin_user_id = excluded.admin_user_id,
+             uninstalled_at = NULL`,
         )
         .run(store.storeHash, encrypt(store.accessToken), store.scope, store.adminUserId);
     });
@@ -132,9 +141,19 @@ export class SqliteCredentialsStore implements CredentialsStore {
     });
   }
 
+  async markStoreUninstalled(storeHash: string): Promise<void> {
+    withDatabaseErrorHandling("markStoreUninstalled", () => {
+      this.db
+        .prepare("UPDATE stores SET uninstalled_at = COALESCE(uninstalled_at, datetime('now')) WHERE store_hash = ?")
+        .run(storeHash);
+    });
+  }
+
   async getStoreToken(storeHash: string): Promise<string | undefined> {
     return withDatabaseErrorHandling("getStoreToken", () => {
-      const row = this.db.prepare("SELECT access_token FROM stores WHERE store_hash = ?").get(storeHash) as unknown as
+      const row = this.db
+        .prepare("SELECT access_token FROM stores WHERE store_hash = ? AND uninstalled_at IS NULL")
+        .get(storeHash) as unknown as
         | StoreTokenRow
         | undefined;
 

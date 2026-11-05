@@ -6,9 +6,11 @@ import { sqlEventsRepository } from "@/lib/huntry/repository/sql/events";
 import { sqlFeaturedRepository } from "@/lib/huntry/repository/sql/featured";
 import { sqlRewardsRepository } from "@/lib/huntry/repository/sql/rewards";
 import { sqlSponsorsRepository } from "@/lib/huntry/repository/sql/sponsors";
+import { sqlStoreDataRepository } from "@/lib/huntry/repository/sql/store-data";
 import type { HuntryRepository } from "@/lib/huntry/repository/types";
 
 const sqlRepository: HuntryRepository = {
+  storeData: sqlStoreDataRepository,
   featured: sqlFeaturedRepository,
   sponsors: sqlSponsorsRepository,
   eggs: sqlEggsRepository,

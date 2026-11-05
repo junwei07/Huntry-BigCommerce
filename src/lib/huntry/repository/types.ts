@@ -169,7 +169,14 @@ export interface ClaimsRepository
     ClaimRecordsRepository,
     PlayerClaimRepository {}
 
+// Removes everything Huntry stores for one store (used on uninstall). Must be
+// idempotent: a retried uninstall calls it again on an already-empty store.
+export interface StoreDataRepository {
+  deleteAllStoreData(storeHash: string): Promise<void>;
+}
+
 export interface HuntryRepository {
+  storeData: StoreDataRepository;
   featured: FeaturedRepository;
   sponsors: SponsorsRepository;
   eggs: EggsRepository;

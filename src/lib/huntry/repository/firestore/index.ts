@@ -6,6 +6,7 @@ import { createFirestoreEventsRepository } from "@/lib/huntry/repository/firesto
 import { createFirestoreFeaturedRepository } from "@/lib/huntry/repository/firestore/featured";
 import { createFirestoreRewardsRepository } from "@/lib/huntry/repository/firestore/rewards";
 import { createFirestoreSponsorsRepository } from "@/lib/huntry/repository/firestore/sponsors";
+import { createFirestoreStoreDataRepository } from "@/lib/huntry/repository/firestore/store-data";
 import type { HuntryRepository } from "@/lib/huntry/repository/types";
 
 // Huntry's own data on Firestore: `stores/{storeHash}/{events,sponsors,rewards,
@@ -13,6 +14,7 @@ import type { HuntryRepository } from "@/lib/huntry/repository/types";
 // docs/FIREBASE-MIGRATION.md, Phase 3). The client resolves lazily on first use.
 export function createFirestoreHuntryRepository(getDb: () => Firestore = getFirestoreDb): HuntryRepository {
   return {
+    storeData: createFirestoreStoreDataRepository(getDb),
     featured: createFirestoreFeaturedRepository(getDb),
     sponsors: createFirestoreSponsorsRepository(getDb),
     eggs: createFirestoreEggsRepository(getDb),

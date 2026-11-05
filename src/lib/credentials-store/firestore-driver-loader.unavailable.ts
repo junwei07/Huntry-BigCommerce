@@ -28,6 +28,10 @@ export class FirestoreCredentialsStore implements CredentialsStore {
     throw unavailableError();
   }
 
+  async markStoreUninstalled(_storeHash: string): Promise<void> {
+    throw unavailableError();
+  }
+
   async getStoreToken(_storeHash: string): Promise<string | undefined> {
     throw unavailableError();
   }

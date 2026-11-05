@@ -148,7 +148,12 @@ BigCommerce calls this app back at four routes under `app/api/app/`:
   BigCommerce's `signed_payload_jwt`, confirms the store is still installed,
   and mints/extends the session cookie.
 - **`/remove_user`** / **`/uninstall`** — server-to-server callbacks (not
-  browser-facing). Verify the JWT and delete the relevant credentials rows.
+  browser-facing). Verify the JWT and delete the relevant data. `/uninstall`
+  runs `uninstallStore` (`src/lib/bc-auth/uninstall-store.ts`): remove the
+  storefront page, tombstone the store (`markStoreUninstalled`, after which
+  `getStoreToken` answers `undefined` so every route treats it as unknown),
+  delete its images, delete all Huntry data (`HuntryRepository.storeData`), then
+  delete the credentials. Each step is idempotent, so a 500 is retried safely.
 
 `/auth` and `/load` are navigated to directly inside the merchant's iframe,
 so their failures redirect to `/app-error?reason=...` (a real page, not a

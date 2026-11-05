@@ -111,6 +111,7 @@ describe("saveHuntryFeaturedSettings", () => {
       remove: async (objectPath) => {
         removed.push(objectPath);
       },
+      removePrefix: async () => {},
     });
 
     const urlFor = (storeHash: string, name: string) =>

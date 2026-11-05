@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   deleteImageByUrl,
+  deleteStoreImages,
   ImageObjectStore,
   ImageUploadError,
   setImageObjectStoreForTesting,
@@ -22,6 +23,13 @@ function fakeStore() {
     },
     async remove(path) {
       objects.delete(path);
+    },
+    async removePrefix(prefix) {
+      for (const path of [...objects.keys()]) {
+        if (path.startsWith(prefix)) {
+          objects.delete(path);
+        }
+      }
     },
   };
 
@@ -123,5 +131,64 @@ describe("resolveSubmittedImageUrl", () => {
 
     expect(parseOwnedImagePath(malformed, BUCKET, "abc")).toBeNull();
     expect(resolveSubmittedImageUrl({ ...base, submitted: malformed }).ok).toBe(false);
+  });
+});
+
+describe("deleteStoreImages", () => {
+  afterEach(() => setImageObjectStoreForTesting(null));
+
+  it("deletes only the uninstalled store's own prefix", async () => {
+    const fake = fakeStore();
+    setImageObjectStoreForTesting(fake.store);
+
+    const mine = await uploadImage({ storeHash: "abc", kind: "reward-image", bytes: PNG });
+    const alsoMine = await uploadImage({ storeHash: "abc", kind: "event-banner", bytes: JPEG });
+    // "abcd" starts with "abc" but is another store: the trailing slash matters.
+    const sibling = await uploadImage({ storeHash: "abcd", kind: "reward-image", bytes: PNG });
+    const other = await uploadImage({ storeHash: "zzz", kind: "reward-image", bytes: PNG });
+
+    await deleteStoreImages("abc");
+
+    expect(fake.objects.has(mine.path)).toBe(false);
+    expect(fake.objects.has(alsoMine.path)).toBe(false);
+    expect(fake.objects.has(sibling.path)).toBe(true);
+    expect(fake.objects.has(other.path)).toBe(true);
+  });
+
+  it("is idempotent on a store with no images", async () => {
+    setImageObjectStoreForTesting(fakeStore().store);
+
+    await expect(deleteStoreImages("abc")).resolves.toBeUndefined();
+  });
+
+  it("rejects an empty or malformed hash instead of widening the prefix", async () => {
+    setImageObjectStoreForTesting(fakeStore().store);
+
+    await expect(deleteStoreImages("")).rejects.toThrow();
+    await expect(deleteStoreImages("../x")).rejects.toThrow();
+  });
+
+  it("swallows a permission or missing-bucket error but rethrows a transient one", async () => {
+    const { store } = fakeStore();
+
+    for (const code of [403, 404]) {
+      setImageObjectStoreForTesting({
+        ...store,
+        removePrefix: async () => {
+          throw Object.assign(new Error("config"), { code });
+        },
+      });
+
+      await expect(deleteStoreImages("abc")).resolves.toBeUndefined();
+    }
+
+    setImageObjectStoreForTesting({
+      ...store,
+      removePrefix: async () => {
+        throw Object.assign(new Error("unavailable"), { code: 503 });
+      },
+    });
+
+    await expect(deleteStoreImages("abc")).rejects.toThrow("unavailable");
   });
 });

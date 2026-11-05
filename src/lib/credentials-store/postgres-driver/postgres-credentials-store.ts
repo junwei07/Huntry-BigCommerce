@@ -68,7 +68,8 @@ export class PostgresCredentialsStore implements CredentialsStore {
          ON CONFLICT (store_hash) DO UPDATE SET
            access_token = excluded.access_token,
            scope = excluded.scope,
-           admin_user_id = excluded.admin_user_id`,
+           admin_user_id = excluded.admin_user_id,
+           uninstalled_at = NULL`,
         [store.storeHash, encrypt(store.accessToken), store.scope, store.adminUserId],
       );
     });
@@ -101,10 +102,21 @@ export class PostgresCredentialsStore implements CredentialsStore {
     });
   }
 
+  async markStoreUninstalled(storeHash: string): Promise<void> {
+    await withDatabaseErrorHandling("markStoreUninstalled", async () => {
+      await getPool().query("UPDATE stores SET uninstalled_at = COALESCE(uninstalled_at, now()) WHERE store_hash = $1", [
+        storeHash,
+      ]);
+    });
+  }
+
   async getStoreToken(storeHash: string): Promise<string | undefined> {
     return withDatabaseErrorHandling("getStoreToken", async () => {
       const pool = getPool();
-      const result = await pool.query<StoreTokenRow>("SELECT access_token FROM stores WHERE store_hash = $1", [storeHash]);
+      const result = await pool.query<StoreTokenRow>(
+        "SELECT access_token FROM stores WHERE store_hash = $1 AND uninstalled_at IS NULL",
+        [storeHash],
+      );
       const row = result.rows[0];
 
       return row ? decrypt(row.access_token) : undefined;

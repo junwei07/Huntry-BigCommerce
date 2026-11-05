@@ -22,9 +22,11 @@ import { assertValidStoreHash, isValidStoreHash } from "@/lib/firebase/store-has
 //                                      isStoreUserLinked on every authorization
 //   users/{userId}                     email, storeHashes (which stores link the user)
 //
-// Deleting a store deletes its document and its storeUsers docs, never its other
-// subcollections: Huntry's own data (Phase 3) lives under the same store
-// document and, as with the SQL drivers, outlives an uninstall.
+//                                      uninstalledAt (tombstone, see markStoreUninstalled)
+//
+// deleteStore deletes the store document and its storeUsers docs only. Huntry's
+// own data lives in sibling subcollections and is removed earlier in the
+// uninstall by HuntryRepository.storeData (repository/firestore/store-data.ts).
 const STORES = "stores";
 const STORE_USERS = "storeUsers";
 const USERS = "users";
@@ -76,9 +78,35 @@ export class FirestoreCredentialsStore implements CredentialsStore {
       assertValidStoreHash(store.storeHash);
 
       await this.storeRef(store.storeHash).set(
-        { accessToken: encrypt(store.accessToken), scope: store.scope, adminUserId: store.adminUserId },
+        {
+          accessToken: encrypt(store.accessToken),
+          scope: store.scope,
+          adminUserId: store.adminUserId,
+          // A reinstall reopens a store closed by an earlier uninstall.
+          uninstalledAt: FieldValue.delete(),
+        },
         { merge: true },
       );
+    });
+  }
+
+  async markStoreUninstalled(storeHash: string): Promise<void> {
+    return withDatabaseErrorHandling("markStoreUninstalled", async () => {
+      if (!isValidStoreHash(storeHash)) {
+        return;
+      }
+
+      const ref = this.storeRef(storeHash);
+
+      // update() fails on a missing doc, which is the no-op we want: never
+      // create a store document just to tombstone it.
+      try {
+        await ref.update({ uninstalledAt: FieldValue.serverTimestamp() });
+      } catch (error) {
+        if ((error as { code?: unknown }).code !== 5) {
+          throw error;
+        }
+      }
     });
   }
 
@@ -118,7 +146,13 @@ export class FirestoreCredentialsStore implements CredentialsStore {
         return undefined;
       }
 
-      const accessToken = (await this.storeRef(storeHash).get()).get("accessToken");
+      const snapshot = await this.storeRef(storeHash).get();
+      const accessToken = snapshot.get("accessToken");
+
+      // A tombstoned store is mid-uninstall: unknown to every caller.
+      if (snapshot.get("uninstalledAt") != null) {
+        return undefined;
+      }
 
       return typeof accessToken === "string" ? decrypt(accessToken) : undefined;
     });

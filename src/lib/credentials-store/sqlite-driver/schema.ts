@@ -8,7 +8,8 @@ export const CREATE_CREDENTIALS_STORE_SCHEMA = `
     store_hash TEXT NOT NULL UNIQUE,
     access_token TEXT NOT NULL,
     scope TEXT NOT NULL,
-    admin_user_id INTEGER NOT NULL
+    admin_user_id INTEGER NOT NULL,
+    uninstalled_at TEXT
   );
 
   CREATE TABLE IF NOT EXISTS users (

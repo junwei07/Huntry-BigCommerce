@@ -175,12 +175,14 @@ PATH="$JAVA_HOME/bin:$PATH" pnpm test:firestore`. CI needs JDK 21+ too.
     every authorization) is one get-by-id, no index.
   - `users/{userId}`: `email`, `storeHashes[]`, which answers "does this user
     have any store left" with no collection-group query.
-- **`deleteStore` is not `recursiveDelete`** (this corrects the earlier text).
-  The SQL drivers delete credentials rows only, and Huntry data outlives an
-  uninstall. Phase 3 puts Huntry data in subcollections of the same
-  `stores/{hash}` document, so the driver deletes the store document and its
-  `storeUsers` docs explicitly: deleting a document never deletes its other
-  subcollections. A contract test pins this.
+- **`deleteStore` is credentials-only, not `recursiveDelete`.** It deletes the
+  store document and its `storeUsers` docs explicitly (deleting a document never
+  deletes its other subcollections). Huntry data and images are wiped earlier in
+  the uninstall, so they do not outlive it: see `src/lib/bc-auth/uninstall-store.ts`
+  for the order, `HuntryRepository.storeData` (`repository/firestore/store-data.ts`,
+  `listCollections()` + `recursiveDelete`) and `deleteStoreImages`
+  (`storage/image-storage.ts`). The `uninstalledAt` field is the tombstone set
+  by `markStoreUninstalled`; `getStoreToken` answers `undefined` while it is set.
 - Setters merge and touch only their own fields (a re-install keeps the
   extension, script, page and webhook ids). `deleteUser` removes the user when no
   store links them any more, whether or not the link existed, as the SQL drivers

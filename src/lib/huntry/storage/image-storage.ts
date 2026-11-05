@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { getStorageBucket, requireStorageBucketName } from "@/lib/firebase/storage";
+import { getStorageBucket, getStorageBucketName, requireStorageBucketName } from "@/lib/firebase/storage";
+import { assertValidStoreHash } from "@/lib/firebase/store-hash";
+import { logError } from "@/lib/errors/logger";
 import { buildDownloadUrl, parseOwnedImagePath } from "@/lib/huntry/storage/image-urls";
 import { ImageKind, MAX_IMAGE_BYTES, sniffImage } from "@/lib/huntry/storage/image-validation";
 
@@ -9,6 +11,9 @@ export interface ImageObjectStore {
   bucketName(): string;
   save(params: { path: string; bytes: Uint8Array; contentType: string; token: string }): Promise<void>;
   remove(path: string): Promise<void>;
+  // Deletes every object whose path starts with `prefix`. A no-op when no
+  // bucket is configured (local dev has no image storage).
+  removePrefix(prefix: string): Promise<void>;
 }
 
 const firebaseObjectStore: ImageObjectStore = {
@@ -32,6 +37,15 @@ const firebaseObjectStore: ImageObjectStore = {
     const bucket = await getStorageBucket();
 
     await bucket.file(path).delete({ ignoreNotFound: true });
+  },
+  async removePrefix(prefix) {
+    if (!getStorageBucketName()) {
+      return;
+    }
+
+    const bucket = await getStorageBucket();
+
+    await bucket.deleteFiles({ prefix });
   },
 };
 
@@ -88,5 +102,32 @@ export async function deleteImageByUrl(url: string | null | undefined, storeHash
     }
   } catch (error) {
     console.error("[image-storage] failed to delete image", error);
+  }
+}
+
+// GCS surfaces HTTP status as a numeric `code` on the error.
+function isStorageConfigError(error: unknown): boolean {
+  const code = (error as { code?: unknown } | null)?.code;
+
+  return code === 403 || code === 404;
+}
+
+// Deletes every image the store uploaded (all live under `{storeHash}/`, see
+// uploadImage). Used on uninstall. The hash is validated first so an empty or
+// malformed value can never turn the prefix into the whole bucket. Config
+// errors (bucket missing, permission denied) are logged and swallowed so a bad
+// bucket setup cannot block the uninstall forever; anything else (transient)
+// throws so the route returns 500 and BigCommerce retries.
+export async function deleteStoreImages(storeHash: string): Promise<void> {
+  assertValidStoreHash(storeHash);
+
+  try {
+    await objectStore.removePrefix(`${storeHash}/`);
+  } catch (error) {
+    if (!isStorageConfigError(error)) {
+      throw error;
+    }
+
+    logError(`deleteStoreImages: store "${storeHash}" (config error, images left in place)`, error);
   }
 }

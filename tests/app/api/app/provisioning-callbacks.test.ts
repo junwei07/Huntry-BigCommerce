@@ -40,8 +40,28 @@ const deleteStoreMock = vi.fn(async () => {
   order.push("deleteStore");
 });
 
+const markUninstalledMock = vi.fn(async (_storeHash: string) => {
+  order.push("markStoreUninstalled");
+});
+
 vi.mock("@/lib/credentials-store/get-credentials-store", () => ({
-  getCredentialsStore: () => ({ deleteStore: deleteStoreMock }),
+  getCredentialsStore: () => ({ deleteStore: deleteStoreMock, markStoreUninstalled: markUninstalledMock }),
+}));
+
+const deleteImagesMock = vi.fn(async (_storeHash: string) => {
+  order.push("deleteStoreImages");
+});
+
+vi.mock("@/lib/huntry/storage/image-storage", () => ({
+  deleteStoreImages: (storeHash: string) => deleteImagesMock(storeHash),
+}));
+
+const deleteAllStoreDataMock = vi.fn(async (_storeHash: string) => {
+  order.push("deleteAllStoreData");
+});
+
+vi.mock("@/lib/huntry/repository/get-huntry-repository", () => ({
+  getHuntryRepository: () => ({ storeData: { deleteAllStoreData: deleteAllStoreDataMock } }),
 }));
 
 vi.mock("@/lib/bc-auth/verify-signed-payload", () => ({
@@ -88,12 +108,31 @@ describe("GET /api/app/load", () => {
 });
 
 describe("uninstallStore", () => {
-  it("removes the Huntry page before the store row (and token) is deleted", async () => {
+  it("closes the store, wipes images and Huntry data, and deletes credentials last", async () => {
     const { uninstallStore } = await import("@/lib/bc-auth/uninstall-store");
 
     await uninstallStore("jwt");
 
     expect(removeMock).toHaveBeenCalledWith("abc123");
-    expect(order).toEqual(["removeStorefrontPage", "deleteStore"]);
+    expect(markUninstalledMock).toHaveBeenCalledWith("abc123");
+    expect(deleteImagesMock).toHaveBeenCalledWith("abc123");
+    expect(deleteAllStoreDataMock).toHaveBeenCalledWith("abc123");
+    expect(order).toEqual([
+      "removeStorefrontPage",
+      "markStoreUninstalled",
+      "deleteStoreImages",
+      "deleteAllStoreData",
+      "deleteStore",
+    ]);
+  });
+
+  it("keeps the credentials when a wipe step fails, so the retry can finish", async () => {
+    deleteImagesMock.mockRejectedValueOnce(new Error("storage unavailable"));
+    const { uninstallStore } = await import("@/lib/bc-auth/uninstall-store");
+
+    await expect(uninstallStore("jwt")).rejects.toThrow("storage unavailable");
+
+    expect(deleteStoreMock).not.toHaveBeenCalled();
+    expect(deleteAllStoreDataMock).not.toHaveBeenCalled();
   });
 });

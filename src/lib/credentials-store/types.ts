@@ -81,6 +81,14 @@ export interface CredentialsStore {
   setStoreWebhook(storeWebhook: StoreWebhookRecord): Promise<void>;
   getStoreWebhook(storeHash: string, scope: string): Promise<string | undefined>;
   isStoreUserLinked(storeHash: string, userId: number): Promise<boolean>;
+  // Closes a store at the start of an uninstall: getStoreToken answers
+  // undefined from here on, so every route that resolves a store (admin,
+  // storefront, webhooks) treats it as unknown while its data is being wiped.
+  // setStore (a reinstall) clears it. Idempotent; a missing store is a no-op.
+  markStoreUninstalled(storeHash: string): Promise<void>;
+  // Removes the credentials rows only (store, links, extension/script/page/
+  // webhook ids, orphaned users). Huntry's own data and images are deleted
+  // beforehand by uninstallStore (HuntryRepository.storeData, image-storage).
   deleteStore(storeHash: string): Promise<void>;
   deleteUser(storeHash: string, userId: number): Promise<void>;
 }

@@ -153,6 +153,35 @@ describe.each(drivers)("$name", ({ create }) => {
     expect(await store.isStoreUserLinked(storeB, userId)).toBe(false);
   });
 
+  it("markStoreUninstalled hides the store's token, leaves others alone, and a reinstall reopens it", async () => {
+    const store = create();
+    const storeHash = newStoreHash();
+    const other = newStoreHash();
+    const userId = newUserId();
+
+    await store.setStore({ storeHash, accessToken: "token-1", scope: "s", adminUserId: userId });
+    await store.setStore({ storeHash: other, accessToken: "token-other", scope: "s", adminUserId: userId });
+
+    await store.markStoreUninstalled(storeHash);
+    await store.markStoreUninstalled(storeHash); // idempotent
+
+    expect(await store.getStoreToken(storeHash)).toBeUndefined();
+    expect(await store.getStoreToken(other)).toBe("token-other");
+
+    await store.setStore({ storeHash, accessToken: "token-2", scope: "s", adminUserId: userId });
+
+    expect(await store.getStoreToken(storeHash)).toBe("token-2");
+  });
+
+  it("markStoreUninstalled on a store that was never installed is a no-op", async () => {
+    const store = create();
+    const storeHash = newStoreHash();
+
+    await store.markStoreUninstalled(storeHash);
+
+    expect(await store.getStoreToken(storeHash)).toBeUndefined();
+  });
+
   it("deleteStore removes that store and its links but leaves other stores alone", async () => {
     const store = create();
     const storeA = newStoreHash();
@@ -312,7 +341,7 @@ describe.skipIf(!useFirestore)("FirestoreCredentialsStore specifics", () => {
     expect((await users.doc(String(userId)).get()).exists).toBe(false);
   });
 
-  it("deleteStore leaves the store's other subcollections (Huntry data) in place", async () => {
+  it("deleteStore is credentials-only: Huntry data is wiped earlier by HuntryRepository.storeData", async () => {
     const storeHash = newStoreHash();
     const event = getFirestoreDb().collection("stores").doc(storeHash).collection("events").doc("1");
 
