@@ -189,3 +189,23 @@ scoped under .huntry-cards* so nothing leaks into the merchant's theme.
 .huntry-page-nav__item--active {
   border-bottom-color: #eb711b;
 }
+
+/* Loading state shown while the hunts load (renderLoading in cards-view.ts). */
+.huntry-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+.huntry-loading__spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e3e3e8;
+  border-top-color: #6b6b76;
+  border-radius: 50%;
+  animation: huntry-spin 0.8s linear infinite;
+}
+@keyframes huntry-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -50,10 +50,19 @@ interface FakeNode {
 }
 
 function fakeNode(tag: string): FakeNode {
+  let text = "";
   const node: FakeNode = {
     tag,
     className: "",
-    textContent: "",
+    // Like the DOM, assigning textContent drops the children: the loader clears
+    // its container this way (renderLoading, then the real view).
+    get textContent() {
+      return text;
+    },
+    set textContent(value: string) {
+      text = value;
+      node.children.length = 0;
+    },
     dataset: {},
     children: [],
     hidden: false,
@@ -328,7 +337,7 @@ describe("storefront loader", () => {
     );
     await runLoader();
 
-    // The stand-in node does not clear its children on `textContent = ""`, so a redraw leaves the old grid first.
+    // Take the last grid: a redraw replaces the old one.
     const grid = () => container.children.filter((child) => child.className === "huntry-cards").at(-1);
 
     expect(grid()?.children[0]?.tag).toBe("div");

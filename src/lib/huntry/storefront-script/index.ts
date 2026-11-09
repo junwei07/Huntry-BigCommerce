@@ -1,7 +1,7 @@
 import { fetchMapData, fetchMyRewards, fetchPlayerStatus, isLoggedIn, submitClaim } from "./api";
 import { isCartPage, startCartGuard } from "./cart-guard";
 import { isCheckoutArea, isCheckoutPage, startCheckoutGuard } from "./checkout-guard";
-import { listingUrl, renderListing, renderNotFound, renderNotStarted } from "./cards-view";
+import { listingUrl, renderListing, renderLoading, renderNotFound, renderNotStarted } from "./cards-view";
 import { startClaimUi } from "./claim-ui";
 import { startCtas } from "./cta";
 import { showHuntFullPrompt, showJoinPrompt } from "./claim-ui/dom-ui";
@@ -36,6 +36,23 @@ export interface HuntryStorefrontApi {
   map?: HuntryMapApi;
 }
 
+const mapScriptUrl = (config: StorefrontConfig) =>
+  `${config.appOrigin}/api/public/huntry/${encodeURIComponent(config.storeHash)}/storefront-map.js`;
+
+// Starts the map download without running it, so loadMapScript() later finds it
+// in the cache. Only called on a live hunt's map page.
+function preloadMapScript(config: StorefrontConfig): void {
+  if (document.querySelector("link[data-huntry-map-preload]")) return;
+
+  const link = document.createElement("link");
+
+  link.rel = "preload";
+  link.as = "script";
+  link.href = mapScriptUrl(config);
+  link.dataset.huntryMapPreload = "";
+  document.head.appendChild(link);
+}
+
 // maplibre is ~1 MB, so the map is its own script: pages without a Huntry
 // container, or with no live events, never download it. Idempotent so a
 // double-loaded loader can't mount two maps.
@@ -44,7 +61,7 @@ function loadMapScript(config: StorefrontConfig): void {
 
   const script = document.createElement("script");
 
-  script.src = `${config.appOrigin}/api/public/huntry/${encodeURIComponent(config.storeHash)}/storefront-map.js`;
+  script.src = mapScriptUrl(config);
   script.async = true;
   script.dataset.huntryMapScript = "";
   document.head.appendChild(script);
@@ -101,6 +118,10 @@ async function start(): Promise<void> {
     return;
   }
 
+  // Replace the page body's static fallback text right away: the data fetch
+  // below can take seconds.
+  renderLoading(container);
+
   const params = new URLSearchParams(window.location.search);
   const slug = params.get("event")?.trim() || undefined;
   const view = readView(window.location.search, window.location.hash);
@@ -130,9 +151,16 @@ async function start(): Promise<void> {
     case "map":
       // A live event's map is for signed-in customers only. Guests get the
       // fullscreen hunt shell (title bar, back link, countdown) with the login
-      // prompt on top, and never download maplibre. Client-side only, like the
+      // prompt on top, and never run maplibre. Client-side only, like the
       // plugin: the coordinates are still in the public map-data.
-      if (!(await isLoggedIn(config))) {
+      // The bundle is only preloaded (downloaded, not run) while the checks are in
+      // flight, so a logged-in player's map starts at once; guests pay the download
+      // but never execute it.
+      preloadMapScript(config);
+
+      const [loggedIn, status] = await Promise.all([isLoggedIn(config), fetchPlayerStatus(config, mode.event.id)]);
+
+      if (!loggedIn) {
         enterFullscreen(container, {
           title: mode.event.name,
           backHref: listingUrl(),
@@ -145,7 +173,7 @@ async function start(): Promise<void> {
 
       // A full hunt is closed to customers who hold no claim yet (the claims
       // route enforces the same cap). Block before the map downloads.
-      if ((await fetchPlayerStatus(config, mode.event.id)).full) {
+      if (status.full) {
         enterFullscreen(container, {
           title: mode.event.name,
           backHref: listingUrl(),

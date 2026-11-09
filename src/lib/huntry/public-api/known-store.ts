@@ -10,15 +10,49 @@ import { buildPreflightHeaders } from "@/lib/huntry/public-api/cors";
 // must not widen what they accept, so do not merge the two.
 const STORE_HASH_PATTERN = /^[a-z0-9]{1,32}$/;
 
+// How long a store that passed the check below is trusted without asking the
+// credentials store again (an in-process memo, one Firestore read + decrypt per
+// public request otherwise). Positive results only; short, so an uninstall takes
+// effect quickly.
+const KNOWN_STORE_TTL_MS = 60 * 1000;
+
+const knownStores = new Map<string, number>();
+
 // The gate every public (cookie-less) route runs first, so CORS resolution —
 // which calls BigCommerce — and any data lookup never run for an arbitrary
 // attacker-chosen store hash. MOCK/STATIC have no per-store credentials row to
 // check.
 export async function isKnownStore(storeHash: string): Promise<boolean> {
-  return (
-    STORE_HASH_PATTERN.test(storeHash) &&
-    (getDataMode() !== "MULTITENANT" || Boolean(await getCredentialsStore().getStoreToken(storeHash)))
-  );
+  if (!STORE_HASH_PATTERN.test(storeHash)) {
+    return false;
+  }
+
+  if (getDataMode() !== "MULTITENANT") {
+    return true;
+  }
+
+  const knownUntil = knownStores.get(storeHash);
+
+  if (knownUntil !== undefined && knownUntil > Date.now()) {
+    return true;
+  }
+
+  const known = Boolean(await getCredentialsStore().getStoreToken(storeHash));
+
+  // Only a hit is remembered, so a store that has just installed is recognized at
+  // once; an uninstalled one is forgotten within KNOWN_STORE_TTL_MS.
+  if (known) {
+    knownStores.set(storeHash, Date.now() + KNOWN_STORE_TTL_MS);
+  } else {
+    knownStores.delete(storeHash);
+  }
+
+  return known;
+}
+
+// For tests.
+export function clearKnownStoreCache(): void {
+  knownStores.clear();
 }
 
 // The OPTIONS handler shared by the public POST routes. Only a known store gets

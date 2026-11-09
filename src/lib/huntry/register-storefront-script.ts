@@ -162,8 +162,7 @@ export async function findOrCreateStorefrontScript(restApiClient: BcRestApiClien
 // yet — same reasoning as register-app-extension.ts's registerAppExtension.
 //
 // Deliberately never throws: a failed registration shouldn't block install.
-// Logged rather than silently swallowed. A user-triggered retry action is
-// Week 2 work (BC-HUN-011/012), once there's a Huntry admin page to host it.
+// Logged rather than silently swallowed.
 // Brings an already-installed store's script up to date (visibility, src,
 // consent category) without a reinstall: reconcile only ever ran at install, so
 // a store installed before a change — or one whose install-time update failed —

@@ -8,9 +8,10 @@ vi.mock("@/lib/credentials-store/get-credentials-store", () => ({
 }));
 vi.mock("@/lib/huntry/public-api/cors", () => ({ buildPreflightHeaders }));
 
-import { handlePublicPreflight, isKnownStore } from "@/lib/huntry/public-api/known-store";
+import { clearKnownStoreCache, handlePublicPreflight, isKnownStore } from "@/lib/huntry/public-api/known-store";
 
 beforeEach(() => {
+  clearKnownStoreCache();
   getStoreToken.mockReset().mockResolvedValue({ accessToken: "t" });
   buildPreflightHeaders.mockReset().mockResolvedValue({ "Access-Control-Allow-Origin": "https://shop.example.com" });
 });
@@ -57,6 +58,19 @@ describe("isKnownStore", () => {
       getStoreToken.mockResolvedValue(undefined);
 
       await expect(isKnownStore("abc123")).resolves.toBe(false);
+    });
+
+    it("remembers a known store, but never an unknown one", async () => {
+      await isKnownStore("abc123");
+      await isKnownStore("abc123");
+
+      expect(getStoreToken).toHaveBeenCalledTimes(1);
+
+      getStoreToken.mockResolvedValue(undefined);
+      await isKnownStore("def456");
+      await isKnownStore("def456");
+
+      expect(getStoreToken).toHaveBeenCalledTimes(3);
     });
 
     it("does not look up a malformed hash at all", async () => {

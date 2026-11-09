@@ -8,7 +8,8 @@ import {
   resolveLocationMarkerUrl,
 } from "@/lib/huntry/events/marker-urls";
 import { EventThemeColors, HuntryEvent } from "@/lib/huntry/events/types";
-import { fetchReward } from "@/lib/huntry/rewards/rewards-api";
+import { DEFAULT_QUERY as DEFAULT_REWARDS_QUERY } from "@/lib/huntry/rewards/query";
+import { fetchRewards } from "@/lib/huntry/rewards/rewards-api";
 import { getAbsoluteAppUrl } from "@/lib/routing/app-url";
 
 // The public, unauthenticated shape of GET .../map-data. Built field by field
@@ -80,15 +81,16 @@ export function toPublicAssetUrl(url: string | null): string | null {
   return /^https?:\/\//i.test(url) ? url : null;
 }
 
-async function buildPublicEvent(event: HuntryEvent, storeHash: string): Promise<PublicMapEvent> {
-  const [eggs, fullEggIds] = await Promise.all([
+async function buildPublicEvent(
+  event: HuntryEvent,
+  storeHash: string,
+  rewardNamesPromise: Promise<Map<number, string>>,
+): Promise<PublicMapEvent> {
+  const [eggs, fullEggIds, rewardNames] = await Promise.all([
     fetchEggs(event.id, storeHash),
     fetchFullEggIds(event.id, event.eggClaimCapacity, storeHash),
+    rewardNamesPromise,
   ]);
-
-  const rewardIds = [...new Set(eggs.map((egg) => egg.rewardId))];
-  const rewards = await Promise.all(rewardIds.map((rewardId) => fetchReward(rewardId, storeHash)));
-  const rewardNames = new Map(rewards.flatMap((reward) => (reward ? [[reward.id, reward.name] as const] : [])));
 
   const { itemMarker, locationMarker, colors } = event.theme;
 
@@ -143,5 +145,16 @@ export async function buildPublicMapData(storeHash: string, eventSlug?: string):
           : [],
       );
 
-  return { events: await Promise.all(live.map((event) => buildPublicEvent(event, storeHash))), upcoming };
+  if (live.length === 0) {
+    return { events: [], upcoming };
+  }
+
+  // One rewards read started alongside every event's eggs, instead of a
+  // per-reward read after the eggs are known: the names are all this payload
+  // needs, and it keeps the build to two sequential reads (events, then the rest).
+  const rewardNames = fetchRewards(DEFAULT_REWARDS_QUERY, storeHash).then(
+    (rewards) => new Map(rewards.map((reward) => [reward.id, reward.name] as const)),
+  );
+
+  return { events: await Promise.all(live.map((event) => buildPublicEvent(event, storeHash, rewardNames))), upcoming };
 }

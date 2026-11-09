@@ -203,6 +203,20 @@ export function renderListing(
   return stop;
 }
 
+// Shown the moment the loader finds its container, replacing the page body's
+// static fallback text while the map data and login checks are in flight.
+export function renderLoading(container: HTMLElement): void {
+  injectStyles();
+  container.textContent = "";
+
+  const loading = element("div", "huntry-loading");
+
+  loading.setAttribute("role", "status");
+  loading.setAttribute("aria-label", "Loading");
+  loading.appendChild(element("span", "huntry-loading__spinner"));
+  container.appendChild(loading);
+}
+
 export function renderNotFound(container: HTMLElement): void {
   injectStyles();
   container.textContent = "";
