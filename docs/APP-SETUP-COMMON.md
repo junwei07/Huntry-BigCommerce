@@ -28,7 +28,7 @@ BigCommerce rejects a mismatch.
 On the **Scopes** tab, enable at minimum:
 
 * **Marketing**: modify
-* **Customers**: modify 
+* **Customers**: read-only
 * **Content**: modify
 * **Products**: read-only 
 * **Information & Settings**: read-only 
