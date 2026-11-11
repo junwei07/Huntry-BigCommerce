@@ -1,16 +1,18 @@
 "use client";
 
-import { Box, Flex, FlexItem, Input, Small } from "@bigcommerce/big-design";
+import { Box, Flex, FlexItem, Small } from "@bigcommerce/big-design";
+import { LogoUploadField } from "@/components/huntry/sponsors/logo-upload-field";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 import { EventItemMarker, getItemMarkerPresetUrls, ITEM_MARKER_PRESET_COUNT } from "@/lib/huntry/events/types";
 
 const THUMB_SIZE = "40px";
+const THUMB_BOX = "96px";
+const ICON_CAPTION = "JPEG, PNG or WebP.";
 
 // Ported from huntry/includes/events/index.php's "Item markers" section —
 // one preset picks BOTH the unclaimed and claimed icon together (18 linked
-// pairs), or a custom pair of URLs. No real file upload exists in this
-// picker (the bucket uploads cover banners and logos only — docs/MIGRATION.md §8), so "custom" is two
-// URL inputs rather than an upload widget. See docs/HUNTRY-UI-REFERENCE.md.
+// pairs), or a custom pair of uploaded images (Firebase Storage, validated
+// server-side by resolveEventMarkers). See docs/HUNTRY-UI-REFERENCE.md.
 export function ItemMarkerPicker({
   value,
   onChange,
@@ -24,8 +26,8 @@ export function ItemMarkerPicker({
     <Box marginBottom="medium">
       <Small marginBottom="none">Item markers</Small>
       <Small marginBottom="xSmall" style={{ color: HUNTRY_COLORS.textMuted }}>
-        Pick a pair from the library — one choice sets both the unclaimed and claimed look together — or provide
-        your own icon URLs.
+        Pick a pair from the library — one choice sets both the unclaimed and claimed look together — or upload
+        your own icons.
       </Small>
 
       <Flex flexGap="0.5rem" flexWrap="wrap">
@@ -90,19 +92,31 @@ export function ItemMarkerPicker({
       </Flex>
 
       {isCustom && (
-        <Flex flexGap="1rem" marginTop="small">
-          <FlexItem flexGrow={1}>
-            <Input
-              label="Unclaimed icon URL"
-              onChange={(event) => onChange({ ...value, unclaimedIconUrl: event.target.value })}
-              value={value.unclaimedIconUrl ?? ""}
+        <Flex flexGap="1.5rem" flexWrap="wrap" marginTop="small">
+          <FlexItem style={{ width: "140px" }}>
+            <LogoUploadField
+              altText="Unclaimed marker preview"
+              ariaLabel="Upload unclaimed marker icon"
+              caption={ICON_CAPTION}
+              height={THUMB_BOX}
+              kind="event-item-marker"
+              label="Unclaimed icon"
+              onUploaded={(url) => onChange({ ...value, unclaimedIconUrl: url })}
+              previewUrl={value.unclaimedIconUrl || getItemMarkerPresetUrls(1).unclaimedUrl}
+              width={THUMB_BOX}
             />
           </FlexItem>
-          <FlexItem flexGrow={1}>
-            <Input
-              label="Claimed icon URL"
-              onChange={(event) => onChange({ ...value, claimedIconUrl: event.target.value })}
-              value={value.claimedIconUrl ?? ""}
+          <FlexItem style={{ width: "140px" }}>
+            <LogoUploadField
+              altText="Claimed marker preview"
+              ariaLabel="Upload claimed marker icon"
+              caption={ICON_CAPTION}
+              height={THUMB_BOX}
+              kind="event-item-marker"
+              label="Claimed icon"
+              onUploaded={(url) => onChange({ ...value, claimedIconUrl: url })}
+              previewUrl={value.claimedIconUrl || getItemMarkerPresetUrls(1).claimedUrl}
+              width={THUMB_BOX}
             />
           </FlexItem>
         </Flex>

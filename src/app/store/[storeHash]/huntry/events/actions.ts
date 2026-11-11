@@ -8,7 +8,7 @@ import { countEvents, createEvent, isUniqueSlugConstraintError } from "@/lib/hun
 import { EVENT_LIMIT_MESSAGE, MAX_EVENTS } from "@/lib/huntry/events/limits";
 import { eventFormSchema, EventFormInput } from "@/lib/huntry/events/event-form-schema";
 import { DEFAULT_EVENT_BANNER_URL } from "@/lib/huntry/events/types";
-import { INVALID_IMAGE_MESSAGE, resolveImageField } from "@/lib/huntry/storage/resolve-image-field";
+import { INVALID_IMAGE_MESSAGE, resolveEventMarkers, resolveImageField } from "@/lib/huntry/storage/resolve-image-field";
 import { toSafeMessage } from "@/lib/errors/app-error";
 import { logError } from "@/lib/errors/logger";
 
@@ -45,7 +45,9 @@ export async function createHuntryEvent(input: EventFormInput, storeHash: string
     storeHash,
   });
 
-  if (!banner.ok) {
+  const markers = resolveEventMarkers({ itemMarker, locationMarker, current: undefined, storeHash });
+
+  if (!banner.ok || !markers.ok) {
     return { success: false, message: INVALID_IMAGE_MESSAGE };
   }
 
@@ -66,7 +68,7 @@ export async function createHuntryEvent(input: EventFormInput, storeHash: string
         markerRadiusMeters,
         maxGrabCount,
         eggClaimCapacity,
-        theme: { colors: themeColors, itemMarker, locationMarker },
+        theme: { colors: themeColors, itemMarker: markers.itemMarker, locationMarker: markers.locationMarker },
         // is_featured/featured_order aren't collected by this form at all —
         // they're a separate ticket's territory (editing/archiving/featured).
         isFeatured: false,

@@ -33,14 +33,14 @@ const eventThemeColorsSchema = z.object({
 const eventItemMarkerSchema = z.object({
   source: z.enum(["preset", "custom"]),
   presetIndex: z.number().int().min(1).max(ITEM_MARKER_PRESET_COUNT).nullable(),
-  unclaimedIconUrl: z.string().trim().nullable(),
-  claimedIconUrl: z.string().trim().nullable(),
+  unclaimedIconUrl: z.string().trim().max(2048).nullable(),
+  claimedIconUrl: z.string().trim().max(2048).nullable(),
 });
 
 const eventLocationMarkerSchema = z.object({
   source: z.enum(["preset", "custom"]),
   presetIndex: z.number().int().min(1).max(LOCATION_MARKER_PRESET_COUNT).nullable(),
-  iconUrl: z.string().trim().nullable(),
+  iconUrl: z.string().trim().max(2048).nullable(),
 });
 
 // markerRadiusMeters/maxGrabCount/eggClaimCapacity bounds are sourced from

@@ -1,14 +1,15 @@
 "use client";
 
-import { Box, Flex, Input, Small } from "@bigcommerce/big-design";
+import { Box, Flex, Small } from "@bigcommerce/big-design";
+import { LogoUploadField } from "@/components/huntry/sponsors/logo-upload-field";
 import { HUNTRY_COLORS } from "@/lib/huntry/theme";
 import { EventLocationMarker, getLocationMarkerPresetUrl, LOCATION_MARKER_PRESET_COUNT } from "@/lib/huntry/events/types";
 
 const THUMB_SIZE = "48px";
 
 // Ported from huntry/includes/events/index.php's "Player location marker"
-// section — 4 presets or a custom icon URL. Same no-real-upload reasoning
-// as ItemMarkerPicker — see docs/HUNTRY-UI-REFERENCE.md.
+// section — 4 presets or a custom uploaded icon (same pipeline as
+// ItemMarkerPicker) — see docs/HUNTRY-UI-REFERENCE.md.
 export function LocationMarkerPicker({
   value,
   onChange,
@@ -75,10 +76,14 @@ export function LocationMarkerPicker({
 
       {isCustom && (
         <Box marginTop="small">
-          <Input
-            label="Icon URL"
-            onChange={(event) => onChange({ ...value, iconUrl: event.target.value })}
-            value={value.iconUrl ?? ""}
+          <LogoUploadField
+            altText="Location marker preview"
+            ariaLabel="Upload location marker icon"
+            caption="JPEG, PNG or WebP."
+            kind="event-location-marker"
+            label="Custom icon"
+            onUploaded={(url) => onChange({ ...value, iconUrl: url })}
+            previewUrl={value.iconUrl || getLocationMarkerPresetUrl(1)}
           />
         </Box>
       )}

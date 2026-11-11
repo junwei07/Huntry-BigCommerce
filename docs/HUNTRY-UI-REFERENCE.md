@@ -168,11 +168,10 @@ export interface EventTheme {
   `public/huntry/markers/location/current_marker_N.png` (N = 1–4, copied
   from `huntry/assets/images/location-markers/`). Resolve via
   `getLocationMarkerPresetUrl(presetIndex)`.
-- **No real file upload** for "custom" in either marker section — no
-  object storage existed at the time (same constraint as
-  `headerBannerUrl` below), so "custom" is a URL text input, not an
-  upload widget. Labeled honestly (e.g. "Unclaimed icon URL"), not
-  presented as a fake upload button.
+- **"Custom" is an image upload** in both marker sections
+  (`LogoUploadField`, kinds `event-item-marker` / `event-location-marker`);
+  the Server Actions validate via `resolveEventMarkers`
+  (`storage/resolve-image-field.ts`).
 - None of the three sections are required (the WP form has no `required`
   attribute on any of them) — `DEFAULT_ITEM_MARKER`/`DEFAULT_LOCATION_MARKER`
   (`source: "preset"`, `presetIndex: null`) represent "nothing configured,"
@@ -231,8 +230,8 @@ after EVMS's `add_event_dialog.dart`/`add_company_dialog.dart`), uploads on sele
 | Featured button logo / banner image | `FeaturedFormInput.bannerLogoUrl` / `bannerImageUrl` | `DEFAULT_BANNER_LOGO_URL` / `DEFAULT_BANNER_IMAGE_URL` (`featured/types.ts`) |
 
 On edit a blank or unchanged URL keeps the current image (the update actions already re-fetch uncached, as for
-`isFeatured`/`featuredOrder`). Rewards have no image field. The marker "custom URL" fields are still plain
-URLs by design, not uploads. Without `FIREBASE_STORAGE_BUCKET` the control is preview-only and says so.
+`isFeatured`/`featuredOrder`). Rewards have no image field. The marker "custom" icons are uploads too (`event-item-marker`,
+`event-location-marker`); empty means no custom icon, not "keep current". Without `FIREBASE_STORAGE_BUCKET` the control is preview-only and says so.
 
 ## Editing and deleting: kebab menu, per-record actions
 

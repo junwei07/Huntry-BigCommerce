@@ -11,7 +11,7 @@ import { eventFormSchema, EventFormInput } from "@/lib/huntry/events/event-form-
 import { resolveStoreHash } from "@/lib/bc-api-client/resolve-store-credentials";
 import { DEFAULT_EVENT_BANNER_URL } from "@/lib/huntry/events/types";
 import { deleteImageByUrl } from "@/lib/huntry/storage/image-storage";
-import { INVALID_IMAGE_MESSAGE, resolveImageField } from "@/lib/huntry/storage/resolve-image-field";
+import { INVALID_IMAGE_MESSAGE, markerUrlsOf, resolveEventMarkers, resolveImageField } from "@/lib/huntry/storage/resolve-image-field";
 
 const EVENT_NOT_FOUND_MESSAGE =
   "That event no longer exists. It may have been deleted — reload the page to see the current list.";
@@ -60,7 +60,9 @@ export async function updateHuntryEvent(id: number, input: EventFormInput, store
       storeHash,
     });
 
-    if (!banner.ok) {
+    const markers = resolveEventMarkers({ itemMarker, locationMarker, current: existing.theme, storeHash });
+
+    if (!banner.ok || !markers.ok) {
       return { success: false, message: INVALID_IMAGE_MESSAGE };
     }
 
@@ -75,7 +77,7 @@ export async function updateHuntryEvent(id: number, input: EventFormInput, store
         markerRadiusMeters,
         maxGrabCount,
         eggClaimCapacity,
-        theme: { colors: themeColors, itemMarker, locationMarker },
+        theme: { colors: themeColors, itemMarker: markers.itemMarker, locationMarker: markers.locationMarker },
         isFeatured: existing.isFeatured,
         featuredOrder: existing.featuredOrder,
       },
@@ -88,6 +90,14 @@ export async function updateHuntryEvent(id: number, input: EventFormInput, store
 
     if (existing.headerBannerUrl !== banner.url) {
       await deleteImageByUrl(existing.headerBannerUrl, resolveStoreHash(storeHash));
+    }
+
+    const keptMarkerUrls = new Set(markerUrlsOf({ itemMarker: markers.itemMarker, locationMarker: markers.locationMarker }));
+
+    for (const oldUrl of markerUrlsOf(existing.theme)) {
+      if (!keptMarkerUrls.has(oldUrl)) {
+        await deleteImageByUrl(oldUrl, resolveStoreHash(storeHash));
+      }
     }
 
     updateTag(EVENTS_LIST_TAG);
@@ -134,6 +144,10 @@ export async function deleteHuntryEvent(id: number, storeHash: string | undefine
     }
 
     await deleteImageByUrl(existing?.headerBannerUrl, resolveStoreHash(storeHash));
+
+    for (const markerUrl of markerUrlsOf(existing?.theme)) {
+      await deleteImageByUrl(markerUrl, resolveStoreHash(storeHash));
+    }
   } catch (error) {
     return actionFailure(`deleteHuntryEvent: event ${id}`, error, "Failed to delete the event.");
   }

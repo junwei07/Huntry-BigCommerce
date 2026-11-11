@@ -10,7 +10,7 @@ import { ImageKind, MAX_IMAGE_BYTES } from "@/lib/huntry/storage/image-validatio
 const BOX_SIZE = "96px";
 
 const PREVIEW_ONLY_CAPTION = "Preview only — image uploads aren't configured for this environment.";
-const UPLOAD_CAPTION = "JPEG, PNG or WebP, up to 5 MB.";
+const UPLOAD_CAPTION = "JPEG, PNG or WebP.";
 
 // A tap-to-upload box, the interaction huntry/EVMS's own image pickers use
 // (add_event_dialog.dart / add_company_dialog.dart — tap a bordered box,
@@ -28,6 +28,7 @@ export function LogoUploadField({
   ariaLabel = "Change sponsor logo",
   altText = "Sponsor logo preview",
   width = BOX_SIZE,
+  height = BOX_SIZE,
   caption,
   kind,
   onUploaded,
@@ -37,6 +38,7 @@ export function LogoUploadField({
   ariaLabel?: string;
   altText?: string;
   width?: string;
+  height?: string;
   caption?: string;
   kind?: ImageKind;
   onUploaded?: (url: string) => void;
@@ -55,6 +57,15 @@ export function LogoUploadField({
       }
     };
   }, [objectUrl]);
+
+  // The parent owns the saved value: once previewUrl changes (an upload was
+  // accepted, or the field was reset) the local preview is stale.
+  const [seenPreviewUrl, setSeenPreviewUrl] = useState(previewUrl);
+
+  if (seenPreviewUrl !== previewUrl) {
+    setSeenPreviewUrl(previewUrl);
+    setObjectUrl(null);
+  }
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const input = event.target;
@@ -121,7 +132,7 @@ export function LogoUploadField({
           border: "1px solid rgba(0,0,0,0.15)",
           borderRadius: "12px",
           cursor: "pointer",
-          height: BOX_SIZE,
+          height,
           overflow: "hidden",
           padding: 0,
           position: "relative",
@@ -132,7 +143,7 @@ export function LogoUploadField({
         {/* eslint-disable-next-line @next/next/no-img-element -- local preview (object URL) or a public/ static asset, neither benefits from next/image */}
         <img
           alt={altText}
-          height={BOX_SIZE}
+          height={height}
           src={objectUrl ?? previewUrl}
           style={{ objectFit: "cover" }}
           width={width}
@@ -156,7 +167,7 @@ export function LogoUploadField({
         </Box>
       </button>
 
-      <input accept="image/*" onChange={handleFileChange} ref={inputRef} style={{ display: "none" }} type="file" />
+      <input accept="image/jpeg,image/png,image/webp" onChange={handleFileChange} ref={inputRef} style={{ display: "none" }} type="file" />
 
       <Small marginTop="xSmall" style={{ color: error ? "#C0392B" : HUNTRY_COLORS.textMuted, maxWidth: "280px" }}>
         {error ?? (isUploading ? "Uploading…" : (caption ?? (canUpload ? UPLOAD_CAPTION : PREVIEW_ONLY_CAPTION)))}

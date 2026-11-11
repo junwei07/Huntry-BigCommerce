@@ -10,6 +10,8 @@ export const IMAGE_KINDS = [
   "featured-banner",
   "featured-logo",
   "reward-image",
+  "event-item-marker",
+  "event-location-marker",
 ] as const;
 
 export type ImageKind = (typeof IMAGE_KINDS)[number];
