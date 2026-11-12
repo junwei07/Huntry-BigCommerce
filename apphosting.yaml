@@ -7,7 +7,7 @@
 #   firebase apphosting:secrets:set CREDENTIALS_ENCRYPTION_KEY
 
 runConfig:
-  minInstances: 1
+  minInstances: 0
   maxInstances: 5
   # The default (false) can cut off the after() provisioning work in
   # src/app/api/app/load/route.ts.
